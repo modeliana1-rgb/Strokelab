@@ -8,7 +8,7 @@ aparece la fatiga y por qué** (SHAP), y medidas de codos, hombros, caderas, rod
 
 - Todo se ejecuta **en local, en CPU**, en el portátil personal de Diana (Windows). No usar Colab salvo que lo pida.
 - Programa principal: `python analizar.py "<vídeo>" --nadador "<nombre>"` (ver README para opciones).
-- Pruebas antes de cada commit: `python tests/test_local.py`, `tests/test_sesion.py` y `tests/test_movenet_recorte.py`.
+- Pruebas antes de cada commit: `python tests/test_local.py`, `tests/test_sesion.py`, `tests/test_aaron.py` y `tests/test_movenet_recorte.py`.
 - Responder siempre en español. Explicar las decisiones técnicas en lenguaje claro: Diana las defiende ante un tribunal.
 - No inventar resultados: lo que no se haya medido se marca como pendiente.
 
@@ -44,11 +44,12 @@ aparece la fatiga y por qué** (SHAP), y medidas de codos, hombros, caderas, rod
   nadador (YOLO a veces lo pone de pie). En GX011614 quita el 11,5 % y la inclinación media pasa de 42° a 8,8°.
   Tras el filtro quedan 5 ciclos (Aaron analizable 12,7 s): un clip suelto no basta para fatiga.
 - **Fatiga por sesión** (`sesion.py`): une las pasadas (clips) de un nadador en orden de grabación.
-- **Ciclos por brazadas de ambos brazos** (`medidas.detectar_ciclos`): cuenta manual de Diana en GX011614 = 9 ciclos
-  en 10 s (54 ciclos/min) frente a 79 del sistema (contaba de más por confusión izquierda/derecha). Ahora se detecta
-  cada entrada de mano de cualquier brazo, se estima el ritmo por autocorrelación y 1 ciclo = 2 brazadas.
-  Pendiente: confirmar en el portátil que GX011614 da ~54 ciclos/min.
-- Sospechas abiertas en GX011614: SR 79 ciclos/min (ya corregido el método, falta confirmar) y ángulos 3D raros (rodilla 80°,
+- **Conteo de brazadas por profundidad de la mano** (`medidas.detectar_ciclos`): con los keypoints reales de Aaron
+  (tests/datos) se vio que YOLO copia el brazo visible en el oculto (muñecas I y D casi idénticas en vista lateral).
+  Señal: profundidad de la mano más profunda respecto al eje del cuerpo, en 2D; ritmo = mediana de intervalos entre
+  brazadas en 0,35-1,0 s; 1 ciclo = 2 brazadas. Validación: cuenta manual de Diana (s 30-40) = 54 ciclos/min;
+  sistema = 50,0 (error 7 %), 8 ciclos válidos. Prueba: `tests/test_aaron.py`.
+- Sospecha abierta en GX011614: ángulos 3D raros (rodilla 80°,
   hombro máx. 110°, alcance 0,47): posible confusión izquierda/derecha de MotionBERT bajo el agua. Comparar con 2D.
 - **Filtro de plausibilidad anatómica** (`medidas.py`): tronco fuera de [0,5, 2] × mediana, segmentos de brazo y
   pierna implausibles, codos < 25°. Motivo: bajo el agua el modelo coloca a veces la cadera sobre el hombro.
