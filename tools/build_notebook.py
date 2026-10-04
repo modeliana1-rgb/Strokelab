@@ -37,13 +37,20 @@ code("""
 from google.colab import drive
 drive.mount('/content/drive')
 
-VIDEO_PATH = '/content/drive/MyDrive/StrokeLab/videos/nadador1_crol.mp4'   # <- tu vídeo
-OUT_DIR    = '/content/drive/MyDrive/StrokeLab/resultados_v3/nadador1'      # <- carpeta de salida
-NADADOR    = 'Nadador 1'
+VIDEO_PATH = '/content/drive/MyDrive/Videos_TFM/Nadador A/GX011615.MP4'   # <- tu vídeo (crol)
+OUT_DIR    = '/content/drive/MyDrive/Videos_TFM/resultados_v3/Nadador A'    # <- carpeta de salida
+NADADOR    = 'Nadador A'
 
 # Calibración (solo si la CÁMARA ESTÁ FIJA): metros horizontales que abarca el encuadre.
 # Ejemplo: si de borde a borde del vídeo se ven 2.5 m -> 2.5.  Si la cámara se mueve -> None.
 METROS_ANCHO_ENCUADRE = None
+
+import os, glob
+if not os.path.exists(VIDEO_PATH):
+    print('No encuentro el vídeo:', VIDEO_PATH, '\nVídeos disponibles en la carpeta:')
+    for v in sorted(glob.glob(os.path.join(os.path.dirname(VIDEO_PATH), '*'))): print('  ', v)
+    raise FileNotFoundError('Copia una de las rutas de arriba en VIDEO_PATH')
+print('Vídeo OK:', VIDEO_PATH, f'({os.path.getsize(VIDEO_PATH)/1e6:.0f} MB)')
 """, colab_only=True)
 
 code("""
