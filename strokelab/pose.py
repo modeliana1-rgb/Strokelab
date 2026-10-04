@@ -26,6 +26,9 @@ MOVENET_URLS = {'lightning': ['https://tfhub.dev/google/movenet/singlepose/light
                             'https://www.kaggle.com/models/google/movenet/TensorFlow2/singlepose-thunder/4']}
 MOVENET_TAM = {'lightning': 192, 'thunder': 256}
 
+MP_MODELO_URL = ('https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/'
+                 'float16/latest/pose_landmarker_full.task')
+
 MAX_LADO = 1920   # los fotogramas 4K/5K se reducen a este lado mayor antes del modelo (los modelos usan 192-640 px)
 
 
@@ -81,7 +84,12 @@ class SeguidorMoveNet:
 
 def cargar_movenet(variante):
     import tensorflow as tf
-    import tensorflow_hub as hub
+    try:
+        import tensorflow_hub as hub
+    except ModuleNotFoundError as e:
+        if 'pkg_resources' in str(e):
+            raise ModuleNotFoundError('tensorflow_hub necesita pkg_resources: ejecuta  pip install --user "setuptools<81"') from e
+        raise
     ultimo = None
     for url in MOVENET_URLS[variante]:
         try:
@@ -104,14 +112,35 @@ class Estimador:
             self.seg = SeguidorMoveNet(infer, tam, ancho, alto)
             self.tipo = 'movenet'
         elif modelo == 'mediapipe':
-            import mediapipe as mp
-            self.mp = mp.solutions.pose.Pose(static_image_mode=False, model_complexity=1,
-                                             min_detection_confidence=0.3, min_tracking_confidence=0.3)
+            self._iniciar_mediapipe()
             self.tipo = 'mediapipe'
         else:
             from ultralytics import YOLO
             self.yolo = YOLO(modelo if modelo.endswith('.pt') else modelo + '.pt')
             self.tipo = 'yolo'
+
+    def _iniciar_mediapipe(self):
+        import mediapipe as mp
+        self.mp_mod = mp
+        if hasattr(mp, 'solutions'):                       # MediaPipe < 1.0
+            self.mp = mp.solutions.pose.Pose(static_image_mode=False, model_complexity=1,
+                                             min_detection_confidence=0.3, min_tracking_confidence=0.3)
+            self.mp_tasks = False
+            return
+        # MediaPipe >= 1.0: API de Tasks (PoseLandmarker) con el modelo descargado una vez
+        import urllib.request
+        from pathlib import Path
+        from mediapipe.tasks import python as mpt
+        from mediapipe.tasks.python import vision
+        ruta = Path('modelos') / 'mediapipe' / 'pose_landmarker_full.task'
+        if not ruta.exists():
+            ruta.parent.mkdir(parents=True, exist_ok=True)
+            urllib.request.urlretrieve(MP_MODELO_URL, ruta)
+        opciones = vision.PoseLandmarkerOptions(
+            base_options=mpt.BaseOptions(model_asset_path=str(ruta)), running_mode=vision.RunningMode.VIDEO,
+            num_poses=1, min_pose_detection_confidence=0.3, min_tracking_confidence=0.3)
+        self.mp = vision.PoseLandmarker.create_from_options(opciones)
+        self.mp_tasks, self.mp_t = True, 0
 
     def reiniciar(self):
         self.prev_c = None
@@ -123,10 +152,19 @@ class Estimador:
             return self.seg(frame)
         if self.tipo == 'mediapipe':
             h, w = frame.shape[:2]
-            r = self.mp.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-            if r.pose_landmarks is None:
-                return np.full((17, 2), np.nan), np.zeros(17)
-            lm = r.pose_landmarks.landmark
+            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            if self.mp_tasks:
+                self.mp_t += 33                            # marca de tiempo creciente (ms) que exige el modo VIDEO
+                r = self.mp.detect_for_video(self.mp_mod.Image(image_format=self.mp_mod.ImageFormat.SRGB,
+                                                               data=np.ascontiguousarray(rgb)), self.mp_t)
+                if not r.pose_landmarks:
+                    return np.full((17, 2), np.nan), np.zeros(17)
+                lm = r.pose_landmarks[0]
+            else:
+                r = self.mp.process(rgb)
+                if r.pose_landmarks is None:
+                    return np.full((17, 2), np.nan), np.zeros(17)
+                lm = r.pose_landmarks.landmark
             xy = np.array([[lm[i].x * w, lm[i].y * h] for i in MP_A_COCO])
             return xy, np.array([lm[i].visibility for i in MP_A_COCO])
         r = self.yolo(frame, verbose=False, device='cpu')[0]
@@ -219,8 +257,8 @@ def comparar_modelos(video, modelos, conf_min=0.30):
             fps = n / (time.time() - t0)
             c = np.array(confs)
             det = (c > conf_min).sum(1) >= 5
-            filas.append(dict(modelo=m, fps_cpu=round(fps, 1), tasa_deteccion=round(100 * det.mean(), 1),
-                              conf_media=round(float(c[det].mean()) if det.any() else 0, 3)))
+            filas.append(dict(modelo=m, fps_cpu=round(fps, 1), tasa_deteccion=round(float(100 * det.mean()), 1),
+                              conf_media=round(float(c[det].mean()) if det.any() else 0.0, 3)))
             print('  ', filas[-1])
         except Exception as e:
             print(f'   omitido {m}: {type(e).__name__}: {str(e)[:120]}')

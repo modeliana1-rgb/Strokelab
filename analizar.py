@@ -41,6 +41,7 @@ def main(argv=None):
     ap.add_argument('--metros-encuadre', type=float, help='metros de piscina de borde a borde (solo cámara fija)')
     ap.add_argument('--comparativa', action='store_true', help='comparar modelos de pose en CPU antes del análisis')
     ap.add_argument('--desde-keypoints', action='store_true', help='reutilizar keypoints_raw.npz de la carpeta de salida')
+    ap.add_argument('--keypoints', help='reutilizar un keypoints_raw.npz de otra carpeta (p. ej. para comparar 2D y 3D)')
     ap.add_argument('--formato', choices=['mp4', 'avi'], default='mp4', help='avi (MJPG) si el mp4 no se abre en tu equipo')
     ap.add_argument('--sin-video', action='store_true', help='no generar el vídeo anotado')
     a = ap.parse_args(argv)
@@ -58,10 +59,13 @@ def main(argv=None):
         print(tabla.to_string(index=False))
 
     npz = out / 'keypoints_raw.npz'
-    if a.desde_keypoints and npz.exists():
-        d = np.load(npz)
+    origen = Path(a.keypoints) if a.keypoints else (npz if a.desde_keypoints and npz.exists() else None)
+    if origen:
+        d = np.load(origen)
         kps, conf, fps, W, H = d['kps'], d['conf'], float(d['fps']), int(d['w']), int(d['h'])
-        print(f'\n[1] Pose 2D cargada de {npz.name}')
+        if origen != npz:
+            np.savez(npz, **{k: d[k] for k in d.files})
+        print(f'\n[1] Pose 2D cargada de {origen}')
     else:
         print(f'\n[1] Pose 2D con {a.modelo} (1 de cada {a.cada} fotogramas)')
         t0 = time.time()
