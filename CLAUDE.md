@@ -31,7 +31,10 @@ aparece la fatiga y por qué** (SHAP), y medidas de codos, hombros, caderas, rod
 - **3D con MotionBERT-Lite se mantiene** (hay vídeos frontales y de varios ángulos). Adaptación: cada fotograma se
   centra en la pelvis y se gira para que el tronco quede vertical (MotionBERT se entrenó con personas de pie), y la
   escala se normaliza por el tamaño del cuerpo. Los ángulos articulares no cambian con el giro.
-  **Pendiente: validar la calidad 3D con los pesos reales** (comparar ángulos 2D vs 3D en vista lateral).
+  **Validación 3D (Aaron GX011614, 85 fotogramas, `validar_3d.py`)**: rodilla 2D 173° frente a 3D 107° (correlación
+  ≈ 0); hombro 3D comprime el rango (82-107° frente a 50-153°); codo y cadera parecidos. MotionBERT reconstruye mal
+  las piernas de un nadador horizontal bajo el agua. Decisión: en vista lateral los ángulos son 2D (`--vista lateral`,
+  por defecto) y el 3D se guarda en columnas *_3d; en vistas frontales u oblicuas se usa el 3D (`--vista otra`).
 - **Giro del fotograma para la pose 2D** (`--girar auto`): YOLO, entrenado con personas de pie, "inventaba" un cuerpo
   vertical bajo la cabeza de Aaron (GX011614). Se prueba el fotograma sin girar y girado ±90° en 8 tramos y se usa el
   giro que mejor detecta; las coordenadas se devuelven al fotograma original.
@@ -49,8 +52,6 @@ aparece la fatiga y por qué** (SHAP), y medidas de codos, hombros, caderas, rod
   Señal: profundidad de la mano más profunda respecto al eje del cuerpo, en 2D; ritmo = mediana de intervalos entre
   brazadas en 0,35-1,0 s; 1 ciclo = 2 brazadas. Validación: cuenta manual de Diana (s 30-40) = 54 ciclos/min;
   sistema = 50,0 (error 7 %), 8 ciclos válidos. Prueba: `tests/test_aaron.py`.
-- Sospecha abierta en GX011614: ángulos 3D raros (rodilla 80°,
-  hombro máx. 110°, alcance 0,47): posible confusión izquierda/derecha de MotionBERT bajo el agua. Comparar con 2D.
 - **Filtro de plausibilidad anatómica** (`medidas.py`): tronco fuera de [0,5, 2] × mediana, segmentos de brazo y
   pierna implausibles, codos < 25°. Motivo: bajo el agua el modelo coloca a veces la cadera sobre el hombro.
 - **Fatiga por ciclo de brazada**, comparando con el primer 30 % de ciclos del propio nadador; inicio = 3 ciclos

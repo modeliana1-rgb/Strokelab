@@ -25,7 +25,7 @@ Qué hace, en orden:
 
 1. **Pose 2D** con YOLOv8n-Pose (1 de cada 2 fotogramas; `--cada 1` para todos, `--modelo` para cambiar de modelo).
 2. **Limpieza**: confianza, huecos de hasta 0,4 s y suavizado.
-3. **3D con MotionBERT-Lite**: el nadador se gira a vertical antes de elevarlo, porque el modelo se entrenó con personas de pie. Los ángulos no dependen de la vista (lateral, frontal...). Con `--sin-3d` se trabaja solo en 2D.
+3. **3D con MotionBERT-Lite**: el nadador se gira a vertical antes de elevarlo, porque el modelo se entrenó con personas de pie. En vista lateral (por defecto) los ángulos se calculan en 2D y el 3D se guarda aparte (`*_3d`), porque la validación mostró que el 3D falla en las piernas bajo el agua; con `--vista otra` (frontal, oblicua) se usan los ángulos 3D. `python validar_3d.py <carpeta>` compara ambos. Con `--sin-3d` no se calcula el 3D.
 4. **Medidas** (izquierda y derecha): codo, hombro, cadera, rodilla, alcance, asimetría, inclinación, amplitud de patada y patadas por ciclo.
 5. **Ciclos de brazada y fatiga**: Isolation Forest, PELT (implementación propia, sin dependencias compiladas) y explicación SHAP.
 6. **Vídeo anotado** con el panel de medidas (`--formato avi` si el mp4 no se abre en tu equipo).

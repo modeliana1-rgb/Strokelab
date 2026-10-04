@@ -104,7 +104,7 @@ def main():
         return
     ck = tmp / 'best_epoch.bin'
     torch.save({'model_pos': {'module.' + k: v for k, v in lift3d.construir_modelo().state_dict().items()}}, ck)
-    analizar.main([str(vid), '--salida', str(out), '--desde-keypoints', '--motionbert', str(ck), '--sin-video'])
+    analizar.main([str(vid), '--salida', str(out), '--desde-keypoints', '--motionbert', str(ck), '--sin-video', '--vista', 'otra'])
     res3 = json.loads((out / 'resumen.json').read_text(encoding='utf-8'))
     assert res3['angulos_3d'] is True
     assert np.load(out / 'keypoints_3d.npy').shape == (len(kps), 17, 3)
