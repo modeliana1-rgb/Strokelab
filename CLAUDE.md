@@ -52,6 +52,10 @@ aparece la fatiga y por qué** (SHAP), y medidas de codos, hombros, caderas, rod
   Señal: profundidad de la mano más profunda respecto al eje del cuerpo, en 2D; ritmo = mediana de intervalos entre
   brazadas en 0,35-1,0 s; 1 ciclo = 2 brazadas. Validación: cuenta manual de Diana (s 30-40) = 54 ciclos/min;
   sistema = 50,0 (error 7 %), 8 ciclos válidos. Prueba: `tests/test_aaron.py`.
+- **Sesión de Aaron (opción A)**: GX011614 8-9 ciclos; GX011617 0 ciclos (detección 10 %, 7 s analizables);
+  GX011618 1 ciclo (detección 20 %, 8,9 s). Los clips de GoPro de Aaron dan muy poca detección: la sesión no basta
+  para concluir sobre fatiga. Siguiente: vídeo largo (opción B, GX010664 de Videos CNMM) o mejorar la detección.
+- Emparejamiento de brazadas en ciclos tolera una brazada perdida (intervalo 1,5-2,6 T cuenta como 2 brazadas).
 - **Filtro de plausibilidad anatómica** (`medidas.py`): tronco fuera de [0,5, 2] × mediana, segmentos de brazo y
   pierna implausibles, codos < 25°. Motivo: bajo el agua el modelo coloca a veces la cadera sobre el hombro.
 - **Fatiga por ciclo de brazada**, comparando con el primer 30 % de ciclos del propio nadador; inicio = 3 ciclos

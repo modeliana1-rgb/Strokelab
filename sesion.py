@@ -27,8 +27,11 @@ def main(argv=None):
     partes, t0 = [], 0.0
     for n, c in enumerate(a.carpetas, 1):
         c = Path(c)
-        cic = pd.read_csv(c / 'variables_por_ciclo.csv')
         res = json.loads((c / 'resumen.json').read_text(encoding='utf-8'))
+        try:
+            cic = pd.read_csv(c / 'variables_por_ciclo.csv')
+        except (pd.errors.EmptyDataError, FileNotFoundError):   # vídeo sin ciclos válidos
+            cic = pd.DataFrame()
         print(f'  pasada {n}: {res["video"]:<16} {len(cic):3d} ciclos válidos')
         if len(cic):
             cic = cic.drop(columns=['anomalia', 'estado'], errors='ignore')

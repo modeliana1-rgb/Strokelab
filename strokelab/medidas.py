@@ -159,14 +159,23 @@ def detectar_ciclos(fr, fps):
     picos, _ = find_peaks(np.where(ok, sig, np.nanmin(sig)), distance=max(1, int(0.6 * T * fps)),
                           prominence=0.3 * np.nanstd(sig))
     picos = picos[ok[picos]]
+    # Un ciclo = 2 brazadas. Cada intervalo entre brazadas detectadas vale 1 brazada (0,5-1,5 T) o 2 si la
+    # detección perdió una en medio (1,5-2,6 T). Se forma un ciclo al sumar exactamente 2 brazadas; un hueco
+    # mayor corta la cuenta.
     ciclos, i = [], 0
-    while i + 2 < len(picos) + 0:
-        d1, d2 = (picos[i + 1] - picos[i]) / fps, (picos[i + 2] - picos[i + 1]) / fps
-        if 0.5 * T <= d1 <= 1.6 * T and 0.5 * T <= d2 <= 1.6 * T:
-            ciclos.append((picos[i], picos[i + 2]))
-            i += 2
+    while i < len(picos) - 1:
+        acum, j = 0, i
+        while j < len(picos) - 1 and acum < 2:
+            n = (picos[j + 1] - picos[j]) / fps / T
+            if not 0.5 <= n <= 2.6:
+                break
+            acum += 1 if n < 1.5 else 2
+            j += 1
+        if acum == 2:
+            ciclos.append((picos[i], picos[j]))
+            i = j
         else:
-            i += 1
+            i = max(j, i + 1)
     return sig, picos, ciclos, T
 
 
