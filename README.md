@@ -36,6 +36,17 @@ Otras opciones:
 - `--desde-keypoints`: repite el análisis sin volver a extraer la pose.
 - `--metros-encuadre`: calibración métrica con cámara fija (velocidad, DPS e Índice de Brazada).
 
+Todos los vídeos de una vez (se puede dejar trabajando; si se corta, continúa donde iba):
+
+```powershell
+python lote.py --carpeta C:\Users\user\StrokeLab\videos --crear-lista   # crea videos\lista_videos.csv: revísala
+python lote.py --carpeta C:\Users\user\StrokeLab\videos                 # analiza y une las sesiones
+```
+
+La lista indica nadador, estilo (`crol`, `espalda`, `mariposa`, `braza`), vista (`lateral` u `otra`) y sesión.
+Salen `resumen_lote.csv`, `resumen_sesiones.csv` y `para_claude.zip` (todo menos los vídeos) en `..\resultados`.
+Con un solo vídeo, `--estilo` fija cuántas brazadas forman un ciclo: 2 en crol y espalda, 1 en mariposa y braza.
+
 Fatiga a lo largo de una sesión (varias pasadas del mismo nadador, en orden de grabación):
 
 ```powershell

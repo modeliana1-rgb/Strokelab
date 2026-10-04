@@ -38,6 +38,8 @@ def main(argv=None):
     ap.add_argument('video')
     ap.add_argument('--salida', help='carpeta de resultados (por defecto resultados/<vídeo>)')
     ap.add_argument('--nadador', default='Nadador')
+    ap.add_argument('--estilo', default='crol', choices=list(medidas.ESTILOS),
+                    help='estilo de nado: fija cuántas brazadas forman un ciclo y el ritmo plausible')
     ap.add_argument('--modelo', default='yolov8n-pose',
                     help='yolov8n-pose (defecto), yolo11n-pose, yolov8s-pose, movenet_lightning, movenet_thunder, mediapipe')
     ap.add_argument('--cada', type=int, default=2, help='analizar 1 de cada N fotogramas (2 = el doble de rápido)')
@@ -124,12 +126,12 @@ def main(argv=None):
         for c in ['codo_I', 'codo_D', 'hombro_I', 'hombro_D', 'cadera_I', 'cadera_D', 'rodilla_I', 'rodilla_D']:
             fr[c + '_3d'] = f3[c]
     fr.to_csv(out / 'medidas_por_fotograma.csv', index=False)
-    sig, picos, ciclos_ab, T_br = medidas.detectar_ciclos(fr, fps)
-    ciclos = medidas.variables_por_ciclo(fr, fps, ciclos_ab, a.metros_encuadre, W)
+    sig, picos, ciclos_ab, T_br = medidas.detectar_ciclos(fr, fps, a.estilo)
+    ciclos = medidas.variables_por_ciclo(fr, fps, ciclos_ab, a.metros_encuadre, W, a.estilo)
     print(f'    ángulos en {"3D" if usar_3d else "2D"} (vista {a.vista}) · tronco implausible descartado: '
           f'{fr.attrs["pct_tronco_descartado"]:.1f}% (con tronco girado: {fr.attrs["pct_tronco_girado"]:.1f}%) · nadador analizable {np.mean(~np.isnan(sig)) * len(sig) / fps:.1f} s '
           f'de {len(sig) / fps:.1f} s · brazadas {len(picos)} (ritmo típico {T_br or 0:.2f} s) · ciclos válidos {len(ciclos)}')
-    _grafica_ciclos(sig, picos, ciclos_ab, fps, out)
+    _grafica_ciclos(sig, picos, ciclos_ab, fps, out, medidas.ESTILOS[a.estilo]['brazadas_ciclo'])
 
     print('\n[5] Fatiga (Isolation Forest + PELT + SHAP)')
     res = fatiga.analizar_fatiga(ciclos) if len(ciclos) else {'aviso': 'no hay ciclos válidos', 'inicio': None, 't_inicio': None, 'cambio_pelt': [], 'feats': []}
@@ -145,8 +147,11 @@ def main(argv=None):
         print('\n    Medias por ciclo:')
         print(ciclos.drop(columns=['ciclo', 't_inicio_s', 'estado'], errors='ignore').mean().round(2).to_string())
 
-    resumen = dict(video=vid.name, nadador=a.nadador, modelo_pose=a.modelo, cada=a.cada, giro=rot, angulos_3d=bool(usar_3d), vista=a.vista,
+    resumen = dict(video=vid.name, nadador=a.nadador, estilo=a.estilo, modelo_pose=a.modelo, cada=a.cada, giro=rot, angulos_3d=bool(usar_3d), vista=a.vista,
                    fps=fps, resolucion=f'{W}x{H}', duracion_s=round(len(kps) / fps, 2), ciclos_validos=len(ciclos),
+                   pct_deteccion=round(float(100 * np.mean((conf[analizados] > 0.3).sum(1) >= 5)), 1),
+                   s_analizable=round(float(np.mean(~np.isnan(sig)) * len(sig) / fps), 1),
+                   SR_media=round(float(ciclos.SR_ciclos_min.mean()), 1) if len(ciclos) else None,
                    pct_tronco_descartado=round(fr.attrs['pct_tronco_descartado'], 1),
                    pct_tronco_girado=round(fr.attrs['pct_tronco_girado'], 1),
                    inicio_fatiga_ciclo=None if res.get('inicio') is None else int(ciclos.ciclo.iloc[res['inicio']]),
@@ -166,16 +171,16 @@ def main(argv=None):
     print(f'\nListo en {time.time() - t_total:.0f} s. Resultados en: {out.resolve()}')
 
 
-def _grafica_ciclos(sig, picos, ciclos_ab, fps, out):
+def _grafica_ciclos(sig, picos, ciclos_ab, fps, out, brazadas_ciclo=2):
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
     t = np.arange(len(sig)) / fps
-    plt.figure(figsize=(14, 3)); plt.plot(t, sig, lw=1, label='muñeca más adelantada (troncos)')
-    plt.plot(t[picos], sig[picos], 'rv', label='entrada de mano (brazada)')
+    plt.figure(figsize=(14, 3)); plt.plot(t, sig, lw=1, label='profundidad de la mano más profunda (troncos)')
+    plt.plot(t[picos], sig[picos], 'rv', label='brazada')
     for a_, b_ in ciclos_ab:
         plt.axvspan(t[a_], t[b_ - 1] if b_ - 1 < len(t) else t[-1], color='green', alpha=0.08)
-    plt.xlabel('tiempo (s)'); plt.title('Brazadas y ciclos (sombreado: 1 ciclo = 2 brazadas)'); plt.legend(loc='upper right')
+    plt.xlabel('tiempo (s)'); plt.title(f'Brazadas y ciclos (sombreado: 1 ciclo = {brazadas_ciclo} brazada{"s" if brazadas_ciclo > 1 else ""})'); plt.legend(loc='upper right')
     plt.tight_layout(); plt.savefig(out / 'fig_ciclos.png', dpi=150); plt.close()
 
 

@@ -19,8 +19,11 @@ sys.path.insert(0, str(RAIZ))
 import analizar  # noqa: E402
 
 
-def nadador_sintetico(fps=30, dur=90, W=640, H=360, seed=0):
-    """Nadador de crol visto de lado; fatiga progresiva centrada en t = 55 s."""
+def nadador_sintetico(fps=30, dur=90, W=640, H=360, seed=0, simultaneo=False):
+    """Nadador de crol visto de lado; fatiga progresiva centrada en t = 55 s.
+
+    simultaneo=True: los dos brazos tiran a la vez (mariposa): 1 ciclo = 1 brazada.
+    """
     rng = np.random.default_rng(seed)
     T = fps * dur
     t = np.arange(T) / fps
@@ -34,7 +37,7 @@ def nadador_sintetico(fps=30, dur=90, W=640, H=360, seed=0):
     hip = np.c_[100 + t * 5 * (1 - 0.3 * fat), np.full(T, 200.)]
     hip[:, 1] += 5 * fat * np.sin(phase)
     sh = hip + np.c_[np.full(T, 80.), -4 - 6 * fat]
-    for (S, E, Wr, Hp, K, A), off, asym in [((5, 7, 9, 11, 13, 15), np.pi, 1.0),
+    for (S, E, Wr, Hp, K, A), off, asym in [((5, 7, 9, 11, 13, 15), 0 if simultaneo else np.pi, 1.0),
                                             ((6, 8, 10, 12, 14, 16), 0, 1.0 - 0.25 * fat)]:
         ph = phase + off
         r = reach * asym

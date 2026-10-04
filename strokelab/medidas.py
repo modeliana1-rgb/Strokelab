@@ -121,6 +121,16 @@ def medidas_por_fotograma(k2d, fps, k3d=None):
     return fr
 
 
+# Brazadas por ciclo y rango fisiológico del tiempo entre brazadas (s) según el estilo. En crol y espalda los brazos
+# alternan (1 ciclo = 2 brazadas); en mariposa y braza tiran a la vez (1 ciclo = 1 brazada).
+ESTILOS = {
+    'crol': dict(brazadas_ciclo=2, t_min=0.35, t_max=1.0),       # 30-85 ciclos/min
+    'espalda': dict(brazadas_ciclo=2, t_min=0.35, t_max=1.2),    # 25-85 ciclos/min
+    'mariposa': dict(brazadas_ciclo=1, t_min=0.7, t_max=2.0),    # 30-85 ciclos/min
+    'braza': dict(brazadas_ciclo=1, t_min=0.7, t_max=2.4),       # 25-85 ciclos/min
+}
+
+
 def periodo_brazada(sig, fps, t_min=0.35, t_max=1.0):
     """Tiempo típico entre brazadas (s): mediana de los intervalos entre máximos consecutivos de la señal.
 
@@ -139,11 +149,11 @@ def periodo_brazada(sig, fps, t_min=0.35, t_max=1.0):
     return float(np.median(d)) if len(d) >= 3 else None
 
 
-def detectar_ciclos(fr, fps):
+def detectar_ciclos(fr, fps, estilo='crol'):
     """Brazadas = máxima profundidad de la mano en la tracción, de CUALQUIER brazo (la mano más profunda).
 
     Así no importa si el modelo confunde la muñeca izquierda con la derecha. Un ciclo = dos brazadas seguidas sin
-    brazadas perdidas entre medias. Devuelve (señal, picos de brazada, lista de ciclos (inicio, fin), periodo).
+    brazadas perdidas entre medias (en mariposa y braza, un ciclo = una brazada). Devuelve (señal, picos de brazada, lista de ciclos (inicio, fin), periodo).
     """
     lim = int(0.2 * fps)
     mI = fr.munI_prof2d.interpolate(limit=lim, limit_area='inside').to_numpy()
@@ -153,7 +163,8 @@ def detectar_ciclos(fr, fps):
         sig = np.fmax(mI, mD)
     fr['muneca_eje'] = sig
     ok = ~np.isnan(sig)
-    T = periodo_brazada(sig, fps)
+    est = ESTILOS[estilo]
+    T = periodo_brazada(sig, fps, est['t_min'], est['t_max'])
     if ok.sum() < fps or T is None:
         return sig, np.array([], int), [], T
     picos, _ = find_peaks(np.where(ok, sig, np.nanmin(sig)), distance=max(1, int(0.6 * T * fps)),
@@ -165,13 +176,13 @@ def detectar_ciclos(fr, fps):
     ciclos, i = [], 0
     while i < len(picos) - 1:
         acum, j = 0, i
-        while j < len(picos) - 1 and acum < 2:
+        while j < len(picos) - 1 and acum < est['brazadas_ciclo']:
             n = (picos[j + 1] - picos[j]) / fps / T
             if not 0.5 <= n <= 2.6:
                 break
             acum += 1 if n < 1.5 else 2
             j += 1
-        if acum == 2:
+        if acum == est['brazadas_ciclo']:
             ciclos.append((picos[i], picos[j]))
             i = j
         else:
@@ -179,7 +190,7 @@ def detectar_ciclos(fr, fps):
     return sig, picos, ciclos, T
 
 
-def variables_por_ciclo(fr, fps, ciclos_ab, metros_ancho=None, ancho_px=None):
+def variables_por_ciclo(fr, fps, ciclos_ab, metros_ancho=None, ancho_px=None, estilo='crol'):
     """Una fila por ciclo válido (0.6-3 s, <= 30 % de datos ausentes en la señal de las muñecas)."""
     ppm = (ancho_px / metros_ancho) if metros_ancho and ancho_px else None
     filas = []
@@ -208,5 +219,5 @@ def variables_por_ciclo(fr, fps, ciclos_ab, metros_ancho=None, ancho_px=None):
         filas.append(f)
     ciclos = pd.DataFrame(filas)
     if len(ciclos):
-        ciclos['brazadas_min'] = 2 * ciclos.SR_ciclos_min
+        ciclos['brazadas_min'] = ESTILOS[estilo]['brazadas_ciclo'] * ciclos.SR_ciclos_min
     return ciclos

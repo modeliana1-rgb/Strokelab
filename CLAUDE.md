@@ -8,7 +8,9 @@ aparece la fatiga y por qué** (SHAP), y medidas de codos, hombros, caderas, rod
 
 - Todo se ejecuta **en local, en CPU**, en el portátil personal de Diana (Windows). No usar Colab salvo que lo pida.
 - Programa principal: `python analizar.py "<vídeo>" --nadador "<nombre>"` (ver README para opciones).
-- Pruebas antes de cada commit: `python tests/test_local.py`, `tests/test_sesion.py`, `tests/test_aaron.py` y `tests/test_movenet_recorte.py`.
+- Pruebas antes de cada commit: `python tests/test_local.py`, `tests/test_sesion.py`, `tests/test_aaron.py`, `tests/test_movenet_recorte.py`,
+  `tests/test_estilos.py` y `tests/test_lote.py`.
+- Todos los vídeos: `python lote.py --carpeta <videos> [--crear-lista]` (lista editable `lista_videos.csv`; reanudable).
 - Responder siempre en español. Explicar las decisiones técnicas en lenguaje claro: Diana las defiende ante un tribunal.
 - No inventar resultados: lo que no se haya medido se marca como pendiente.
 
@@ -60,6 +62,10 @@ aparece la fatiga y por qué** (SHAP), y medidas de codos, hombros, caderas, rod
   pierna implausibles, codos < 25°. Motivo: bajo el agua el modelo coloca a veces la cadera sobre el hombro.
 - **Fatiga por ciclo de brazada**, comparando con el primer 30 % de ciclos del propio nadador; inicio = 3 ciclos
   seguidos por encima del percentil 95 de la fase fresca; contraste con PELT.
+- **Ciclos por estilo** (`--estilo`, `medidas.ESTILOS`): crol y espalda 1 ciclo = 2 brazadas (0,35-1,0/1,2 s entre
+  brazadas); mariposa y braza 1 ciclo = 1 brazada (0,7-2,0/2,4 s). Validado solo en crol real; resto con sintético.
+- **Lote** (`lote.py`, 4 oct): sin vídeo anotado por defecto (`--con-video`) para ahorrar tiempo; sesión = mismo nombre
+  en la lista (GoPro y móvil separados por defecto). Pendiente: clasificador de estilo (no implementado en local aún).
 - Variables redundantes fuera del modelo (v = SR·DPS; potencia ∝ v³).
 - El 99,99 % de accuracy de versiones antiguas era fuga de datos; la clasificación de estilo usa GroupKFold por vídeo.
 
