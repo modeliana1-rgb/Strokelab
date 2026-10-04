@@ -36,6 +36,12 @@ Otras opciones:
 - `--desde-keypoints`: repite el análisis sin volver a extraer la pose.
 - `--metros-encuadre`: calibración métrica con cámara fija (velocidad, DPS e Índice de Brazada).
 
+Fatiga a lo largo de una sesión (varias pasadas del mismo nadador, en orden de grabación):
+
+```powershell
+python sesion.py ..\resultados\GX011614_Aaron ..\resultados\GX011617_Aaron ..\resultados\GX011618_Aaron --nadador "Aaron"
+```
+
 Modelo 3D: la primera vez se descarga de Hugging Face. Si falla, descarga `best_epoch.bin` de MotionBERT-Lite
 ([enlace oficial](https://1drv.ms/f/s!AvAdh0LSjEOlgT67igq_cIoYvO2y?e=bfEc73)) en `modelos/motionbert/best_epoch.bin`
 o pásalo con `--motionbert RUTA`.
@@ -48,6 +54,8 @@ diagnostico.py                          # comprueba las librerías disponibles
 strokelab/                              # pose, 3D (MotionBERT), medidas, fatiga y vídeo
 strokelab/motionbert/                   # modelo DSTformer de MotionBERT (Apache 2.0)
 tests/test_local.py                     # prueba del programa local con nadador sintético
+tests/test_sesion.py                    # prueba del análisis por sesión (3 pasadas)
+sesion.py                               # fatiga a lo largo de varias pasadas
 notebooks/StrokeLab_v3_pipeline.ipynb   # versión anterior para Google Colab (GPU)
 tools/build_notebook.py                 # genera el notebook (fuente de verdad del código)
 tests/test_pipeline_sintetico.py        # prueba con un nadador sintético que se fatiga

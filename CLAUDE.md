@@ -8,7 +8,7 @@ aparece la fatiga y por qué** (SHAP), y medidas de codos, hombros, caderas, rod
 
 - Todo se ejecuta **en local, en CPU**, en el portátil personal de Diana (Windows). No usar Colab salvo que lo pida.
 - Programa principal: `python analizar.py "<vídeo>" --nadador "<nombre>"` (ver README para opciones).
-- Pruebas antes de cada commit: `python tests/test_local.py` (y `tests/test_movenet_recorte.py`).
+- Pruebas antes de cada commit: `python tests/test_local.py`, `tests/test_sesion.py` y `tests/test_movenet_recorte.py`.
 - Responder siempre en español. Explicar las decisiones técnicas en lenguaje claro: Diana las defiende ante un tribunal.
 - No inventar resultados: lo que no se haya medido se marca como pendiente.
 
@@ -40,7 +40,13 @@ aparece la fatiga y por qué** (SHAP), y medidas de codos, hombros, caderas, rod
 - **Resultados en el portátil (CPU, 4 hilos)**: GX011614 (Aaron, crol, 5K, 46 s): YOLOv8n 6,6 FPS, YOLO11n 6,2,
   YOLOv8s 3,3 (detección 36-38 %, confianza 0,74-0,78); 7 ciclos válidos (Aaron en cuadro 17,5 s); MotionBERT 22 s.
   Pendiente: SR media 73 ciclos/min parece alta (contar a mano 10 s) y ángulos 3D de hombro/rodilla bajos (comparar con 2D).
-- - **Filtro de plausibilidad anatómica** (`medidas.py`): tronco fuera de [0,5, 2] × mediana, segmentos de brazo y
+- **Filtro de tronco girado**: se descartan fotogramas cuyo tronco se desvía > 45° de la dirección habitual del
+  nadador (YOLO a veces lo pone de pie). En GX011614 quita el 11,5 % y la inclinación media pasa de 42° a 8,8°.
+  Tras el filtro quedan 5 ciclos (Aaron analizable 12,7 s): un clip suelto no basta para fatiga.
+- **Fatiga por sesión** (`sesion.py`): une las pasadas (clips) de un nadador en orden de grabación.
+- Sospechas abiertas en GX011614: SR 79 ciclos/min (posible doble conteo) y ángulos 3D raros (rodilla 80°,
+  hombro máx. 110°, alcance 0,47): posible confusión izquierda/derecha de MotionBERT bajo el agua. Comparar con 2D.
+- **Filtro de plausibilidad anatómica** (`medidas.py`): tronco fuera de [0,5, 2] × mediana, segmentos de brazo y
   pierna implausibles, codos < 25°. Motivo: bajo el agua el modelo coloca a veces la cadera sobre el hombro.
 - **Fatiga por ciclo de brazada**, comparando con el primer 30 % de ciclos del propio nadador; inicio = 3 ciclos
   seguidos por encima del percentil 95 de la fase fresca; contraste con PELT.
