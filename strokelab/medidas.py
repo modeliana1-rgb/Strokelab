@@ -111,6 +111,22 @@ def medidas_por_fotograma(k2d, fps, k3d=None):
     okD2 = segmentos_ok(RSH, REL, RWR, kk=k2d, LL=L2) & ~np.isnan(L2)
     fr['munI_prof2d'] = np.where(okI2, ((k2d[:, LWR] - k2d[:, LSH]) * abajo).sum(1) / L2, np.nan)
     fr['munD_prof2d'] = np.where(okD2, ((k2d[:, RWR] - k2d[:, RSH]) * abajo).sum(1) / L2, np.nan)
+    # Vista FRONTAL (el nadador viene hacia la cámara o se le ve desde el borde): la profundidad respecto al eje del
+    # cuerpo no se ve, pero cada brazo recorre una trayectoria de ida y vuelta en la imagen (bajar-subir de frente,
+    # adelante-atrás desde arriba). Se toma la dirección en la que más se mueven las muñecas respecto al centro de los
+    # hombros (componente principal), con sentido hacia abajo en la imagen, y se divide por el ancho de hombros
+    # (de frente es más estable que el tronco, que aparece acortado). De frente sí se distinguen los dos brazos.
+    hom2 = np.nanmean([k2d[:, LSH], k2d[:, RSH]], 0)
+    ancho = np.nanmedian(np.linalg.norm(k2d[:, LSH] - k2d[:, RSH], axis=1))
+    rel = [k2d[:, w] - hom2 for w in (LWR, RWR)]
+    rel = np.concatenate([r - np.nanmean(r, 0) for r in rel])       # cada brazo centrado: cuenta su recorrido, no su lado
+    rel = rel[~np.isnan(rel).any(1)]
+    d = np.array([0.0, 1.0])
+    if len(rel) >= 10:
+        d = np.linalg.svd(rel, full_matrices=False)[2][0]
+        d = -d if d[1] < 0 else d
+    fr['munI_front'] = ((k2d[:, LWR] - hom2) @ d) / ancho if ancho > 0 else np.nan
+    fr['munD_front'] = ((k2d[:, RWR] - hom2) @ d) / ancho if ancho > 0 else np.nan
     fr['sep_tobillos'] = con(piernaI & piernaD, np.linalg.norm(k[:, LAN] - k[:, RAN], axis=1) / L)
     # Inclinación del tronco respecto a la horizontal: solo tiene sentido en 2D con vista lateral
     fr['inclinacion_tronco'] = np.where(np.isnan(L), np.nan, np.degrees(np.arctan2(np.abs(e2[:, 1]), np.abs(e2[:, 0]))))
@@ -149,15 +165,17 @@ def periodo_brazada(sig, fps, t_min=0.35, t_max=1.0):
     return float(np.median(d)) if len(d) >= 3 else None
 
 
-def detectar_ciclos(fr, fps, estilo='crol'):
+def detectar_ciclos(fr, fps, estilo='crol', vista='lateral'):
     """Brazadas = máxima profundidad de la mano en la tracción, de CUALQUIER brazo (la mano más profunda).
 
     Así no importa si el modelo confunde la muñeca izquierda con la derecha. Un ciclo = dos brazadas seguidas sin
-    brazadas perdidas entre medias (en mariposa y braza, un ciclo = una brazada). Devuelve (señal, picos de brazada, lista de ciclos (inicio, fin), periodo).
+    brazadas perdidas entre medias (en mariposa y braza, un ciclo = una brazada). En vista frontal la señal es el
+    recorrido de cada muñeca en la imagen en lugar de su profundidad. Devuelve (señal, picos de brazada, lista de ciclos (inicio, fin), periodo).
     """
     lim = int(0.2 * fps)
-    mI = fr.munI_prof2d.interpolate(limit=lim, limit_area='inside').to_numpy()
-    mD = fr.munD_prof2d.interpolate(limit=lim, limit_area='inside').to_numpy()
+    señal = 'front' if vista == 'frontal' else 'prof2d'     # de frente: recorrido de la muñeca (ver medidas_por_fotograma)
+    mI = fr[f'munI_{señal}'].interpolate(limit=lim, limit_area='inside').to_numpy()
+    mD = fr[f'munD_{señal}'].interpolate(limit=lim, limit_area='inside').to_numpy()
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')
         sig = np.fmax(mI, mD)
@@ -201,17 +219,21 @@ def alto(x):
     return bajo(x, 0.90)
 
 
-def variables_por_ciclo(fr, fps, ciclos_ab, metros_ancho=None, ancho_px=None, estilo='crol'):
+def variables_por_ciclo(fr, fps, ciclos_ab, metros_ancho=None, ancho_px=None, estilo='crol', vista='lateral'):
     """Una fila por ciclo válido (0.6-3 s, <= 30 % de datos ausentes en la señal de las muñecas)."""
-    ppm = (ancho_px / metros_ancho) if metros_ancho and ancho_px else None
+    frontal = vista == 'frontal'
+    # De frente no se ve el avance ni la inclinación del tronco: sin velocidad ni inclinación, y el alcance es el
+    # recorrido de cada muñeca en anchos de hombros.
+    ppm = (ancho_px / metros_ancho) if metros_ancho and ancho_px and not frontal else None
+    eje = 'front' if frontal else 'eje'
     filas = []
     for a, b in ciclos_ab:
         seg = fr.iloc[a:b]
         dur = (b - a) / fps
         if not (0.6 <= dur <= 3.0) or seg.muneca_eje.isna().mean() > 0.3:
             continue
-        alcI = seg.munI_eje.max() - seg.munI_eje.min()
-        alcD = seg.munD_eje.max() - seg.munD_eje.min()
+        alcI = seg[f'munI_{eje}'].max() - seg[f'munI_{eje}'].min()
+        alcD = seg[f'munD_{eje}'].max() - seg[f'munD_{eje}'].min()
         sep = seg.sep_tobillos.interpolate(limit_area='inside').to_numpy()
         n_patadas = len(find_peaks(sep[~np.isnan(sep)], prominence=0.05)[0]) if np.sum(~np.isnan(sep)) > 5 else np.nan
         f = dict(ciclo=len(filas) + 1, t_inicio_s=round(a / fps, 2), duracion_s=dur, SR_ciclos_min=60 / dur,
@@ -221,7 +243,7 @@ def variables_por_ciclo(fr, fps, ciclos_ab, metros_ancho=None, ancho_px=None, es
                  rodilla_min_I=bajo(seg.rodilla_I), rodilla_min_D=bajo(seg.rodilla_D),
                  alcance_I=alcI, alcance_D=alcD,
                  asimetria_brazos_pct=100 * abs(alcI - alcD) / np.nanmean([alcI, alcD]),
-                 inclinacion_tronco=seg.inclinacion_tronco.mean(),
+                 inclinacion_tronco=np.nan if frontal else seg.inclinacion_tronco.mean(),
                  amplitud_patada=np.nanmax(sep) if np.sum(~np.isnan(sep)) else np.nan,
                  patadas_por_ciclo=n_patadas)
         if ppm:

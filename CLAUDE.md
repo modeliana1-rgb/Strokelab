@@ -9,7 +9,7 @@ aparece la fatiga y por qué** (SHAP), y medidas de codos, hombros, caderas, rod
 - Todo se ejecuta **en local, en CPU**, en el portátil personal de Diana (Windows). No usar Colab salvo que lo pida.
 - Programa principal: `python analizar.py "<vídeo>" --nadador "<nombre>"` (ver README para opciones).
 - Pruebas antes de cada commit: `python tests/test_local.py`, `tests/test_sesion.py`, `tests/test_aaron.py`, `tests/test_movenet_recorte.py`,
-  `tests/test_estilos.py` y `tests/test_lote.py`.
+  `tests/test_estilos.py`, `tests/test_lote.py` y `tests/test_frontal.py`.
 - Todos los vídeos: `python lote.py --carpeta <videos> [--crear-lista]` (lista editable `lista_videos.csv`; reanudable).
 - Responder siempre en español. Explicar las decisiones técnicas en lenguaje claro: Diana las defiende ante un tribunal.
 - No inventar resultados: lo que no se haya medido se marca como pendiente.
@@ -74,6 +74,11 @@ aparece la fatiga y por qué** (SHAP), y medidas de codos, hombros, caderas, rod
   (imgsz 640/1280 × conf 0,25/0,10); `--imgsz/--conf-det` en analizar y lote (`--rehacer-pose`).
 - **Mínimos/máximos por ciclo robustos** (percentil 10/90, `medidas.bajo/alto`): con el mínimo puro, un fotograma
   malo daba rodillas de 12° en GX011614. Rodilla media por ciclo pasó de 107° a 149°.
+- **Vista frontal** (`--vista frontal`, 5 oct; Diana necesita detectar al nadador de frente): brazadas por el recorrido
+  de cada muñeca respecto al centro de hombros, en la dirección de máximo movimiento (PCA con cada brazo centrado),
+  hacia abajo en la imagen, en anchos de hombros; alcance = recorrido de muñeca; sin inclinación ni velocidad; ángulos 3D.
+  Sintético frontal (`tests/test_frontal.py`): SR 48,9 (verdad ~50), fatiga t = 47,5 s, SHAP: alcance, SR, asimetría.
+  Real: IMG_7215 4 ciclos 47-61 ciclos/min; IMG_7207 3 ciclos 58-90 (dudoso). Pendiente: cuenta manual de Diana.
 - `informe_nadador.py <resultados> --nadador X --estilo Y`: tablas y figuras por clip y por variable (solo vista lateral).
 - Variables redundantes fuera del modelo (v = SR·DPS; potencia ∝ v³).
 - El 99,99 % de accuracy de versiones antiguas era fuga de datos; la clasificación de estilo usa GroupKFold por vídeo.

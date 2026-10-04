@@ -55,9 +55,10 @@ def main(argv=None):
     ap.add_argument('--sin-video', action='store_true', help='no generar el vídeo anotado')
     ap.add_argument('--girar', default='auto', choices=['auto', '0', '90', '-90'],
                     help='girar el fotograma para que el nadador quede de pie ante el modelo (auto: elige el mejor)')
-    ap.add_argument('--vista', default='lateral', choices=['lateral', 'otra'],
-                    help='lateral: ángulos en 2D (validado; el 3D falla en piernas bajo el agua). '
-                         'otra (frontal, oblicua): ángulos en 3D con MotionBERT')
+    ap.add_argument('--vista', default='lateral', choices=['lateral', 'frontal', 'otra'],
+                    help='lateral: cámara de lado, ángulos en 2D (validado; el 3D falla en piernas bajo el agua). '
+                         'frontal: el nadador viene hacia la cámara o se ve desde el borde; brazadas por el recorrido '
+                         'de las muñecas y ángulos en 3D. otra (oblicua): brazadas como en lateral y ángulos en 3D')
     ap.add_argument('--panel', default='fatiga', choices=['fatiga', 'completo'],
                     help='panel del vídeo: solo fatiga (defecto) o también los ángulos articulares')
     a = ap.parse_args(argv)
@@ -124,15 +125,15 @@ def main(argv=None):
             print(f'    AVISO: sin 3D, se continúa en 2D. {type(e).__name__}: {e}')
 
     print('\n[4] Medidas por fotograma y ciclos de brazada')
-    usar_3d = k3d is not None and a.vista == 'otra'
+    usar_3d = k3d is not None and a.vista != 'lateral'
     fr = medidas.medidas_por_fotograma(k2d, fps, k3d if usar_3d else None)
     if k3d is not None and not usar_3d:        # el 3D se guarda aparte para comparar (columnas *_3d)
         f3 = medidas.medidas_por_fotograma(k2d, fps, k3d)
         for c in ['codo_I', 'codo_D', 'hombro_I', 'hombro_D', 'cadera_I', 'cadera_D', 'rodilla_I', 'rodilla_D']:
             fr[c + '_3d'] = f3[c]
     fr.to_csv(out / 'medidas_por_fotograma.csv', index=False)
-    sig, picos, ciclos_ab, T_br = medidas.detectar_ciclos(fr, fps, a.estilo)
-    ciclos = medidas.variables_por_ciclo(fr, fps, ciclos_ab, a.metros_encuadre, W, a.estilo)
+    sig, picos, ciclos_ab, T_br = medidas.detectar_ciclos(fr, fps, a.estilo, a.vista)
+    ciclos = medidas.variables_por_ciclo(fr, fps, ciclos_ab, a.metros_encuadre, W, a.estilo, a.vista)
     print(f'    ángulos en {"3D" if usar_3d else "2D"} (vista {a.vista}) · tronco implausible descartado: '
           f'{fr.attrs["pct_tronco_descartado"]:.1f}% (con tronco girado: {fr.attrs["pct_tronco_girado"]:.1f}%) · nadador analizable {np.mean(~np.isnan(sig)) * len(sig) / fps:.1f} s '
           f'de {len(sig) / fps:.1f} s · brazadas {len(picos)} (ritmo típico {T_br or 0:.2f} s) · ciclos válidos {len(ciclos)}')

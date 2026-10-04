@@ -43,7 +43,8 @@ python lote.py --carpeta C:\Users\user\StrokeLab\videos --crear-lista   # crea v
 python lote.py --carpeta C:\Users\user\StrokeLab\videos                 # analiza y une las sesiones
 ```
 
-La lista indica nadador, estilo (`crol`, `espalda`, `mariposa`, `braza`), vista (`lateral` u `otra`) y sesión.
+La lista indica nadador, estilo (`crol`, `espalda`, `mariposa`, `braza`), vista (`lateral`, `frontal` u `otra`) y sesión.
+De frente (`--vista frontal`) las brazadas se cuentan por el recorrido de cada muñeca y los ángulos se toman del 3D.
 Salen `resumen_lote.csv`, `resumen_sesiones.csv` y `para_claude.zip` (todo menos los vídeos) en `..\resultados`.
 Con un solo vídeo, `--estilo` fija cuántas brazadas forman un ciclo: 2 en crol y espalda, 1 en mariposa y braza.
 

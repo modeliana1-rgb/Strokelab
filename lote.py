@@ -3,7 +3,7 @@
 Pasos (PowerShell, desde la carpeta del proyecto):
   1) python lote.py --carpeta C:\\Users\\user\\StrokeLab\\videos --crear-lista
      Crea videos\\lista_videos.csv con nadador, estilo, vista y sesión de cada vídeo. Revísala en Excel:
-     - vista: lateral (cámara de lado) u otra (frontal, oblicua, desde arriba).
+     - vista: lateral (cámara de lado), frontal (viene hacia la cámara o desde el borde) u otra (oblicua).
      - sesion: los vídeos con el mismo nombre de sesión se unen en orden para analizar la fatiga.
      - incluir: si / no.
   2) python lote.py --carpeta C:\\Users\\user\\StrokeLab\\videos
@@ -121,9 +121,9 @@ def main(argv=None):
     filas = [f for f in leer_lista(lista) if f.get('incluir', 'si').lower() in ('si', 'sí', 's', '1', 'x')]
     if a.solo:
         filas = [f for f in filas if f['archivo'] in a.solo]
-    malos = [f['archivo'] for f in filas if f.get('estilo') not in ESTILOS or f.get('vista') not in ('lateral', 'otra')]
+    malos = [f['archivo'] for f in filas if f.get('estilo') not in ESTILOS or f.get('vista') not in ('lateral', 'frontal', 'otra')]
     if malos:
-        print(f'Corrige estilo ({"/".join(ESTILOS)}) o vista (lateral/otra) en: {", ".join(malos)}')
+        print(f'Corrige estilo ({"/".join(ESTILOS)}) o vista (lateral/frontal/otra) en: {", ".join(malos)}')
         return 1
 
     pendientes = []

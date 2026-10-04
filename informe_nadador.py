@@ -130,7 +130,7 @@ def main(argv=None):
     ap.add_argument('resultados')
     ap.add_argument('--nadador', required=True)
     ap.add_argument('--estilo', default='crol')
-    ap.add_argument('--vista', default='lateral', choices=['lateral', 'otra', 'todas'], help='clips cuyas medidas se resumen')
+    ap.add_argument('--vista', default='lateral', choices=['lateral', 'frontal', 'otra', 'todas'], help='clips cuyas medidas se resumen')
     a = ap.parse_args(argv)
     res_dir = Path(a.resultados)
     out = res_dir / f'informe_{a.nadador}_{a.estilo}'
