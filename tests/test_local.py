@@ -56,6 +56,11 @@ def nadador_sintetico(fps=30, dur=90, W=640, H=360, seed=0):
     for t0 in (900, 1800, 2300):                   # errores típicos bajo el agua
         kps[t0:t0 + 4, [11, 12]] = kps[t0:t0 + 4, [5, 6]] + rng.normal(0, 2, (4, 2, 2))
         kps[t0 + 10:t0 + 13, [9, 10]] += rng.normal(0, 900, (3, 2, 2))
+    for t0 in (1200, 2000):                        # esqueleto "de pie": cadera justo debajo del hombro
+        L = np.linalg.norm(kps[t0, 5] - kps[t0, 11])
+        kps[t0:t0 + 15, [11, 12]] = kps[t0:t0 + 15, [5, 6]] + np.array([0, L])
+        kps[t0:t0 + 15, [13, 14]] = kps[t0:t0 + 15, [11, 12]] + np.array([0, 0.75 * L])
+        kps[t0:t0 + 15, [15, 16]] = kps[t0:t0 + 15, [13, 14]] + np.array([0, 0.75 * L])
     conf[:150] = 0.05                              # tramo inicial sin nadador
     kps[conf == 0] = np.nan
     return kps, conf, fps, W, H
@@ -80,6 +85,7 @@ def main():
     cic = pd.read_csv(out / 'variables_por_ciclo.csv')
     assert cic[['alcance_I', 'alcance_D']].max().max() < 3, 'alcance imposible'
     assert cic[['codo_min_I', 'codo_min_D']].min().min() > 25, 'codo imposible'
+    assert cic.inclinacion_tronco.max() < 30, 'quedan esqueletos "de pie" sin filtrar'
     for col in ['hombro_max_I', 'cadera_media_D', 'rodilla_min_I', 'amplitud_patada', 'patadas_por_ciclo']:
         assert cic[col].notna().mean() > 0.8, f'{col} sin datos'
     cap = cv2.VideoCapture(str(out / 'video_anotado.mp4'))

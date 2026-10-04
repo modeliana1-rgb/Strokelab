@@ -7,6 +7,11 @@ Ejemplos (PowerShell, desde la carpeta del proyecto):
 
 Salida en resultados/<nombre del vídeo>/: keypoints, CSV por fotograma y por ciclo, resumen JSON, figuras y vídeo anotado.
 """
+import os
+# Windows: PyTorch y NumPy/scikit-learn traen cada uno su copia de OpenMP (libiomp5md.dll); sin esto el programa se
+# cierra con "OMP: Error #15". Es el ajuste habitual para este conflicto y debe hacerse antes de importarlas.
+os.environ.setdefault('KMP_DUPLICATE_LIB_OK', 'TRUE')
+
 import argparse
 import json
 import sys
@@ -114,7 +119,7 @@ def main(argv=None):
     brazo, sig, picos = medidas.detectar_ciclos(fr, fps)
     ciclos = medidas.variables_por_ciclo(fr, fps, brazo, picos, a.metros_encuadre, W)
     print(f'    ángulos en {"3D" if k3d is not None else "2D"} · tronco implausible descartado: '
-          f'{fr.attrs["pct_tronco_descartado"]:.1f}% · nadador analizable {np.mean(~np.isnan(sig)) * len(sig) / fps:.1f} s '
+          f'{fr.attrs["pct_tronco_descartado"]:.1f}% (con tronco girado: {fr.attrs["pct_tronco_girado"]:.1f}%) · nadador analizable {np.mean(~np.isnan(sig)) * len(sig) / fps:.1f} s '
           f'de {len(sig) / fps:.1f} s · entradas de mano {len(picos)} · ciclos válidos {len(ciclos)}')
     _grafica_ciclos(sig, picos, fps, out)
 
@@ -135,6 +140,7 @@ def main(argv=None):
     resumen = dict(video=vid.name, nadador=a.nadador, modelo_pose=a.modelo, cada=a.cada, giro=rot, angulos_3d=k3d is not None,
                    fps=fps, resolucion=f'{W}x{H}', duracion_s=round(len(kps) / fps, 2), ciclos_validos=len(ciclos),
                    pct_tronco_descartado=round(fr.attrs['pct_tronco_descartado'], 1),
+                   pct_tronco_girado=round(fr.attrs['pct_tronco_girado'], 1),
                    inicio_fatiga_ciclo=None if res.get('inicio') is None else int(ciclos.ciclo.iloc[res['inicio']]),
                    inicio_fatiga_s=res.get('t_inicio'), cambio_pelt=res.get('cambio_pelt', []),
                    variables_modelo=res.get('feats', []),

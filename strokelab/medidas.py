@@ -54,6 +54,21 @@ def medidas_por_fotograma(k2d, fps, k3d=None):
     # Filtro de plausibilidad anatómica: tronco fuera de [0.5, 2] x mediana = cadera/hombro mal detectados
     L_med = np.nanmedian(L)
     malo = ~((L > 0.5 * L_med) & (L < 2.0 * L_med))
+
+    # Dirección del tronco en la imagen: los modelos de pose a veces "ponen de pie" a un nadador horizontal.
+    # Se descartan los fotogramas cuyo tronco se desvía más de 45° de la dirección habitual del nadador en el
+    # vídeo (estadística axial: nadar hacia la izquierda o hacia la derecha cuenta como la misma dirección).
+    e2 = np.nanmean([k2d[:, LSH], k2d[:, RSH]], 0) - np.nanmean([k2d[:, LHIP], k2d[:, RHIP]], 0)
+    ang2 = np.arctan2(e2[:, 1], e2[:, 0])
+    ok2 = ~np.isnan(ang2)
+    desv = np.full(len(ang2), np.nan)
+    if ok2.sum() >= 10:
+        cand = np.radians(np.arange(0, 180, 2))
+        dif = lambda a, b: np.abs((a - b + np.pi / 2) % np.pi - np.pi / 2)      # diferencia axial en [0, 90°]
+        ang_hab = cand[np.argmin([dif(ang2[ok2], c).sum() for c in cand])]     # mediana axial (robusta)
+        desv = np.degrees(dif(ang2, ang_hab))
+    girado = desv > 45
+    malo = malo | girado
     L = np.where(malo, np.nan, L)
     u = eje / L[:, None]
 
@@ -81,10 +96,10 @@ def medidas_por_fotograma(k2d, fps, k3d=None):
     fr['munD_eje'] = con(brazoD, ((k[:, RWR] - k[:, RSH]) * u).sum(1) / L)
     fr['sep_tobillos'] = con(piernaI & piernaD, np.linalg.norm(k[:, LAN] - k[:, RAN], axis=1) / L)
     # Inclinación del tronco respecto a la horizontal: solo tiene sentido en 2D con vista lateral
-    e2 = np.nanmean([k2d[:, LSH], k2d[:, RSH]], 0) - np.nanmean([k2d[:, LHIP], k2d[:, RHIP]], 0)
     fr['inclinacion_tronco'] = np.where(np.isnan(L), np.nan, np.degrees(np.arctan2(np.abs(e2[:, 1]), np.abs(e2[:, 0]))))
     fr['cadera_x_px'] = np.nanmean([k2d[:, LHIP], k2d[:, RHIP]], 0)[:, 0]
     fr.attrs['pct_tronco_descartado'] = float(100 * np.mean(malo & ~np.isnan(eje[:, 0])))
+    fr.attrs['pct_tronco_girado'] = float(100 * np.mean(girado & ~np.isnan(eje[:, 0])))
     fr.attrs['usa_3d'] = k3d is not None
     return fr
 
