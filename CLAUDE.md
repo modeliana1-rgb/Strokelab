@@ -71,11 +71,15 @@ aparece la fatiga y por qué** (SHAP), y medidas de codos, hombros, caderas, rod
 
 ## Memoria
 
-Documento "TFM StrokeLab – Memoria (versión de revisión)" en claude.ai. Huecos marcados como [PENDIENTE].
+- Borrador vivo: documento "TFM StrokeLab – Memoria (versión de revisión)" en claude.ai
+  (https://claude.ai/code/artifact/887425c4-4432-4c90-9862-b247bfdd8fe8).
+- Entrega final: plantilla de la escuela `memoria/Plantilla_memoria_TFM.docx`, rellenada por
+  `memoria/generar_memoria.py` -> `memoria/TFM_StrokeLab_borrador.docx`. Base antigua (sept., con resultados no
+  válidos: 5 nadadores con potencia, 99,9 %, LSTM): `memoria/TFM_STROKELAB_ACTUALIZADO_base_sept.docx`.
+- Datos de la portada pendientes: apellidos de Diana, director/a, horas y presupuesto.
 
 ## Siguientes pasos
 
-1. `python diagnostico.py` y `python analizar.py <GX011615> --comparativa` en el portátil: velocidad real en CPU.
-2. Validar el 3D (pesos reales de MotionBERT) frente al 2D en la vista lateral.
-3. Analizar un vídeo largo (GX010664) para obtener el resultado de fatiga.
-4. Volcar resultados en la memoria (Cap. 5) y actualizar Cap. 3 (YOLOv8n en CPU, MotionBERT, nuevas medidas).
+1. Nuevos vídeos de Diana (más largos) para el resultado de fatiga real; la sesión GX011614/17/18 da ~10 ciclos.
+2. MoveNet y MediaPipe en la CPU del portátil (`--comparativa`) para completar la Tabla 3.1.
+3. Rellenar los [PENDIENTE] de la memoria final y regenerar el .docx.
