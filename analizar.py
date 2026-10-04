@@ -44,6 +44,10 @@ def main(argv=None):
     ap.add_argument('--keypoints', help='reutilizar un keypoints_raw.npz de otra carpeta (p. ej. para comparar 2D y 3D)')
     ap.add_argument('--formato', choices=['mp4', 'avi'], default='mp4', help='avi (MJPG) si el mp4 no se abre en tu equipo')
     ap.add_argument('--sin-video', action='store_true', help='no generar el vídeo anotado')
+    ap.add_argument('--girar', default='auto', choices=['auto', '0', '90', '-90'],
+                    help='girar el fotograma para que el nadador quede de pie ante el modelo (auto: elige el mejor)')
+    ap.add_argument('--panel', default='fatiga', choices=['fatiga', 'completo'],
+                    help='panel del vídeo: solo fatiga (defecto) o también los ángulos articulares')
     a = ap.parse_args(argv)
 
     vid = Path(a.video)
@@ -52,25 +56,35 @@ def main(argv=None):
     t_total = time.time()
     print(f'StrokeLab · {vid.name} -> {out}')
 
+    npz = out / 'keypoints_raw.npz'
+    origen = Path(a.keypoints) if a.keypoints else (npz if a.desde_keypoints and npz.exists() else None)
+    rot = 0
+    if not origen:
+        if a.girar == 'auto':
+            print(f'\n[0] Orientación: nadador sin girar y girado ±90° con {a.modelo}')
+            rot = pose.elegir_rotacion(vid, a.modelo)
+            print(f'    elegido: {rot:+d}°')
+        else:
+            rot = int(a.girar)
+
     if a.comparativa:
-        print('\n[0] Comparativa de modelos de pose en CPU (15 tramos de 10 fotogramas repartidos por el vídeo)')
-        tabla = pose.comparar_modelos(vid, MODELOS_COMPARATIVA)
+        print(f'\n[0] Comparativa de modelos de pose en CPU (15 tramos de 10 fotogramas; giro {rot:+d}°)')
+        tabla = pose.comparar_modelos(vid, MODELOS_COMPARATIVA, rot=rot)
         tabla.to_csv(out / 'comparativa_modelos_cpu.csv', index=False)
         print(tabla.to_string(index=False))
 
-    npz = out / 'keypoints_raw.npz'
-    origen = Path(a.keypoints) if a.keypoints else (npz if a.desde_keypoints and npz.exists() else None)
     if origen:
         d = np.load(origen)
         kps, conf, fps, W, H = d['kps'], d['conf'], float(d['fps']), int(d['w']), int(d['h'])
+        rot = int(d['giro']) if 'giro' in d.files else 0
         if origen != npz:
             np.savez(npz, **{k: d[k] for k in d.files})
         print(f'\n[1] Pose 2D cargada de {origen}')
     else:
-        print(f'\n[1] Pose 2D con {a.modelo} (1 de cada {a.cada} fotogramas)')
+        print(f'\n[1] Pose 2D con {a.modelo} (1 de cada {a.cada} fotogramas, giro {rot:+d}°)')
         t0 = time.time()
-        kps, conf, fps, W, H = pose.extraer_keypoints(vid, a.modelo, cada=a.cada)
-        np.savez(npz, kps=kps, conf=conf, fps=fps, w=W, h=H, modelo=a.modelo, cada=a.cada)
+        kps, conf, fps, W, H = pose.extraer_keypoints(vid, a.modelo, cada=a.cada, rot=rot)
+        np.savez(npz, kps=kps, conf=conf, fps=fps, w=W, h=H, modelo=a.modelo, cada=a.cada, giro=rot)
         print(f'    {len(kps)} fotogramas, {W}x{H}, {fps:.2f} fps, en {time.time() - t0:.0f} s')
     analizados = conf.max(1) > 0
     print(f'    fotogramas analizados con >= 5 articulaciones fiables: '
@@ -118,7 +132,7 @@ def main(argv=None):
         print('\n    Medias por ciclo:')
         print(ciclos.drop(columns=['ciclo', 't_inicio_s', 'estado'], errors='ignore').mean().round(2).to_string())
 
-    resumen = dict(video=vid.name, nadador=a.nadador, modelo_pose=a.modelo, cada=a.cada, angulos_3d=k3d is not None,
+    resumen = dict(video=vid.name, nadador=a.nadador, modelo_pose=a.modelo, cada=a.cada, giro=rot, angulos_3d=k3d is not None,
                    fps=fps, resolucion=f'{W}x{H}', duracion_s=round(len(kps) / fps, 2), ciclos_validos=len(ciclos),
                    pct_tronco_descartado=round(fr.attrs['pct_tronco_descartado'], 1),
                    inicio_fatiga_ciclo=None if res.get('inicio') is None else int(ciclos.ciclo.iloc[res['inicio']]),
@@ -132,7 +146,7 @@ def main(argv=None):
         print('\n[6] Vídeo anotado')
         t0 = time.time()
         destino = out / f'video_anotado.{a.formato}'
-        video.anotar(vid, destino, k2d, fr, ciclos, fps, a.nadador, a.formato)
+        video.anotar(vid, destino, k2d, fr, ciclos, fps, a.nadador, a.formato, res=res, panel=a.panel)
         print(f'    {destino} ({time.time() - t0:.0f} s)')
 
     print(f'\nListo en {time.time() - t_total:.0f} s. Resultados en: {out.resolve()}')

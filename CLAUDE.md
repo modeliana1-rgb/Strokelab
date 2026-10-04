@@ -32,7 +32,15 @@ aparece la fatiga y por qué** (SHAP), y medidas de codos, hombros, caderas, rod
   centra en la pelvis y se gira para que el tronco quede vertical (MotionBERT se entrenó con personas de pie), y la
   escala se normaliza por el tamaño del cuerpo. Los ángulos articulares no cambian con el giro.
   **Pendiente: validar la calidad 3D con los pesos reales** (comparar ángulos 2D vs 3D en vista lateral).
-- **Filtro de plausibilidad anatómica** (`medidas.py`): tronco fuera de [0,5, 2] × mediana, segmentos de brazo y
+- **Giro del fotograma para la pose 2D** (`--girar auto`): YOLO, entrenado con personas de pie, "inventaba" un cuerpo
+  vertical bajo la cabeza de Aaron (GX011614). Se prueba el fotograma sin girar y girado ±90° en 8 tramos y se usa el
+  giro que mejor detecta; las coordenadas se devuelven al fotograma original.
+- **Vídeo anotado centrado en la fatiga** (petición de Diana): estado FRESCO/FATIGA, ciclo, frecuencia y barra temporal
+  de anomalía por ciclo con umbral e inicio. Los ángulos van a los CSV (`--panel completo` para verlos en el vídeo).
+- **Resultados en el portátil (CPU, 4 hilos)**: GX011614 (Aaron, crol, 5K, 46 s): YOLOv8n 6,6 FPS, YOLO11n 6,2,
+  YOLOv8s 3,3 (detección 36-38 %, confianza 0,74-0,78); 7 ciclos válidos (Aaron en cuadro 17,5 s); MotionBERT 22 s.
+  Pendiente: SR media 73 ciclos/min parece alta (contar a mano 10 s) y ángulos 3D de hombro/rodilla bajos (comparar con 2D).
+- - **Filtro de plausibilidad anatómica** (`medidas.py`): tronco fuera de [0,5, 2] × mediana, segmentos de brazo y
   pierna implausibles, codos < 25°. Motivo: bajo el agua el modelo coloca a veces la cadera sobre el hombro.
 - **Fatiga por ciclo de brazada**, comparando con el primer 30 % de ciclos del propio nadador; inicio = 3 ciclos
   seguidos por encima del percentil 95 de la fase fresca; contraste con PELT.

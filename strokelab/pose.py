@@ -41,6 +41,27 @@ def reducir(frame, max_lado=MAX_LADO):
     return frame, f
 
 
+# ---------------------------------------------------------------- Giro del fotograma
+# Los modelos de pose se entrenaron sobre todo con personas de pie. Con un nadador en horizontal tienden a
+# "inventar" un cuerpo vertical. Girando el fotograma 90° el nadador queda de pie para el modelo; después se
+# deshace el giro en las coordenadas.
+def girar(frame, rot):
+    if rot == 90:
+        return cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
+    if rot == -90:
+        return cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+    return frame
+
+
+def desgirar(xy, rot, ancho, alto):
+    """Coordenadas del fotograma girado -> fotograma original (ancho x alto antes de girar)."""
+    if rot == 90:
+        return np.c_[xy[:, 1], alto - 1 - xy[:, 0]]
+    if rot == -90:
+        return np.c_[ancho - 1 - xy[:, 1], xy[:, 0]]
+    return xy
+
+
 # ---------------------------------------------------------------- MoveNet
 def recorte_cuadrado(frame, cx, cy, lado):
     """Cuadrado de 'lado' px centrado en (cx, cy); lo que cae fuera del vídeo queda en negro."""
@@ -182,7 +203,22 @@ class Estimador:
         return xy[i], cf[i]
 
 
-def extraer_keypoints(video, modelo='yolov8n-pose', cada=1, progreso=True):
+class EstimadorGirado:
+    """Estimador que trabaja sobre el fotograma girado 'rot' grados y devuelve coordenadas del original."""
+
+    def __init__(self, modelo, ancho, alto, rot=0):
+        self.rot, self.ancho, self.alto = rot, ancho, alto
+        self.est = Estimador(modelo, *((alto, ancho) if rot else (ancho, alto)))
+
+    def reiniciar(self):
+        self.est.reiniciar()
+
+    def __call__(self, frame):
+        xy, cf = self.est(girar(frame, self.rot))
+        return desgirar(xy, self.rot, frame.shape[1], frame.shape[0]), cf
+
+
+def extraer_keypoints(video, modelo='yolov8n-pose', cada=1, progreso=True, rot=0):
     """Procesa el vídeo completo. Con cada=2 analiza un fotograma de cada dos (el resto se interpola después).
 
     Devuelve kps (T,17,2) en px originales (NaN donde no hay detección), conf (T,17), fps, ancho, alto.
@@ -194,7 +230,7 @@ def extraer_keypoints(video, modelo='yolov8n-pose', cada=1, progreso=True):
     W, H = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     N = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     f_red = min(1.0, MAX_LADO / max(W, H))
-    est = Estimador(modelo, int(round(W * f_red)), int(round(H * f_red)))
+    est = EstimadorGirado(modelo, int(round(W * f_red)), int(round(H * f_red)), rot)
     kps = np.full((N, 17, 2), np.nan)
     conf = np.zeros((N, 17))
     t0 = time.time()
@@ -238,7 +274,34 @@ def leer_tramos(video, n_tramos=15, largo=10):
     return tramos
 
 
-def comparar_modelos(video, modelos, conf_min=0.30):
+def _puntuar(est, tramos, conf_min=0.30):
+    """Ejecuta el estimador sobre los tramos: (fps, tasa de detección %, confianza media)."""
+    est(tramos[0][0])                                      # calentamiento
+    confs, t0, n = [], time.time(), 0
+    for tramo in tramos:
+        est.reiniciar()
+        for f in tramo:
+            confs.append(est(f)[1])
+            n += 1
+    fps = n / (time.time() - t0)
+    c = np.array(confs)
+    det = (c > conf_min).sum(1) >= 5
+    return fps, float(100 * det.mean()), float(c[det].mean()) if det.any() else 0.0
+
+
+def elegir_rotacion(video, modelo):
+    """Prueba el fotograma sin girar y girado ±90° en 8 tramos del vídeo; elige el que mejor detecta."""
+    tramos = leer_tramos(video, n_tramos=8, largo=5)
+    h, w = tramos[0][0].shape[:2]
+    filas = []
+    for rot in (0, 90, -90):
+        _, det, conf = _puntuar(EstimadorGirado(modelo, w, h, rot), tramos)
+        filas.append((rot, det, conf, det / 100 * conf))
+        print(f'   giro {rot:+4d}°: detección {det:5.1f} %  confianza {conf:.3f}  puntuación {det / 100 * conf:.3f}')
+    return max(filas, key=lambda f: f[3])[0]
+
+
+def comparar_modelos(video, modelos, conf_min=0.30, rot=0):
     """Comparativa en CPU: FPS, % de fotogramas con >= 5 articulaciones fiables, confianza media."""
     import pandas as pd
     tramos = leer_tramos(video)
@@ -246,19 +309,9 @@ def comparar_modelos(video, modelos, conf_min=0.30):
     filas = []
     for m in modelos:
         try:
-            est = Estimador(m, w, h)
-            est(tramos[0][0])                      # calentamiento
-            confs, t0, n = [], time.time(), 0
-            for tramo in tramos:
-                est.reiniciar()
-                for f in tramo:
-                    confs.append(est(f)[1])
-                    n += 1
-            fps = n / (time.time() - t0)
-            c = np.array(confs)
-            det = (c > conf_min).sum(1) >= 5
-            filas.append(dict(modelo=m, fps_cpu=round(fps, 1), tasa_deteccion=round(float(100 * det.mean()), 1),
-                              conf_media=round(float(c[det].mean()) if det.any() else 0.0, 3)))
+            fps, det, conf = _puntuar(EstimadorGirado(m, w, h, rot), tramos, conf_min)
+            filas.append(dict(modelo=m, giro=rot, fps_cpu=round(fps, 1), tasa_deteccion=round(det, 1),
+                              conf_media=round(conf, 3)))
             print('  ', filas[-1])
         except Exception as e:
             print(f'   omitido {m}: {type(e).__name__}: {str(e)[:120]}')
