@@ -1,0 +1,442 @@
+"""Genera StrokeLab_v3_pipeline.ipynb (Colab)."""
+import os
+import nbformat as nbf
+
+cells = []  # (tipo, fuente, colab_only)
+
+
+def md(s):
+    cells.append(("md", s.strip(), False))
+
+
+def code(s, colab_only=False):
+    cells.append(("code", s.strip(), colab_only))
+
+
+md("""
+# StrokeLab v3: pipeline limpio (1 nadador, crol)
+
+**Vertical 1 (Visión):** vídeo → estimación de pose 2D (comparativa de modelos) → keypoints COCO-17 limpios.
+**Vertical 2 (Tabulares):** keypoints → features por ciclo de brazada → eficiencia → fatiga (Isolation Forest + SHAP).
+
+**Cómo usarlo:**
+1. `Entorno de ejecución → Cambiar tipo → GPU (T4)`.
+2. Edita la celda **CONFIGURACIÓN** (ruta del vídeo y calibración).
+3. `Entorno de ejecución → Ejecutar todas`.
+
+Todo se guarda en `OUT_DIR` (CSV, JSON, figuras PNG y vídeo anotado), listo para la memoria.
+""")
+
+md("## 0. Instalación")
+code("""
+!pip -q install ultralytics ruptures shap xgboost
+""", colab_only=True)
+
+md("## 1. CONFIGURACIÓN (edita solo esta celda)")
+code("""
+from google.colab import drive
+drive.mount('/content/drive')
+
+VIDEO_PATH = '/content/drive/MyDrive/StrokeLab/videos/nadador1_crol.mp4'   # <- tu vídeo
+OUT_DIR    = '/content/drive/MyDrive/StrokeLab/resultados_v3/nadador1'      # <- carpeta de salida
+NADADOR    = 'Nadador 1'
+
+# Calibración (solo si la CÁMARA ESTÁ FIJA): metros horizontales que abarca el encuadre.
+# Ejemplo: si de borde a borde del vídeo se ven 2.5 m -> 2.5.  Si la cámara se mueve -> None.
+METROS_ANCHO_ENCUADRE = None
+""", colab_only=True)
+
+code("""
+import os, json, time, warnings, cv2
+import numpy as np, pandas as pd
+import matplotlib.pyplot as plt
+from scipy.signal import find_peaks, savgol_filter
+warnings.filterwarnings('ignore')
+
+CONF_KP = 0.30            # confianza mínima por keypoint
+N_FRAMES_BENCH = 300      # frames usados en la comparativa de modelos
+BASELINE_FRAC = 0.30      # % inicial de ciclos considerado "fresco"
+os.makedirs(OUT_DIR, exist_ok=True)
+FIG = lambda name: os.path.join(OUT_DIR, name)
+
+# Índices COCO-17
+NOSE, LSH, RSH, LEL, REL, LWR, RWR, LHIP, RHIP, LKN, RKN, LAN, RAN = 0, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16
+SKELETON = [(5,7),(7,9),(6,8),(8,10),(5,6),(5,11),(6,12),(11,12),(11,13),(13,15),(12,14),(14,16),(0,5),(0,6)]
+""")
+
+md("""
+## 2. Vertical 1 · Comparativa de modelos de pose (punto 5 del profesor)
+Mismo vídeo, mismos frames. Métricas: **FPS**, **tasa de detección** (% de frames con nadador)
+y **confianza media** de los keypoints. MoveNet se intenta también; si no carga, se omite sin romper nada.
+""")
+code("""
+import cv2, torch
+from ultralytics import YOLO
+
+def leer_frames(path, n):
+    cap = cv2.VideoCapture(path); frames = []
+    while len(frames) < n:
+        ok, f = cap.read()
+        if not ok: break
+        frames.append(f)
+    cap.release(); return frames
+
+bench_frames = leer_frames(VIDEO_PATH, N_FRAMES_BENCH)
+print(f'{len(bench_frames)} frames para la comparativa')
+
+def bench_yolo(nombre):
+    m = YOLO(nombre); m(bench_frames[0], verbose=False)          # warm-up
+    det, confs = 0, []
+    t0 = time.time()
+    for f in bench_frames:
+        r = m(f, verbose=False)[0]
+        if r.keypoints is not None and r.keypoints.conf is not None and len(r.boxes):
+            i = int(r.boxes.conf.argmax()); det += 1
+            confs.append(float(r.keypoints.conf[i].mean()))
+    fps = len(bench_frames) / (time.time() - t0)
+    return dict(modelo=nombre.replace('.pt',''), params_M=round(sum(p.numel() for p in m.model.parameters())/1e6, 1),
+                fps=round(fps, 1), tasa_deteccion=round(100*det/len(bench_frames), 1),
+                conf_media=round(float(np.mean(confs)) if confs else 0, 3))
+
+def bench_movenet():
+    import tensorflow as tf, tensorflow_hub as hub
+    mod = hub.load('https://tfhub.dev/google/movenet/singlepose/lightning/4').signatures['serving_default']
+    def run(f):
+        img = tf.image.resize_with_pad(tf.expand_dims(cv2.cvtColor(f, cv2.COLOR_BGR2RGB), 0), 192, 192)
+        return mod(tf.cast(img, tf.int32))['output_0'].numpy()[0, 0]   # (17,3) y,x,score
+    run(bench_frames[0]); t0 = time.time(); scores = [run(f)[:, 2] for f in bench_frames]
+    fps = len(bench_frames) / (time.time() - t0); scores = np.array(scores)
+    return dict(modelo='movenet_lightning', params_M=None, fps=round(fps, 1),
+                tasa_deteccion=round(100*np.mean(scores.mean(1) > CONF_KP), 1), conf_media=round(float(scores.mean()), 3))
+
+filas = []
+for nombre in ['yolov8n-pose.pt', 'yolov8s-pose.pt', 'yolov8m-pose.pt', 'yolo11n-pose.pt', 'yolo11m-pose.pt']:
+    try: filas.append(bench_yolo(nombre)); print(filas[-1])
+    except Exception as e: print('omitido', nombre, e)
+try: filas.append(bench_movenet()); print(filas[-1])
+except Exception as e: print('MoveNet omitido:', e)
+
+bench = pd.DataFrame(filas)
+bench['score'] = bench.tasa_deteccion/100 * bench.conf_media
+bench.to_csv(FIG('comparativa_modelos_pose.csv'), index=False)
+display(bench)
+
+# Elección: mejor score (detección x confianza) entre los YOLO con >= 15 FPS
+cand = bench[bench.modelo.str.startswith('yolo') & (bench.fps >= 15)]
+POSE_MODEL = (cand if len(cand) else bench[bench.modelo.str.startswith('yolo')]).sort_values('score').iloc[-1].modelo + '.pt'
+print('Modelo elegido:', POSE_MODEL)
+
+fig, ax = plt.subplots(1, 3, figsize=(14, 4))
+for a, col, t in zip(ax, ['fps', 'tasa_deteccion', 'conf_media'], ['FPS (GPU)', 'Tasa de detección (%)', 'Confianza media']):
+    a.bar(bench.modelo, bench[col], color=['#2a9d8f' if m+'.pt' == POSE_MODEL else '#9aa5b1' for m in bench.modelo])
+    a.set_title(t); a.tick_params(axis='x', rotation=45)
+plt.tight_layout(); plt.savefig(FIG('fig_comparativa_pose.png'), dpi=150); plt.show()
+""", colab_only=True)
+
+md("""
+## 3. Vertical 1 · Extracción de keypoints del vídeo completo
+Ultralytics devuelve las coordenadas **ya en píxeles del vídeo original** (sin padding que corregir).
+Si hay varias personas, se sigue al nadador más cercano a su posición anterior.
+""")
+code("""
+model = YOLO(POSE_MODEL)
+cap = cv2.VideoCapture(VIDEO_PATH)
+FPS = cap.get(cv2.CAP_PROP_FPS); W = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)); H = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+N = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+kps = np.full((N, 17, 2), np.nan); conf = np.zeros((N, 17)); prev_c = None
+for t in range(N):
+    ok, f = cap.read()
+    if not ok: break
+    r = model(f, verbose=False)[0]
+    if r.keypoints is None or r.keypoints.conf is None or len(r.boxes) == 0: continue
+    xy = r.keypoints.xy.cpu().numpy(); cf = r.keypoints.conf.cpu().numpy()
+    centros = r.boxes.xywh.cpu().numpy()[:, :2]
+    if prev_c is None: i = int((r.boxes.conf.cpu().numpy() * r.boxes.xywh.cpu().numpy()[:, 2:].prod(1)).argmax())
+    else: i = int(np.linalg.norm(centros - prev_c, axis=1).argmin())
+    kps[t], conf[t], prev_c = xy[i], cf[i], centros[i]
+    if t % 500 == 0: print(f'{t}/{N}')
+cap.release()
+kps[conf == 0] = np.nan
+np.savez(FIG('keypoints_raw.npz'), kps=kps[:t+1], conf=conf[:t+1], fps=FPS, w=W, h=H)
+print(f'OK: {t+1} frames, {FPS:.1f} fps, {W}x{H}, detección {100*np.mean(conf[:t+1].max(1) > 0):.1f}%')
+""", colab_only=True)
+
+md("## 4. Limpieza: filtro por confianza, interpolación de huecos cortos y suavizado")
+code("""
+d = np.load(FIG('keypoints_raw.npz'))
+kps, conf, FPS, W, H = d['kps'].copy(), d['conf'], float(d['fps']), int(d['w']), int(d['h'])
+T = len(kps); tiempo = np.arange(T) / FPS
+kps[conf < CONF_KP] = np.nan
+
+def limpiar(x, fps, max_hueco_s=0.4):
+    s = pd.Series(x).interpolate(limit=int(max_hueco_s*fps), limit_area='inside').to_numpy()
+    win = max(5, int(fps/5) | 1)                       # ~0.2 s, impar
+    out = s.copy(); ok = ~np.isnan(s)
+    # suaviza cada tramo continuo
+    idx = np.flatnonzero(np.diff(np.r_[0, ok.astype(int), 0]))
+    for a, b in zip(idx[::2], idx[1::2]):
+        if b - a > win: out[a:b] = savgol_filter(s[a:b], win, 2)
+    return out
+
+for j in range(17):
+    for c in range(2): kps[:, j, c] = limpiar(kps[:, j, c], FPS)
+validez = pd.Series(100*np.mean(~np.isnan(kps[:, :, 0]), 0).round(1),
+                    index=['nariz','ojoI','ojoD','orejaI','orejaD','hombroI','hombroD','codoI','codoD','muñecaI','muñecaD',
+                           'caderaI','caderaD','rodillaI','rodillaD','tobilloI','tobilloD'])
+print('% frames válidos por keypoint tras limpieza:'); print(validez.to_string())
+np.save(FIG('keypoints_clean.npy'), kps)
+""")
+
+md("""
+## 5. Vertical 2 · Features por frame y detección de ciclos de brazada
+El ciclo se detecta con la posición de la muñeca **proyectada sobre el eje del cuerpo** (cadera→hombro),
+normalizada por la longitud del tronco: no depende del tamaño en píxeles ni de la dirección de nado.
+""")
+code("""
+def ang(a, b, c):                     # ángulo en b (grados)
+    v1, v2 = a - b, c - b
+    cos = (v1*v2).sum(-1) / (np.linalg.norm(v1, axis=-1)*np.linalg.norm(v2, axis=-1))
+    return np.degrees(np.arccos(np.clip(cos, -1, 1)))
+
+hom = (kps[:, LSH] + kps[:, RSH]) / 2; cad = (kps[:, LHIP] + kps[:, RHIP]) / 2
+hom = np.where(np.isnan(hom), np.nanmean([kps[:, LSH], kps[:, RSH]], 0), hom)
+cad = np.where(np.isnan(cad), np.nanmean([kps[:, LHIP], kps[:, RHIP]], 0), cad)
+eje = hom - cad; L_tronco = np.linalg.norm(eje, axis=1); u = eje / L_tronco[:, None]
+
+fr = pd.DataFrame({'t': tiempo})
+fr['codo_I'] = ang(kps[:, LSH], kps[:, LEL], kps[:, LWR])
+fr['codo_D'] = ang(kps[:, RSH], kps[:, REL], kps[:, RWR])
+fr['munI_eje'] = ((kps[:, LWR] - kps[:, LSH]) * u).sum(1) / L_tronco
+fr['munD_eje'] = ((kps[:, RWR] - kps[:, RSH]) * u).sum(1) / L_tronco
+incl = np.degrees(np.arctan2(np.abs(eje[:, 1]), np.abs(eje[:, 0])))   # 0 = cuerpo horizontal
+fr['inclinacion_tronco'] = incl
+perp = np.c_[-u[:, 1], u[:, 0]]                                        # perpendicular al cuerpo
+fr['tobillo_perp'] = np.nanmean([((kps[:, a] - cad) * perp).sum(1) for a in (LAN, RAN)], 0) / L_tronco
+fr['cadera_x_px'] = cad[:, 0]
+
+# Brazo de referencia: el que más se ve
+brazo = 'munD_eje' if fr.munD_eje.notna().mean() >= fr.munI_eje.notna().mean() else 'munI_eje'
+sig = fr[brazo].interpolate(limit_area='inside').to_numpy()
+ok = ~np.isnan(sig)
+picos, _ = find_peaks(np.where(ok, sig, np.nanmin(sig)), distance=int(0.6*FPS), prominence=0.3*np.nanstd(sig))
+print(f'Brazo de referencia: {brazo} | picos (entradas de mano) detectados: {len(picos)}')
+
+plt.figure(figsize=(14, 3)); plt.plot(tiempo, sig, lw=1); plt.plot(tiempo[picos], sig[picos], 'rv')
+plt.xlabel('tiempo (s)'); plt.ylabel('muñeca sobre eje (troncos)'); plt.title('Detección de ciclos de brazada')
+plt.tight_layout(); plt.savefig(FIG('fig_ciclos.png'), dpi=150); plt.show()
+""")
+
+md("""
+## 6. Features por ciclo y **eficiencia**
+- **SR** (ciclos/min) y brazadas/min (= 2 × SR en crol).
+- Si hay calibración: **velocidad**, **DPS** (distancia por ciclo) e **Índice de Brazada SI = v·DPS** (Costill et al., 1985).
+- Indicadores técnicos: flexión de codo en el agarre, alcance de brazo, simetría I/D, alineación del tronco y amplitud de patada.
+""")
+code("""
+PPM = (W / METROS_ANCHO_ENCUADRE) if METROS_ANCHO_ENCUADRE else None
+filas = []
+for k, (a, b) in enumerate(zip(picos[:-1], picos[1:])):
+    seg = fr.iloc[a:b]; dur = (b - a) / FPS
+    if not (0.6 <= dur <= 3.0) or seg[brazo].isna().mean() > 0.3: continue
+    alcI = seg.munI_eje.max() - seg.munI_eje.min(); alcD = seg.munD_eje.max() - seg.munD_eje.min()
+    f = dict(ciclo=len(filas)+1, t_inicio_s=round(a/FPS, 2), duracion_s=dur, SR_ciclos_min=60/dur,
+             codo_min_I=seg.codo_I.min(), codo_min_D=seg.codo_D.min(),
+             alcance_I=alcI, alcance_D=alcD,
+             asimetria_brazos_pct=100*abs(alcI-alcD)/np.nanmean([alcI, alcD]),
+             inclinacion_tronco=seg.inclinacion_tronco.mean(),
+             amplitud_patada=seg.tobillo_perp.max() - seg.tobillo_perp.min())
+    if PPM:
+        v = abs(np.nanmedian(np.diff(seg.cadera_x_px))) * FPS / PPM     # mediana: robusta a saltos
+        f.update(velocidad_m_s=v, DPS_m=v*dur, SI=v*v*dur)
+    filas.append(f)
+ciclos = pd.DataFrame(filas)
+ciclos['brazadas_min'] = 2 * ciclos.SR_ciclos_min
+print(f'{len(ciclos)} ciclos válidos')
+display(ciclos.round(2).head(10))
+display(ciclos.drop(columns=['ciclo', 't_inicio_s']).describe().T[['mean', 'std', 'min', 'max']].round(2))
+ciclos.to_csv(FIG('features_por_ciclo.csv'), index=False)
+if len(ciclos) < 12:
+    print('AVISO: menos de 12 ciclos. Para analizar fatiga usa un vídeo más largo (>= 1 min de nado continuo).')
+""")
+
+md("""
+## 7. **Fatiga**: en qué momento aparece y por qué
+1. Se aprende el patrón "fresco" con los primeros ciclos (`BASELINE_FRAC`) usando **Isolation Forest**.
+2. Cada ciclo recibe una **puntuación de anomalía** (cuánto se aleja de su propia técnica fresca).
+3. **Inicio de fatiga** = primer ciclo a partir del cual la puntuación supera el umbral de forma sostenida (3 ciclos).
+   Se contrasta con detección de punto de cambio (PELT, `ruptures`).
+4. **Por qué** = valores **SHAP** del modelo: qué features empujan cada ciclo hacia "fatigado", y cómo cambian respecto a la base.
+
+No se usan a la vez velocidad, DPS y SR, porque son redundantes (v = SR·DPS/60) y SHAP repartiría la importancia entre ellas.
+""")
+code("""
+import shap, ruptures as rpt
+from sklearn.ensemble import IsolationForest
+from sklearn.preprocessing import StandardScaler
+
+FEATS = ['SR_ciclos_min', 'codo_min_I', 'codo_min_D', 'alcance_I', 'alcance_D',
+         'asimetria_brazos_pct', 'inclinacion_tronco', 'amplitud_patada'] + (['DPS_m'] if 'DPS_m' in ciclos else [])
+NOMBRES = {'SR_ciclos_min': 'Frecuencia de ciclo (ciclos/min)', 'codo_min_I': 'Flexión codo izq. en agarre (°)',
+           'codo_min_D': 'Flexión codo dcho. en agarre (°)', 'alcance_I': 'Alcance brazo izq. (troncos)',
+           'alcance_D': 'Alcance brazo dcho. (troncos)', 'asimetria_brazos_pct': 'Asimetría de brazos (%)',
+           'inclinacion_tronco': 'Inclinación del tronco (°)', 'amplitud_patada': 'Amplitud de patada (troncos)',
+           'DPS_m': 'Distancia por ciclo (m)'}
+X = ciclos[FEATS].copy()
+X = X.fillna(X.median())
+n_base = max(5, int(BASELINE_FRAC * len(X)))
+scaler = StandardScaler().fit(X.iloc[:n_base])
+Xs = pd.DataFrame(scaler.transform(X), columns=FEATS)
+
+iso = IsolationForest(n_estimators=500, random_state=42).fit(Xs.iloc[:n_base])
+anom = -iso.score_samples(Xs)                       # mayor = más alejado del estado fresco
+ciclos['anomalia'] = anom
+umbral = np.percentile(anom[:n_base], 95)
+suav = pd.Series(anom).rolling(3, min_periods=1).mean().to_numpy()
+inicio = None
+for i in range(n_base, len(suav) - 2):
+    if (suav[i:i+3] > umbral).all(): inicio = i; break
+try:
+    cp = rpt.Pelt(model='rbf').fit(anom.reshape(-1, 1)).predict(pen=3)
+    cambio = [c for c in cp[:-1] if c >= n_base]
+except Exception: cambio = []
+ciclos['estado'] = np.where((inicio is not None) & (ciclos.index >= (inicio if inicio is not None else 1e9)), 'fatigado', 'fresco')
+
+if inicio is not None:
+    t_ini = ciclos.t_inicio_s.iloc[inicio]
+    print(f'INICIO DE FATIGA: ciclo {ciclos.ciclo.iloc[inicio]} (t = {t_ini:.1f} s, {100*inicio/len(ciclos):.0f}% del recorrido)')
+else:
+    t_ini = None; print('No se detecta fatiga sostenida en este vídeo.')
+print('Punto(s) de cambio PELT (índice de ciclo):', cambio)
+
+# ---------- SHAP ----------
+expl = shap.TreeExplainer(iso)
+sv = -expl.shap_values(Xs)                           # signo: positivo = empuja hacia "fatigado/anómalo"
+print('Comprobación de signo (corr. suma SHAP vs anomalía, debe ser > 0):', round(np.corrcoef(sv.sum(1), anom)[0, 1], 3))
+shap_df = pd.DataFrame(sv, columns=FEATS)
+shap_df.to_csv(FIG('shap_por_ciclo.csv'), index=False)
+""")
+
+code("""
+fig, ax = plt.subplots(2, 1, figsize=(14, 7), sharex=True)
+ax[0].plot(ciclos.t_inicio_s, anom, 'o-', label='anomalía por ciclo'); ax[0].plot(ciclos.t_inicio_s, suav, lw=3, alpha=.6, label='media móvil 3')
+ax[0].axhline(umbral, ls='--', c='gray', label='umbral (p95 fase fresca)')
+ax[0].axvspan(ciclos.t_inicio_s.iloc[0], ciclos.t_inicio_s.iloc[n_base-1], color='green', alpha=.08, label='fase base (fresco)')
+if t_ini is not None: ax[0].axvline(t_ini, c='red', lw=2, label=f'inicio fatiga ({t_ini:.1f} s)')
+ax[0].legend(loc='upper left'); ax[0].set_ylabel('puntuación de anomalía'); ax[0].set_title(f'{NADADOR}: evolución de la fatiga')
+ax[1].plot(ciclos.t_inicio_s, ciclos.SR_ciclos_min, 'o-', label='SR (ciclos/min)')
+ax2 = ax[1].twinx(); ax2.plot(ciclos.t_inicio_s, ciclos[['alcance_I', 'alcance_D']].mean(1), 's-', c='C1', label='alcance medio')
+ax[1].set_xlabel('tiempo (s)'); ax[1].set_ylabel('SR'); ax2.set_ylabel('alcance (troncos)')
+if t_ini is not None: ax[1].axvline(t_ini, c='red', lw=2)
+ax[1].legend(loc='upper left'); ax2.legend(loc='upper right')
+plt.tight_layout(); plt.savefig(FIG('fig_fatiga_timeline.png'), dpi=150); plt.show()
+
+Xn = X.rename(columns=NOMBRES)
+plt.figure(); shap.summary_plot(sv, Xn, show=False); plt.title('SHAP: contribución a la fatiga (todos los ciclos)')
+plt.tight_layout(); plt.savefig(FIG('fig_shap_summary.png'), dpi=150, bbox_inches='tight'); plt.show()
+
+if inicio is not None:
+    exp_i = shap.Explanation(values=sv[inicio], base_values=float(-np.ravel(expl.expected_value)[0]), data=X.iloc[inicio].values,
+                             feature_names=[NOMBRES[f] for f in FEATS])
+    plt.figure(); shap.plots.waterfall(exp_i, show=False); plt.title(f'Por qué el ciclo {ciclos.ciclo.iloc[inicio]} ya es fatiga')
+    plt.tight_layout(); plt.savefig(FIG('fig_shap_waterfall_inicio.png'), dpi=150, bbox_inches='tight'); plt.show()
+""")
+
+md("## 8. Explicación en lenguaje natural para el entrenador")
+code("""
+def explicar():
+    lineas = []
+    if inicio is None:
+        lineas.append(f'{NADADOR}: no se detecta fatiga sostenida en los {len(ciclos)} ciclos analizados.')
+        return lineas
+    post = slice(inicio, None)
+    imp = shap_df.iloc[post].mean().sort_values(ascending=False)
+    lineas.append(f'{NADADOR}: la fatiga aparece en el ciclo {ciclos.ciclo.iloc[inicio]} '
+                  f'(t = {t_ini:.1f} s, {100*inicio/len(ciclos):.0f}% del recorrido).')
+    lineas.append('Principales causas (contribución SHAP media tras el inicio):')
+    for f in imp.index[:4]:
+        if imp[f] <= 0: continue
+        b, p = X[f].iloc[:n_base].mean(), X[f].iloc[post].mean()
+        lineas.append(f'  - {NOMBRES[f]}: {b:.2f} -> {p:.2f} ({100*(p-b)/abs(b):+.0f}%)  [SHAP {imp[f]:+.3f}]')
+    return lineas
+
+texto = explicar(); print('\\n'.join(texto))
+resumen = dict(nadador=NADADOR, n_ciclos=len(ciclos), n_ciclos_base=n_base, fps=FPS,
+               inicio_fatiga_ciclo=None if inicio is None else int(ciclos.ciclo.iloc[inicio]),
+               inicio_fatiga_s=t_ini, cambio_pelt=[int(c) for c in cambio], umbral=float(umbral),
+               medias=ciclos[FEATS + (['velocidad_m_s', 'SI'] if 'SI' in ciclos else [])].mean().round(3).to_dict(),
+               explicacion=texto)
+json.dump(resumen, open(FIG('resumen_fatiga.json'), 'w'), ensure_ascii=False, indent=2, default=float)
+ciclos.to_csv(FIG('features_por_ciclo.csv'), index=False)
+""")
+
+md("""
+## 9. Clasificación de estilo (cuando haya datos de varios estilos)
+Necesita un CSV con las features por ciclo de **varios estilos y nadadores** (`estilo`, `video` + features).
+Se valida con **GroupKFold por vídeo**, para que ciclos del mismo vídeo nunca estén a la vez en train y test (evita el 99.99 % artificial).
+""")
+code("""
+CSV_ESTILOS = os.path.join(os.path.dirname(OUT_DIR), 'ciclos_todos_estilos.csv')
+if os.path.exists(CSV_ESTILOS):
+    from xgboost import XGBClassifier
+    from sklearn.model_selection import GroupKFold, cross_val_predict
+    from sklearn.metrics import classification_report
+    df = pd.read_csv(CSV_ESTILOS); FE = [c for c in FEATS if c in df]
+    y = df.estilo.astype('category'); clf = XGBClassifier(n_estimators=300, max_depth=3, learning_rate=0.05)
+    pred = cross_val_predict(clf, df[FE], y.cat.codes, groups=df.video, cv=GroupKFold(5))
+    print(classification_report(y.cat.codes, pred, target_names=y.cat.categories))
+    clf.fit(df[FE], y.cat.codes); sv_e = shap.TreeExplainer(clf).shap_values(df[FE])
+    plt.figure(); shap.summary_plot(sv_e, df[FE], class_names=list(y.cat.categories), show=False)
+    plt.savefig(FIG('fig_shap_estilo.png'), dpi=150, bbox_inches='tight'); plt.show()
+else:
+    print('Sin datos multiestilo todavía: módulo de estilo pendiente.')
+""")
+
+md("## 10. Vídeo anotado (para la defensa)")
+code("""
+ESC = max(1.0, W / 1280)          # escala texto/caja para vídeos HD
+cap = cv2.VideoCapture(VIDEO_PATH)
+tmp = '/content/anotado_tmp.mp4'
+out = cv2.VideoWriter(tmp, cv2.VideoWriter_fourcc(*'mp4v'), FPS, (W, H))
+ciclo_de_frame = np.full(T, -1)
+for i, r in ciclos.iterrows():
+    a = int(r.t_inicio_s * FPS); ciclo_de_frame[a:a + int(r.duracion_s * FPS)] = i
+for t in range(T):
+    ok, f = cap.read()
+    if not ok: break
+    i = ciclo_de_frame[t]; fat = i >= 0 and ciclos.estado.iloc[i] == 'fatigado'
+    col = (0, 0, 255) if fat else (0, 200, 0)
+    for a, b in SKELETON:
+        if not np.isnan(kps[t, [a, b]]).any():
+            cv2.line(f, tuple(kps[t, a].astype(int)), tuple(kps[t, b].astype(int)), col, max(3, int(3*ESC)))
+    cv2.rectangle(f, (10, 10), (int(470*ESC), int(150*ESC)), (0, 0, 0), -1)
+    txt = [f'{NADADOR}  t={t/FPS:5.1f}s']
+    if i >= 0:
+        r = ciclos.iloc[i]
+        txt += [f'Ciclo {int(r.ciclo)}  SR {r.SR_ciclos_min:4.1f} ciclos/min',
+                f'Codo D {fr.codo_D.iloc[t]:5.0f} deg  Asim {r.asimetria_brazos_pct:4.1f}%',
+                ('FATIGA' if fat else 'FRESCO') + f'  (anomalia {r.anomalia:.2f})']
+    for k, s in enumerate(txt):
+        cv2.putText(f, s, (20, int((40 + 30*k)*ESC)), cv2.FONT_HERSHEY_SIMPLEX, 0.75*ESC, col if k == 3 else (255, 255, 255), 2)
+    out.write(f)
+cap.release(); out.release()
+!ffmpeg -y -loglevel error -i {tmp} -vcodec libx264 -pix_fmt yuv420p "{FIG('video_anotado.mp4')}"
+print('Vídeo guardado en', FIG('video_anotado.mp4'))
+""", colab_only=True)
+
+md("""
+## 11. Listado de resultados
+Copia aquí el texto de la sección 8 y las figuras `fig_*.png` en la memoria (Cap. 5).
+""")
+code("""
+for f in sorted(os.listdir(OUT_DIR)): print(f)
+""")
+
+nb = nbf.v4.new_notebook()
+nb.metadata = {"accelerator": "GPU", "colab": {"provenance": []},
+               "kernelspec": {"name": "python3", "display_name": "Python 3"}}
+for tipo, src, colab_only in cells:
+    c = nbf.v4.new_markdown_cell(src) if tipo == "md" else nbf.v4.new_code_cell(src)
+    if colab_only: c.metadata["tags"] = ["colab_only"]
+    nb.cells.append(c)
+nbf.write(nb, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "notebooks", "StrokeLab_v3_pipeline.ipynb"))
+print("ok", len(nb.cells), "celdas")

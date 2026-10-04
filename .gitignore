@@ -1,0 +1,7 @@
+test_out/
+__pycache__/
+*.mp4
+*.avi
+*.npz
+*.npy
+.ipynb_checkpoints/

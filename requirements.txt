@@ -1,0 +1,12 @@
+numpy
+pandas
+scipy
+scikit-learn
+matplotlib
+opencv-python-headless
+shap
+xgboost
+ruptures
+nbformat
+# solo en Colab, para la Vertical de Visión:
+# ultralytics
