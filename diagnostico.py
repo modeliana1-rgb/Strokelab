@@ -17,12 +17,11 @@ PRUEBAS = [
     ('cv2', 'lectura y escritura de vídeo (OpenCV)'),
     ('matplotlib', 'gráficas'),
     ('shap', 'explicabilidad'),
-    ('ruptures', 'puntos de cambio'),
     ('torch', 'YOLO y MotionBERT (PyTorch)'),
     ('ultralytics', 'YOLO-Pose'),
     ('mediapipe', 'alternativa de pose sin TensorFlow'),
     ('tensorflow', 'MoveNet'),
-    ('easydict', 'configuración de MotionBERT'),
+    ('huggingface_hub', 'descarga del modelo de MotionBERT'),
 ]
 
 ok = {}
@@ -45,7 +44,7 @@ if ok.get('torch'):
 
 print('\nResumen:')
 print('  YOLO (recomendado)  :', 'disponible' if ok.get('torch') and ok.get('ultralytics') else 'NO disponible')
-print('  MotionBERT (3D)     :', 'disponible' if ok.get('torch') and ok.get('easydict') else 'NO disponible')
+print('  MotionBERT (3D)     :', 'disponible' if ok.get('torch') else 'NO disponible')
 print('  MediaPipe           :', 'disponible' if ok.get('mediapipe') else 'NO disponible')
 print('  MoveNet             :', 'disponible' if ok.get('tensorflow') else 'NO disponible')
 print('\nCopia todo este texto y pégaselo a Claude.')

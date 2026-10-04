@@ -16,7 +16,7 @@ El modelo hidrodinámico (F = ½·ρ·Cd·A·v²) es conocimiento previo del dom
 ## Uso local en CPU (recomendado)
 
 ```powershell
-pip install --user -r requirements.txt
+pip install --user --only-binary=:all: -r requirements.txt
 python diagnostico.py                       # comprueba qué librerías funcionan en tu equipo
 python analizar.py "C:\ruta\al\video.MP4" --nadador "Nadador A"
 ```
@@ -27,7 +27,7 @@ Qué hace, en orden:
 2. **Limpieza**: confianza, huecos de hasta 0,4 s y suavizado.
 3. **3D con MotionBERT-Lite**: el nadador se gira a vertical antes de elevarlo, porque el modelo se entrenó con personas de pie. Los ángulos no dependen de la vista (lateral, frontal...). Con `--sin-3d` se trabaja solo en 2D.
 4. **Medidas** (izquierda y derecha): codo, hombro, cadera, rodilla, alcance, asimetría, inclinación, amplitud de patada y patadas por ciclo.
-5. **Ciclos de brazada y fatiga**: Isolation Forest, PELT y explicación SHAP.
+5. **Ciclos de brazada y fatiga**: Isolation Forest, PELT (implementación propia, sin dependencias compiladas) y explicación SHAP.
 6. **Vídeo anotado** con el panel de medidas (`--formato avi` si el mp4 no se abre en tu equipo).
 
 Otras opciones:

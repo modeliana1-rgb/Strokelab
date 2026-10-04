@@ -6,7 +6,6 @@ scikit-learn
 matplotlib
 opencv-python
 shap
-ruptures
 torch            # YOLO y MotionBERT
 ultralytics      # YOLO-Pose (modelo por defecto: yolov8n-pose)
 huggingface_hub  # descarga automática del modelo de MotionBERT

@@ -19,6 +19,39 @@ CANDIDATAS = ['SR_ciclos_min', 'codo_min_I', 'codo_min_D', 'hombro_max_I', 'homb
               'inclinacion_tronco', 'amplitud_patada', 'patadas_por_ciclo', 'DPS_m']
 
 
+def cambios_pelt(serie, pen=None, min_seg=2):
+    """Puntos de cambio en la media con PELT (Killick et al., 2012), coste L2, sobre la serie estandarizada.
+
+    Implementación propia (sin dependencias compiladas). pen por defecto = 2·ln(n) (criterio tipo BIC).
+    Devuelve los índices donde empieza cada segmento nuevo.
+    """
+    x = np.asarray(serie, float)
+    n = len(x)
+    if n < 2 * min_seg:
+        return []
+    x = (x - x.mean()) / (x.std() or 1.0)
+    pen = 2 * np.log(n) if pen is None else pen
+    cs, cs2 = np.r_[0, np.cumsum(x)], np.r_[0, np.cumsum(x * x)]
+    coste = lambda a, b: (cs2[b] - cs2[a]) - (cs[b] - cs[a]) ** 2 / (b - a)
+    F = np.full(n + 1, np.inf)
+    F[0] = -pen
+    previo = np.zeros(n + 1, int)
+    candidatos = [0]
+    for t in range(min_seg, n + 1):
+        validos = [s for s in candidatos if t - s >= min_seg]
+        vals = [F[s] + coste(s, t) + pen for s in validos]
+        i = int(np.argmin(vals))
+        F[t], previo[t] = vals[i], validos[i]
+        # poda de PELT: se descartan los inicios que ya no pueden ser óptimos
+        candidatos = [s for s in candidatos if t - s < min_seg or F[s] + coste(s, t) <= F[t]] + [t - min_seg + 1]
+    cambios, t = [], n
+    while t > 0:
+        t = previo[t]
+        if t > 0:
+            cambios.append(int(t))
+    return sorted(cambios)
+
+
 def analizar_fatiga(ciclos, frac_base=0.30, min_base=5):
     """Devuelve un dict con el inicio de la fatiga, la serie de anomalía, los SHAP y la explicación."""
     from sklearn.ensemble import IsolationForest
@@ -41,12 +74,7 @@ def analizar_fatiga(ciclos, frac_base=0.30, min_base=5):
     umbral = float(np.percentile(anom[:n_base], 95))
     suav = pd.Series(anom).rolling(3, min_periods=1).mean().to_numpy()
     inicio = next((i for i in range(n_base, len(suav) - 2) if (suav[i:i + 3] > umbral).all()), None)
-    try:
-        import ruptures as rpt
-        cp = rpt.Pelt(model='rbf').fit(anom.reshape(-1, 1)).predict(pen=3)
-        cambio = [int(c) for c in cp[:-1] if c >= n_base]
-    except Exception:
-        cambio = []
+    cambio = [c for c in cambios_pelt(anom) if c >= n_base]
 
     expl = shap.TreeExplainer(iso)
     sv = -expl.shap_values(Xs)                            # positivo = empuja hacia "fatigado"
