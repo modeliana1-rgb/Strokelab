@@ -287,25 +287,44 @@ def ang(a, b, c):                     # ángulo en b (grados)
 hom = (kps[:, LSH] + kps[:, RSH]) / 2; cad = (kps[:, LHIP] + kps[:, RHIP]) / 2
 hom = np.where(np.isnan(hom), np.nanmean([kps[:, LSH], kps[:, RSH]], 0), hom)
 cad = np.where(np.isnan(cad), np.nanmean([kps[:, LHIP], kps[:, RHIP]], 0), cad)
-eje = hom - cad; L_tronco = np.linalg.norm(eje, axis=1); u = eje / L_tronco[:, None]
+eje = hom - cad; L_tronco = np.linalg.norm(eje, axis=1)
 
+# --- Filtro de plausibilidad anatómica: descarta detecciones imposibles ---
+# Tronco: fuera de [0.5, 2] x la mediana = cadera y hombro mal colocados (p. ej. superpuestos).
+L_med = np.nanmedian(L_tronco)
+tronco_mal = ~((L_tronco > 0.5 * L_med) & (L_tronco < 2.0 * L_med))
+L_tronco[tronco_mal] = np.nan; eje[tronco_mal] = np.nan
+u = eje / L_tronco[:, None]
+print(f'Fotogramas con tronco implausible descartados: {100*np.mean(tronco_mal & ~np.isnan(hom[:, 0])):.1f}%')
+
+def brazo_ok(sh, el, wr):
+    # Brazo y antebrazo entre 0.15 y 1.3 troncos; si no, la detección del brazo no es fiable.
+    a = np.linalg.norm(kps[:, el] - kps[:, sh], axis=1) / L_tronco
+    b = np.linalg.norm(kps[:, wr] - kps[:, el], axis=1) / L_tronco
+    return (a > 0.15) & (a < 1.3) & (b > 0.15) & (b < 1.3)
+
+okI, okD = brazo_ok(LSH, LEL, LWR), brazo_ok(RSH, REL, RWR)
 fr = pd.DataFrame({'t': tiempo})
-fr['codo_I'] = ang(kps[:, LSH], kps[:, LEL], kps[:, LWR])
-fr['codo_D'] = ang(kps[:, RSH], kps[:, REL], kps[:, RWR])
-fr['munI_eje'] = ((kps[:, LWR] - kps[:, LSH]) * u).sum(1) / L_tronco
-fr['munD_eje'] = ((kps[:, RWR] - kps[:, RSH]) * u).sum(1) / L_tronco
+fr['codo_I'] = np.where(okI, ang(kps[:, LSH], kps[:, LEL], kps[:, LWR]), np.nan)
+fr['codo_D'] = np.where(okD, ang(kps[:, RSH], kps[:, REL], kps[:, RWR]), np.nan)
+fr['munI_eje'] = np.where(okI, ((kps[:, LWR] - kps[:, LSH]) * u).sum(1) / L_tronco, np.nan)
+fr['munD_eje'] = np.where(okD, ((kps[:, RWR] - kps[:, RSH]) * u).sum(1) / L_tronco, np.nan)
 incl = np.degrees(np.arctan2(np.abs(eje[:, 1]), np.abs(eje[:, 0])))   # 0 = cuerpo horizontal
 fr['inclinacion_tronco'] = incl
 perp = np.c_[-u[:, 1], u[:, 0]]                                        # perpendicular al cuerpo
 fr['tobillo_perp'] = np.nanmean([((kps[:, a] - cad) * perp).sum(1) for a in (LAN, RAN)], 0) / L_tronco
+fr.loc[fr.tobillo_perp.abs() > 1.5, 'tobillo_perp'] = np.nan          # tobillo a más de 1.5 troncos del eje: imposible
 fr['cadera_x_px'] = cad[:, 0]
 
 # Brazo de referencia: el que más se ve
 brazo = 'munD_eje' if fr.munD_eje.notna().mean() >= fr.munI_eje.notna().mean() else 'munI_eje'
-sig = fr[brazo].interpolate(limit_area='inside').to_numpy()
+# Solo se rellenan huecos cortos: en los tramos sin nadador no se buscan ciclos.
+sig = fr[brazo].interpolate(limit=int(0.2*FPS), limit_area='inside').to_numpy()
 ok = ~np.isnan(sig)
 picos, _ = find_peaks(np.where(ok, sig, np.nanmin(sig)), distance=int(0.6*FPS), prominence=0.3*np.nanstd(sig))
+picos = picos[ok[picos]]
 print(f'Brazo de referencia: {brazo} | picos (entradas de mano) detectados: {len(picos)}')
+print(f'Nadador analizable en {100*ok.mean():.0f}% del vídeo ({ok.sum()/FPS:.1f} s de {len(ok)/FPS:.1f} s)')
 
 plt.figure(figsize=(14, 3)); plt.plot(tiempo, sig, lw=1); plt.plot(tiempo[picos], sig[picos], 'rv')
 plt.xlabel('tiempo (s)'); plt.ylabel('muñeca sobre eje (troncos)'); plt.title('Detección de ciclos de brazada')
@@ -497,12 +516,13 @@ for t in range(T):
     for a, b in SKELETON:
         if not np.isnan(kps_v[t, [a, b]]).any():
             cv2.line(f, tuple(kps_v[t, a].astype(int)), tuple(kps_v[t, b].astype(int)), col, max(3, int(3*ESC)))
-    cv2.rectangle(f, (10, 10), (int(470*ESC), int(150*ESC)), (0, 0, 0), -1)
+    cv2.rectangle(f, (10, 10), (int(560*ESC), int(150*ESC)), (0, 0, 0), -1)
     txt = [f'{NADADOR}  t={t/FPS:5.1f}s']
     if i >= 0:
         r = ciclos.iloc[i]
-        txt += [f'Ciclo {int(r.ciclo)}  SR {r.SR_ciclos_min:4.1f} ciclos/min',
-                f'Codo D {fr.codo_D.iloc[t]:5.0f} deg  Asim {r.asimetria_brazos_pct:4.1f}%',
+        cI, cD = fr.codo_I.iloc[t], fr.codo_D.iloc[t]
+        txt += [f'Ciclo {int(r.ciclo)} de {len(ciclos)}  SR {r.SR_ciclos_min:4.1f} ciclos/min',
+                f'Codo izq {cI:3.0f}  dcho {cD:3.0f} grados  Asimetria {r.asimetria_brazos_pct:3.0f}%'.replace('nan', ' --'),
                 ('FATIGA' if fat else 'FRESCO') + f'  (anomalia {r.anomalia:.2f})']
     for k, s in enumerate(txt):
         cv2.putText(f, s, (20, int((40 + 30*k)*ESC)), cv2.FONT_HERSHEY_SIMPLEX, 0.75*ESC, col if k == 3 else (255, 255, 255), 2)

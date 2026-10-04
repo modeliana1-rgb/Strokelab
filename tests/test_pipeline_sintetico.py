@@ -27,6 +27,12 @@ kps+=rng.normal(0,1.5,kps.shape)
 drop=rng.random((T,17))<0.08; conf[drop]=0.1
 conf[600:620]=0  # hueco de detección
 kps[conf==0]=np.nan
+# Errores reales de MoveNet bajo el agua: tronco colapsado (cadera sobre hombro) y muñecas disparadas
+for t0 in (900, 1800, 2300):
+    kps[t0:t0+4,[11,12]]=kps[t0:t0+4,[5,6]]+rng.normal(0,2,(4,2,2))
+    kps[t0+10:t0+13,[9,10]]+=rng.normal(0,900,(3,2,2))
+# Tramo inicial sin nadador en cuadro (como en el vídeo real)
+conf[:150]=0.05
 OUT=os.path.join(ROOT,'test_out'); os.makedirs(OUT,exist_ok=True)
 np.savez(f'{OUT}/keypoints_raw.npz',kps=kps,conf=conf,fps=FPS,w=W,h=H)
 vw=cv2.VideoWriter(os.path.join(OUT,'')+'synth.mp4',cv2.VideoWriter_fourcc(*'mp4v'),FPS,(W,H))
@@ -51,4 +57,7 @@ res=json.load(open(f'{OUT}/resumen_fatiga.json'))
 # La fatiga sintética se introduce alrededor de t=55 s (sigmoide de escala 4 s)
 assert res['inicio_fatiga_s'] is not None and 40 <= res['inicio_fatiga_s'] <= 60, res['inicio_fatiga_s']
 assert int(cap.get(7)) == T
+cic=__import__('pandas').read_csv(f'{OUT}/features_por_ciclo.csv')
+assert cic[['alcance_I','alcance_D']].max().max() < 3, 'alcance imposible: no se han filtrado las detecciones absurdas'
+assert cic.codo_min_I.min() > 10 and cic.codo_min_D.min() > 10, 'ángulo de codo imposible'
 print('OK: test sintético superado')
