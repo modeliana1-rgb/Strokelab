@@ -9,7 +9,7 @@ aparece la fatiga y por qué** (SHAP), y medidas de codos, hombros, caderas, rod
 - Todo se ejecuta **en local, en CPU**, en el portátil personal de Diana (Windows). No usar Colab salvo que lo pida.
 - Programa principal: `python analizar.py "<vídeo>" --nadador "<nombre>"` (ver README para opciones).
 - Pruebas antes de cada commit: `python tests/test_local.py`, `tests/test_sesion.py`, `tests/test_aaron.py`, `tests/test_movenet_recorte.py`,
-  `tests/test_estilos.py`, `tests/test_lote.py` y `tests/test_frontal.py`.
+  `tests/test_estilos.py`, `tests/test_lote.py`, `tests/test_frontal.py` y `tests/test_aaron_frontal.py`.
 - Todos los vídeos: `python lote.py --carpeta <videos> [--crear-lista]` (lista editable `lista_videos.csv`; reanudable).
 - Responder siempre en español. Explicar las decisiones técnicas en lenguaje claro: Diana las defiende ante un tribunal.
 - No inventar resultados: lo que no se haya medido se marca como pendiente.
@@ -78,7 +78,9 @@ aparece la fatiga y por qué** (SHAP), y medidas de codos, hombros, caderas, rod
   de cada muñeca respecto al centro de hombros, en la dirección de máximo movimiento (PCA con cada brazo centrado),
   hacia abajo en la imagen, en anchos de hombros; alcance = recorrido de muñeca; sin inclinación ni velocidad; ángulos 3D.
   Sintético frontal (`tests/test_frontal.py`): SR 48,9 (verdad ~50), fatiga t = 47,5 s, SHAP: alcance, SR, asimetría.
-  Real: IMG_7215 4 ciclos 47-61 ciclos/min; IMG_7207 3 ciclos 58-90 (dudoso). Pendiente: cuenta manual de Diana.
+  **Validación real (cuenta manual de Diana, 8 ciclos en cada clip entero)**: IMG_7207 80 manual vs 73,9 sistema
+  (−7,6 %, 3 de 8 ciclos); IMG_7215 51,1 vs 55,2 (+8,2 %, 4 de 8). El ritmo se mide bien y distingue los dos ritmos;
+  la cobertura es baja (38-50 % de los ciclos) por la detección. Prueba: `tests/test_aaron_frontal.py`.
 - `informe_nadador.py <resultados> --nadador X --estilo Y`: tablas y figuras por clip y por variable (solo vista lateral).
 - Variables redundantes fuera del modelo (v = SR·DPS; potencia ∝ v³).
 - El 99,99 % de accuracy de versiones antiguas era fuga de datos; la clasificación de estilo usa GroupKFold por vídeo.
