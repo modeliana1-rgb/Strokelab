@@ -116,12 +116,12 @@ def main(argv=None):
     print('\n[4] Medidas por fotograma y ciclos de brazada')
     fr = medidas.medidas_por_fotograma(k2d, fps, k3d)
     fr.to_csv(out / 'medidas_por_fotograma.csv', index=False)
-    brazo, sig, picos = medidas.detectar_ciclos(fr, fps)
-    ciclos = medidas.variables_por_ciclo(fr, fps, brazo, picos, a.metros_encuadre, W)
+    sig, picos, ciclos_ab, T_br = medidas.detectar_ciclos(fr, fps)
+    ciclos = medidas.variables_por_ciclo(fr, fps, ciclos_ab, a.metros_encuadre, W)
     print(f'    ángulos en {"3D" if k3d is not None else "2D"} · tronco implausible descartado: '
           f'{fr.attrs["pct_tronco_descartado"]:.1f}% (con tronco girado: {fr.attrs["pct_tronco_girado"]:.1f}%) · nadador analizable {np.mean(~np.isnan(sig)) * len(sig) / fps:.1f} s '
-          f'de {len(sig) / fps:.1f} s · entradas de mano {len(picos)} · ciclos válidos {len(ciclos)}')
-    _grafica_ciclos(sig, picos, fps, out)
+          f'de {len(sig) / fps:.1f} s · brazadas {len(picos)} (ritmo típico {T_br or 0:.2f} s) · ciclos válidos {len(ciclos)}')
+    _grafica_ciclos(sig, picos, ciclos_ab, fps, out)
 
     print('\n[5] Fatiga (Isolation Forest + PELT + SHAP)')
     res = fatiga.analizar_fatiga(ciclos) if len(ciclos) else {'aviso': 'no hay ciclos válidos', 'inicio': None, 't_inicio': None, 'cambio_pelt': [], 'feats': []}
@@ -158,13 +158,16 @@ def main(argv=None):
     print(f'\nListo en {time.time() - t_total:.0f} s. Resultados en: {out.resolve()}')
 
 
-def _grafica_ciclos(sig, picos, fps, out):
+def _grafica_ciclos(sig, picos, ciclos_ab, fps, out):
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
     t = np.arange(len(sig)) / fps
-    plt.figure(figsize=(14, 3)); plt.plot(t, sig, lw=1); plt.plot(t[picos], sig[picos], 'rv')
-    plt.xlabel('tiempo (s)'); plt.ylabel('muñeca sobre eje (troncos)'); plt.title('Detección de ciclos de brazada')
+    plt.figure(figsize=(14, 3)); plt.plot(t, sig, lw=1, label='muñeca más adelantada (troncos)')
+    plt.plot(t[picos], sig[picos], 'rv', label='entrada de mano (brazada)')
+    for a_, b_ in ciclos_ab:
+        plt.axvspan(t[a_], t[b_ - 1] if b_ - 1 < len(t) else t[-1], color='green', alpha=0.08)
+    plt.xlabel('tiempo (s)'); plt.title('Brazadas y ciclos (sombreado: 1 ciclo = 2 brazadas)'); plt.legend(loc='upper right')
     plt.tight_layout(); plt.savefig(out / 'fig_ciclos.png', dpi=150); plt.close()
 
 

@@ -61,6 +61,8 @@ def nadador_sintetico(fps=30, dur=90, W=640, H=360, seed=0):
         kps[t0:t0 + 15, [11, 12]] = kps[t0:t0 + 15, [5, 6]] + np.array([0, L])
         kps[t0:t0 + 15, [13, 14]] = kps[t0:t0 + 15, [11, 12]] + np.array([0, 0.75 * L])
         kps[t0:t0 + 15, [15, 16]] = kps[t0:t0 + 15, [13, 14]] + np.array([0, 0.75 * L])
+    for t0 in range(300, 2600, 400):               # el modelo confunde brazo izquierdo y derecho durante 1 s
+        kps[t0:t0 + 30, [7, 8, 9, 10]] = kps[t0:t0 + 30, [8, 7, 10, 9]]
     conf[:150] = 0.05                              # tramo inicial sin nadador
     kps[conf == 0] = np.nan
     return kps, conf, fps, W, H
@@ -86,6 +88,8 @@ def main():
     assert cic[['alcance_I', 'alcance_D']].max().max() < 3, 'alcance imposible'
     assert cic[['codo_min_I', 'codo_min_D']].min().min() > 25, 'codo imposible'
     assert cic.inclinacion_tronco.max() < 30, 'quedan esqueletos "de pie" sin filtrar'
+    sr = cic.SR_ciclos_min.mean()                  # verdad: ciclos de 1.35 s -> 1.10 s, media ~ 50 ciclos/min
+    assert 44 <= sr <= 56, f'frecuencia de ciclo mal contada: {sr:.1f} ciclos/min'
     for col in ['hombro_max_I', 'cadera_media_D', 'rodilla_min_I', 'amplitud_patada', 'patadas_por_ciclo']:
         assert cic[col].notna().mean() > 0.8, f'{col} sin datos'
     cap = cv2.VideoCapture(str(out / 'video_anotado.mp4'))

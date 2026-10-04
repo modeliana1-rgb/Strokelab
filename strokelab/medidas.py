@@ -104,25 +104,66 @@ def medidas_por_fotograma(k2d, fps, k3d=None):
     return fr
 
 
-def detectar_ciclos(fr, fps):
-    """Entradas de mano = máximos de la muñeca proyectada sobre el eje del cuerpo (brazo más visible)."""
-    brazo = 'munD_eje' if fr.munD_eje.notna().mean() >= fr.munI_eje.notna().mean() else 'munI_eje'
-    sig = fr[brazo].interpolate(limit=int(0.2 * fps), limit_area='inside').to_numpy()
+def periodo_brazada(sig, fps, t_min=0.3, t_max=1.6):
+    """Periodo típico entre brazadas (s) por autocorrelación de la señal (ignorando huecos)."""
     ok = ~np.isnan(sig)
-    if ok.sum() < fps:
-        return brazo, sig, np.array([], int)
-    picos, _ = find_peaks(np.where(ok, sig, np.nanmin(sig)), distance=int(0.6 * fps), prominence=0.3 * np.nanstd(sig))
-    return brazo, sig, picos[ok[picos]]
+    if ok.sum() < 3 * fps:
+        return None
+    x = np.where(ok, sig - np.nanmean(sig), 0.0)
+    m = ok.astype(float)
+    lags = np.arange(int(t_min * fps), int(t_max * fps) + 1)
+    acf = []
+    for L in lags:
+        pares = (m[:-L] * m[L:]).sum()
+        acf.append((x[:-L] * x[L:]).sum() / pares if pares > fps else -np.inf)
+    acf = np.array(acf)
+    if not np.isfinite(acf).any():
+        return None
+    # primer máximo local claro (evita escoger múltiplos del periodo)
+    picos, _ = find_peaks(np.where(np.isfinite(acf), acf, np.nanmin(acf[np.isfinite(acf)])))
+    k = picos[0] if len(picos) else int(np.argmax(acf))
+    return lags[k] / fps
 
 
-def variables_por_ciclo(fr, fps, brazo, picos, metros_ancho=None, ancho_px=None):
-    """Una fila por ciclo válido (0.6-3 s, <= 30 % de datos ausentes del brazo de referencia)."""
+def detectar_ciclos(fr, fps):
+    """Brazadas = entradas de mano de CUALQUIER brazo (máximo de las dos muñecas sobre el eje del cuerpo).
+
+    Así no importa si el modelo confunde la muñeca izquierda con la derecha. Un ciclo = dos brazadas seguidas sin
+    brazadas perdidas entre medias. Devuelve (señal, picos de brazada, lista de ciclos (inicio, fin), periodo).
+    """
+    lim = int(0.2 * fps)
+    mI = fr.munI_eje.interpolate(limit=lim, limit_area='inside').to_numpy()
+    mD = fr.munD_eje.interpolate(limit=lim, limit_area='inside').to_numpy()
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        sig = np.fmax(mI, mD)
+    fr['muneca_eje'] = sig
+    ok = ~np.isnan(sig)
+    T = periodo_brazada(sig, fps)
+    if ok.sum() < fps or T is None:
+        return sig, np.array([], int), [], T
+    picos, _ = find_peaks(np.where(ok, sig, np.nanmin(sig)), distance=max(1, int(0.6 * T * fps)),
+                          prominence=0.3 * np.nanstd(sig))
+    picos = picos[ok[picos]]
+    ciclos, i = [], 0
+    while i + 2 < len(picos) + 0:
+        d1, d2 = (picos[i + 1] - picos[i]) / fps, (picos[i + 2] - picos[i + 1]) / fps
+        if 0.5 * T <= d1 <= 1.6 * T and 0.5 * T <= d2 <= 1.6 * T:
+            ciclos.append((picos[i], picos[i + 2]))
+            i += 2
+        else:
+            i += 1
+    return sig, picos, ciclos, T
+
+
+def variables_por_ciclo(fr, fps, ciclos_ab, metros_ancho=None, ancho_px=None):
+    """Una fila por ciclo válido (0.6-3 s, <= 30 % de datos ausentes en la señal de las muñecas)."""
     ppm = (ancho_px / metros_ancho) if metros_ancho and ancho_px else None
     filas = []
-    for a, b in zip(picos[:-1], picos[1:]):
+    for a, b in ciclos_ab:
         seg = fr.iloc[a:b]
         dur = (b - a) / fps
-        if not (0.6 <= dur <= 3.0) or seg[brazo].isna().mean() > 0.3:
+        if not (0.6 <= dur <= 3.0) or seg.muneca_eje.isna().mean() > 0.3:
             continue
         alcI = seg.munI_eje.max() - seg.munI_eje.min()
         alcD = seg.munD_eje.max() - seg.munD_eje.min()

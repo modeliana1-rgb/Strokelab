@@ -44,7 +44,11 @@ aparece la fatiga y por qué** (SHAP), y medidas de codos, hombros, caderas, rod
   nadador (YOLO a veces lo pone de pie). En GX011614 quita el 11,5 % y la inclinación media pasa de 42° a 8,8°.
   Tras el filtro quedan 5 ciclos (Aaron analizable 12,7 s): un clip suelto no basta para fatiga.
 - **Fatiga por sesión** (`sesion.py`): une las pasadas (clips) de un nadador en orden de grabación.
-- Sospechas abiertas en GX011614: SR 79 ciclos/min (posible doble conteo) y ángulos 3D raros (rodilla 80°,
+- **Ciclos por brazadas de ambos brazos** (`medidas.detectar_ciclos`): cuenta manual de Diana en GX011614 = 9 ciclos
+  en 10 s (54 ciclos/min) frente a 79 del sistema (contaba de más por confusión izquierda/derecha). Ahora se detecta
+  cada entrada de mano de cualquier brazo, se estima el ritmo por autocorrelación y 1 ciclo = 2 brazadas.
+  Pendiente: confirmar en el portátil que GX011614 da ~54 ciclos/min.
+- Sospechas abiertas en GX011614: SR 79 ciclos/min (ya corregido el método, falta confirmar) y ángulos 3D raros (rodilla 80°,
   hombro máx. 110°, alcance 0,47): posible confusión izquierda/derecha de MotionBERT bajo el agua. Comparar con 2D.
 - **Filtro de plausibilidad anatómica** (`medidas.py`): tronco fuera de [0,5, 2] × mediana, segmentos de brazo y
   pierna implausibles, codos < 25°. Motivo: bajo el agua el modelo coloca a veces la cadera sobre el hombro.
