@@ -29,7 +29,7 @@ Todo se guarda en `OUT_DIR` (CSV, JSON, figuras PNG y vídeo anotado), listo par
 
 md("## 0. Instalación")
 code("""
-!pip -q install ultralytics ruptures shap xgboost
+!pip -q install ultralytics ruptures shap xgboost tensorflow_hub
 """, colab_only=True)
 
 md("## 1. CONFIGURACIÓN (edita solo esta celda)")
@@ -45,9 +45,15 @@ NADADOR    = 'Nadador A'
 # Ejemplo: si de borde a borde del vídeo se ven 2.5 m -> 2.5.  Si la cámara se mueve -> None.
 METROS_ANCHO_ENCUADRE = None
 
+# Modelo de pose para la extracción. Decisión del TFM: MoveNet (vídeo fluido, sin tirones).
+# YOLO se mide igualmente en la comparativa como alternativa.
+POSE_BACKEND    = 'movenet'      # 'movenet' o 'yolo'
+MOVENET_VARIANT = 'lightning'    # 'lightning' (rápido, 192 px) o 'thunder' (más preciso, 256 px)
+
 import os, glob
 if not os.path.exists(VIDEO_PATH):
-    print('No encuentro el vídeo:', VIDEO_PATH, '\nVídeos disponibles en la carpeta:')
+    print('No encuentro el vídeo:', VIDEO_PATH)
+    print('Vídeos disponibles en la carpeta:')
     for v in sorted(glob.glob(os.path.join(os.path.dirname(VIDEO_PATH), '*'))): print('  ', v)
     raise FileNotFoundError('Copia una de las rutas de arriba en VIDEO_PATH')
 print('Vídeo OK:', VIDEO_PATH, f'({os.path.getsize(VIDEO_PATH)/1e6:.0f} MB)')
@@ -73,105 +79,175 @@ SKELETON = [(5,7),(7,9),(6,8),(8,10),(5,6),(5,11),(6,12),(11,12),(11,13),(13,15)
 """)
 
 md("""
-## 2. Vertical 1 · Comparativa de modelos de pose (punto 5 del profesor)
-Mismo vídeo, mismos frames. Métricas: **FPS**, **tasa de detección** (% de frames con nadador)
-y **confianza media** de los keypoints. MoveNet se intenta también; si no carga, se omite sin romper nada.
+## 2. Vertical 1 · MoveNet con recorte que sigue al nadador
+MoveNet trabaja con una imagen cuadrada pequeña (192 px en Lightning). En un vídeo 4K el nadador
+quedaría diminuto, así que se aplica el **recorte de seguimiento** de MoveNet: cada fotograma se recorta
+en un cuadrado alrededor de la posición anterior del nadador.
+
+Como el recorte ya es cuadrado, no hay relleno que deshacer, y las coordenadas vuelven al vídeo original con
+`x = x0 + x_norm · lado`, `y = y0 + y_norm · lado`. Esto evita el error de escalado de versiones anteriores.
 """)
 code("""
-import cv2, torch
+def recorte_cuadrado(frame, cx, cy, lado):
+    \"\"\"Cuadrado de 'lado' px centrado en (cx, cy); lo que cae fuera del vídeo queda en negro.\"\"\"
+    alto, ancho = frame.shape[:2]; lado = int(round(lado))
+    x0, y0 = int(round(cx - lado / 2)), int(round(cy - lado / 2))
+    lienzo = np.zeros((lado, lado, 3), frame.dtype)
+    xa, ya, xb, yb = max(0, x0), max(0, y0), min(ancho, x0 + lado), min(alto, y0 + lado)
+    if xb > xa and yb > ya:
+        lienzo[ya - y0:yb - y0, xa - x0:xb - x0] = frame[ya:yb, xa:xb]
+    return lienzo, x0, y0, lado
+
+class SeguidorMoveNet:
+    \"\"\"MoveNet + recorte de seguimiento. infer(rgb tam x tam) -> (17, 3) con [y, x, score] normalizados.\"\"\"
+    def __init__(self, infer, tam, ancho, alto, umbral=0.2):
+        self.infer, self.tam, self.ancho, self.alto, self.umbral = infer, tam, ancho, alto, umbral
+        self.region = None
+    def __call__(self, frame):
+        lado_max = max(self.ancho, self.alto)
+        cx, cy, lado = self.region or (self.ancho / 2, self.alto / 2, lado_max)
+        img, x0, y0, lado = recorte_cuadrado(frame, cx, cy, lado)
+        rgb = cv2.cvtColor(cv2.resize(img, (self.tam, self.tam), interpolation=cv2.INTER_AREA), cv2.COLOR_BGR2RGB)
+        out = self.infer(rgb)
+        xy = np.c_[x0 + out[:, 1] * lado, y0 + out[:, 0] * lado]; sc = out[:, 2]
+        ok = sc > self.umbral
+        if ok.sum() >= 5:                                   # siguiente recorte: caja del cuerpo x 1.6
+            (xa, ya), (xb, yb) = xy[ok].min(0), xy[ok].max(0)
+            self.region = ((xa + xb) / 2, (ya + yb) / 2, float(np.clip(1.6 * max(xb - xa, yb - ya), 0.25 * lado_max, lado_max)))
+        else:
+            self.region = None                              # perdido: vuelve a buscar en todo el fotograma
+        return xy, sc
+""")
+
+md("""
+## 3. Vertical 1 · Comparativa de modelos de pose (punto 5 del profesor)
+Mismo vídeo, mismos fotogramas (reducidos a 1280 px para no agotar la RAM). Métricas: **FPS**,
+**tasa de detección** (% de fotogramas con al menos 5 articulaciones fiables) y **confianza media**.
+Se comparan MoveNet (Lightning y Thunder) y YOLO-Pose; la extracción usa `POSE_BACKEND`.
+""")
+code("""
+import torch
 from ultralytics import YOLO
+
+MOVENET_URLS = {'lightning': ['https://tfhub.dev/google/movenet/singlepose/lightning/4',
+                              'https://www.kaggle.com/models/google/movenet/TensorFlow2/singlepose-lightning/4'],
+                'thunder':   ['https://tfhub.dev/google/movenet/singlepose/thunder/4',
+                              'https://www.kaggle.com/models/google/movenet/TensorFlow2/singlepose-thunder/4']}
+MOVENET_TAM = {'lightning': 192, 'thunder': 256}
+
+def cargar_movenet(variante):
+    import tensorflow as tf, tensorflow_hub as hub
+    ultimo = None
+    for url in MOVENET_URLS[variante]:
+        try:
+            mod = hub.load(url).signatures['serving_default']
+            return (lambda rgb: mod(tf.constant(rgb[None].astype(np.int32)))['output_0'].numpy()[0, 0]), MOVENET_TAM[variante]
+        except Exception as e: ultimo = e
+    raise RuntimeError(f'No se pudo cargar MoveNet {variante}: {ultimo}')
 
 def leer_frames(path, n):
     cap = cv2.VideoCapture(path); frames = []
     while len(frames) < n:
         ok, f = cap.read()
         if not ok: break
-        if f.shape[1] > MAX_ANCHO:            # 4K -> 1280 px: evita agotar la RAM (YOLO usa 640 px igualmente)
+        if f.shape[1] > MAX_ANCHO:            # 4K -> 1280 px: evita agotar la RAM
             f = cv2.resize(f, (MAX_ANCHO, int(f.shape[0] * MAX_ANCHO / f.shape[1])), interpolation=cv2.INTER_AREA)
         frames.append(f)
     cap.release(); return frames
 
 bench_frames = leer_frames(VIDEO_PATH, N_FRAMES_BENCH)
-print(f'{len(bench_frames)} frames para la comparativa')
+bh, bw = bench_frames[0].shape[:2]
+print(f'{len(bench_frames)} frames para la comparativa ({bw}x{bh})')
+
+def resumen(nombre, params, fps, confs_por_frame):
+    c = np.array(confs_por_frame)
+    det = (c > CONF_KP).sum(1) >= 5
+    return dict(modelo=nombre, params_M=params, fps=round(fps, 1), tasa_deteccion=round(100 * det.mean(), 1),
+                conf_media=round(float(c[det].mean()) if det.any() else 0, 3))
+
+def bench_movenet(variante):
+    infer, tam = cargar_movenet(variante)
+    seg = SeguidorMoveNet(infer, tam, bw, bh); seg(bench_frames[0])     # warm-up
+    seg.region = None; t0 = time.time(); confs = [seg(f)[1] for f in bench_frames]
+    return resumen(f'movenet_{variante}', None, len(bench_frames) / (time.time() - t0), confs)
 
 def bench_yolo(nombre):
-    m = YOLO(nombre); m(bench_frames[0], verbose=False)          # warm-up
-    det, confs = 0, []
-    t0 = time.time()
+    m = YOLO(nombre); m(bench_frames[0], verbose=False)
+    t0 = time.time(); confs = []
     for f in bench_frames:
         r = m(f, verbose=False)[0]
         if r.keypoints is not None and r.keypoints.conf is not None and len(r.boxes):
-            i = int(r.boxes.conf.argmax()); det += 1
-            confs.append(float(r.keypoints.conf[i].mean()))
-    fps = len(bench_frames) / (time.time() - t0)
-    return dict(modelo=nombre.replace('.pt',''), params_M=round(sum(p.numel() for p in m.model.parameters())/1e6, 1),
-                fps=round(fps, 1), tasa_deteccion=round(100*det/len(bench_frames), 1),
-                conf_media=round(float(np.mean(confs)) if confs else 0, 3))
-
-def bench_movenet():
-    import tensorflow as tf, tensorflow_hub as hub
-    mod = hub.load('https://tfhub.dev/google/movenet/singlepose/lightning/4').signatures['serving_default']
-    def run(f):
-        img = tf.image.resize_with_pad(tf.expand_dims(cv2.cvtColor(f, cv2.COLOR_BGR2RGB), 0), 192, 192)
-        return mod(tf.cast(img, tf.int32))['output_0'].numpy()[0, 0]   # (17,3) y,x,score
-    run(bench_frames[0]); t0 = time.time(); scores = [run(f)[:, 2] for f in bench_frames]
-    fps = len(bench_frames) / (time.time() - t0); scores = np.array(scores)
-    return dict(modelo='movenet_lightning', params_M=None, fps=round(fps, 1),
-                tasa_deteccion=round(100*np.mean(scores.mean(1) > CONF_KP), 1), conf_media=round(float(scores.mean()), 3))
+            confs.append(r.keypoints.conf[int(r.boxes.conf.argmax())].cpu().numpy())
+        else: confs.append(np.zeros(17))
+    return resumen(nombre.replace('.pt', ''), round(sum(p.numel() for p in m.model.parameters()) / 1e6, 1),
+                   len(bench_frames) / (time.time() - t0), confs)
 
 filas = []
+for v in ['lightning', 'thunder']:
+    try: filas.append(bench_movenet(v)); print(filas[-1])
+    except Exception as e: print('omitido movenet', v, e)
 for nombre in ['yolov8n-pose.pt', 'yolov8s-pose.pt', 'yolov8m-pose.pt', 'yolo11n-pose.pt', 'yolo11m-pose.pt']:
     try: filas.append(bench_yolo(nombre)); print(filas[-1])
     except Exception as e: print('omitido', nombre, e)
-try: filas.append(bench_movenet()); print(filas[-1])
-except Exception as e: print('MoveNet omitido:', e)
 
 bench = pd.DataFrame(filas)
-bench['score'] = bench.tasa_deteccion/100 * bench.conf_media
+bench['score'] = bench.tasa_deteccion / 100 * bench.conf_media
 bench.to_csv(FIG('comparativa_modelos_pose.csv'), index=False)
 display(bench)
 
-# Elección: mejor score (detección x confianza) entre los YOLO con >= 15 FPS
-cand = bench[bench.modelo.str.startswith('yolo') & (bench.fps >= 15)]
-POSE_MODEL = (cand if len(cand) else bench[bench.modelo.str.startswith('yolo')]).sort_values('score').iloc[-1].modelo + '.pt'
-print('Modelo elegido:', POSE_MODEL)
+if POSE_BACKEND == 'movenet':
+    ELEGIDO = f'movenet_{MOVENET_VARIANT}'
+    if ELEGIDO not in set(bench.modelo):
+        raise RuntimeError(f'{ELEGIDO} no se pudo cargar (mira el mensaje "omitido" de arriba).')
+else:
+    yolos = bench[bench.modelo.str.startswith('yolo')]
+    ELEGIDO = yolos.sort_values('score').iloc[-1].modelo
+print('Modelo para la extracción:', ELEGIDO)
 
 fig, ax = plt.subplots(1, 3, figsize=(14, 4))
-for a, col, t in zip(ax, ['fps', 'tasa_deteccion', 'conf_media'], ['FPS (GPU)', 'Tasa de detección (%)', 'Confianza media']):
-    a.bar(bench.modelo, bench[col], color=['#2a9d8f' if m+'.pt' == POSE_MODEL else '#9aa5b1' for m in bench.modelo])
+for a, col, t in zip(ax, ['fps', 'tasa_deteccion', 'conf_media'], ['FPS', 'Tasa de detección (%)', 'Confianza media']):
+    a.bar(bench.modelo, bench[col], color=['#2a9d8f' if m == ELEGIDO else '#9aa5b1' for m in bench.modelo])
     a.set_title(t); a.tick_params(axis='x', rotation=45)
 plt.tight_layout(); plt.savefig(FIG('fig_comparativa_pose.png'), dpi=150); plt.show()
 """, colab_only=True)
 
 md("""
-## 3. Vertical 1 · Extracción de keypoints del vídeo completo
-Ultralytics devuelve las coordenadas **ya en píxeles del vídeo original** (sin padding que corregir).
-Si hay varias personas, se sigue al nadador más cercano a su posición anterior.
+## 4. Vertical 1 · Extracción de keypoints del vídeo completo
+Con MoveNet, el seguidor recorta alrededor del nadador en cada fotograma, a resolución completa.
+Con YOLO, si hay varias personas, se sigue a la más cercana a su posición anterior.
 """)
 code("""
-model = YOLO(POSE_MODEL)
 cap = cv2.VideoCapture(VIDEO_PATH)
 FPS = cap.get(cv2.CAP_PROP_FPS); W = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)); H = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 N = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 kps = np.full((N, 17, 2), np.nan); conf = np.zeros((N, 17)); prev_c = None
+if POSE_BACKEND == 'movenet':
+    infer, tam = cargar_movenet(MOVENET_VARIANT); seguidor = SeguidorMoveNet(infer, tam, W, H)
+else:
+    model = YOLO(ELEGIDO + '.pt')
+t0 = time.time()
 for t in range(N):
     ok, f = cap.read()
     if not ok: break
-    r = model(f, verbose=False)[0]
-    if r.keypoints is None or r.keypoints.conf is None or len(r.boxes) == 0: continue
-    xy = r.keypoints.xy.cpu().numpy(); cf = r.keypoints.conf.cpu().numpy()
-    centros = r.boxes.xywh.cpu().numpy()[:, :2]
-    if prev_c is None: i = int((r.boxes.conf.cpu().numpy() * r.boxes.xywh.cpu().numpy()[:, 2:].prod(1)).argmax())
-    else: i = int(np.linalg.norm(centros - prev_c, axis=1).argmin())
-    kps[t], conf[t], prev_c = xy[i], cf[i], centros[i]
-    if t % 500 == 0: print(f'{t}/{N}')
+    if POSE_BACKEND == 'movenet':
+        kps[t], conf[t] = seguidor(f)
+    else:
+        r = model(f, verbose=False)[0]
+        if r.keypoints is None or r.keypoints.conf is None or len(r.boxes) == 0: continue
+        xy = r.keypoints.xy.cpu().numpy(); cf = r.keypoints.conf.cpu().numpy()
+        centros = r.boxes.xywh.cpu().numpy()[:, :2]
+        if prev_c is None: i = int((r.boxes.conf.cpu().numpy() * r.boxes.xywh.cpu().numpy()[:, 2:].prod(1)).argmax())
+        else: i = int(np.linalg.norm(centros - prev_c, axis=1).argmin())
+        kps[t], conf[t], prev_c = xy[i], cf[i], centros[i]
+    if t % 500 == 0: print(f'{t}/{N}  ({t / max(time.time() - t0, 1e-6):.1f} fps)')
 cap.release()
-kps[conf == 0] = np.nan
-np.savez(FIG('keypoints_raw.npz'), kps=kps[:t+1], conf=conf[:t+1], fps=FPS, w=W, h=H)
-print(f'OK: {t+1} frames, {FPS:.1f} fps, {W}x{H}, detección {100*np.mean(conf[:t+1].max(1) > 0):.1f}%')
+kps, conf = kps[:t+1], conf[:t+1]
+np.savez(FIG('keypoints_raw.npz'), kps=kps, conf=conf, fps=FPS, w=W, h=H)
+print(f'OK ({ELEGIDO}): {t+1} frames, {FPS:.1f} fps, {W}x{H}, '
+      f'frames con >= 5 articulaciones fiables: {100*np.mean((conf > CONF_KP).sum(1) >= 5):.1f}%')
 """, colab_only=True)
 
-md("## 4. Limpieza: filtro por confianza, interpolación de huecos cortos y suavizado")
+md("## 5. Limpieza: filtro por confianza, interpolación de huecos cortos y suavizado")
 code("""
 d = np.load(FIG('keypoints_raw.npz'))
 kps, conf, FPS, W, H = d['kps'].copy(), d['conf'], float(d['fps']), int(d['w']), int(d['h'])
@@ -198,7 +274,7 @@ np.save(FIG('keypoints_clean.npy'), kps)
 """)
 
 md("""
-## 5. Vertical 2 · Features por frame y detección de ciclos de brazada
+## 6. Vertical 2 · Features por frame y detección de ciclos de brazada
 El ciclo se detecta con la posición de la muñeca **proyectada sobre el eje del cuerpo** (cadera→hombro),
 normalizada por la longitud del tronco: no depende del tamaño en píxeles ni de la dirección de nado.
 """)
@@ -237,7 +313,7 @@ plt.tight_layout(); plt.savefig(FIG('fig_ciclos.png'), dpi=150); plt.show()
 """)
 
 md("""
-## 6. Features por ciclo y **eficiencia**
+## 7. Features por ciclo y **eficiencia**
 - **SR** (ciclos/min) y brazadas/min (= 2 × SR en crol).
 - Si hay calibración: **velocidad**, **DPS** (distancia por ciclo) e **Índice de Brazada SI = v·DPS** (Costill et al., 1985).
 - Indicadores técnicos: flexión de codo en el agarre, alcance de brazo, simetría I/D, alineación del tronco y amplitud de patada.
@@ -270,7 +346,7 @@ if len(ciclos) < 12:
 """)
 
 md("""
-## 7. **Fatiga**: en qué momento aparece y por qué
+## 8. **Fatiga**: en qué momento aparece y por qué
 1. Se aprende el patrón "fresco" con los primeros ciclos (`BASELINE_FRAC`) usando **Isolation Forest**.
 2. Cada ciclo recibe una **puntuación de anomalía** (cuánto se aleja de su propia técnica fresca).
 3. **Inicio de fatiga** = primer ciclo a partir del cual la puntuación supera el umbral de forma sostenida (3 ciclos).
@@ -351,7 +427,7 @@ if inicio is not None:
     plt.tight_layout(); plt.savefig(FIG('fig_shap_waterfall_inicio.png'), dpi=150, bbox_inches='tight'); plt.show()
 """)
 
-md("## 8. Explicación en lenguaje natural para el entrenador")
+md("## 9. Explicación en lenguaje natural para el entrenador")
 code("""
 def explicar():
     lineas = []
@@ -380,7 +456,7 @@ ciclos.to_csv(FIG('features_por_ciclo.csv'), index=False)
 """)
 
 md("""
-## 9. Clasificación de estilo (cuando haya datos de varios estilos)
+## 10. Clasificación de estilo (cuando haya datos de varios estilos)
 Necesita un CSV con las features por ciclo de **varios estilos y nadadores** (`estilo`, `video` + features).
 Se valida con **GroupKFold por vídeo**, para que ciclos del mismo vídeo nunca estén a la vez en train y test (evita el 99.99 % artificial).
 """)
@@ -401,7 +477,7 @@ else:
     print('Sin datos multiestilo todavía: módulo de estilo pendiente.')
 """)
 
-md("## 10. Vídeo anotado (para la defensa)")
+md("## 11. Vídeo anotado (para la defensa)")
 code("""
 SC = min(1.0, MAX_ANCHO / W)          # el vídeo anotado se guarda como máximo a 1280 px de ancho
 OW, OH = int(W * SC), int(H * SC); ESC = max(1.0, OW / 1280)
@@ -437,8 +513,8 @@ print('Vídeo guardado en', FIG('video_anotado.mp4'))
 """, colab_only=True)
 
 md("""
-## 11. Listado de resultados
-Copia aquí el texto de la sección 8 y las figuras `fig_*.png` en la memoria (Cap. 5).
+## 12. Listado de resultados
+Copia aquí el texto de la sección 9 y las figuras `fig_*.png` en la memoria (Cap. 5).
 """)
 code("""
 for f in sorted(os.listdir(OUT_DIR)): print(f)

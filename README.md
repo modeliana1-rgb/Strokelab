@@ -8,7 +8,7 @@ Análisis biomecánico explicable de la natación a partir de vídeo. Detecta **
 
 | Vertical | Entrada → salida | Técnicas |
 | --- | --- | --- |
-| 1 · Visión | vídeo → 17 keypoints COCO por fotograma | Comparativa YOLOv8/YOLO11-Pose vs MoveNet, limpieza y suavizado Savitzky-Golay |
+| 1 · Visión | vídeo → 17 keypoints COCO por fotograma | MoveNet con recorte de seguimiento (comparado con YOLO-Pose), limpieza y suavizado Savitzky-Golay |
 | 2 · Tabular | keypoints → ciclos → eficiencia y fatiga | Variables por ciclo, Isolation Forest, PELT, SHAP, XGBoost (estilo) |
 
 El modelo hidrodinámico (F = ½·ρ·Cd·A·v²) es conocimiento previo del dominio y no forma parte de la IA.
@@ -19,6 +19,8 @@ El modelo hidrodinámico (F = ½·ρ·Cd·A·v²) es conocimiento previo del dom
 notebooks/StrokeLab_v3_pipeline.ipynb   # pipeline completo para Google Colab (GPU)
 tools/build_notebook.py                 # genera el notebook (fuente de verdad del código)
 tests/test_pipeline_sintetico.py        # prueba con un nadador sintético que se fatiga
+tests/test_movenet_recorte.py           # prueba de coordenadas del seguidor MoveNet
+tests/test_notebook_compila.py          # comprueba que todas las celdas son Python válido
 ```
 
 ## Ejecutar en Colab
@@ -36,4 +38,6 @@ Edita `tools/build_notebook.py` (no el `.ipynb` a mano) y regenera el notebook:
 pip install -r requirements.txt
 python tools/build_notebook.py
 MPLBACKEND=Agg python tests/test_pipeline_sintetico.py
+python tests/test_movenet_recorte.py
+python tests/test_notebook_compila.py
 ```
