@@ -22,6 +22,8 @@ import zipfile
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent
+sys.path.insert(0, str(RAIZ))
+from strokelab import VERSION_ANALISIS  # noqa: E402
 EXTENSIONES = {'.mp4', '.mov', '.avi', '.mkv', '.m4v'}
 ESTILOS = ['crol', 'espalda', 'mariposa', 'braza']
 COLUMNAS = ['archivo', 'nadador', 'estilo', 'vista', 'sesion', 'incluir', 'notas']
@@ -130,8 +132,9 @@ def main(argv=None):
     for f in filas:
         out = res_dir / Path(f['archivo']).stem
         r = out / 'resumen.json'
-        hecho = r.exists() and json.loads(r.read_text(encoding='utf-8')).get('estilo') == f['estilo'] \
-            and json.loads(r.read_text(encoding='utf-8')).get('vista') == f['vista']
+        previo = json.loads(r.read_text(encoding='utf-8')) if r.exists() else {}
+        hecho = (previo.get('estilo') == f['estilo'] and previo.get('vista') == f['vista']
+                 and previo.get('version') == VERSION_ANALISIS)     # código nuevo: se rehace (reutiliza la pose)
         if a.rehacer or a.rehacer_pose or not hecho:
             pendientes.append(f)
     total = sum(duracion_s(carpeta / f['archivo']) for f in pendientes

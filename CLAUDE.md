@@ -81,6 +81,9 @@ aparece la fatiga y por qué** (SHAP), y medidas de codos, hombros, caderas, rod
   **Validación real (cuenta manual de Diana, 8 ciclos en cada clip entero)**: IMG_7207 80 manual vs 73,9 sistema
   (−7,6 %, 3 de 8 ciclos); IMG_7215 51,1 vs 55,2 (+8,2 %, 4 de 8). El ritmo se mide bien y distingue los dos ritmos;
   la cobertura es baja (38-50 % de los ciclos) por la detección. Prueba: `tests/test_aaron_frontal.py`.
+- **Versión del análisis** (`strokelab.VERSION_ANALISIS`): lote.py rehace (reutilizando la pose) los vídeos analizados
+  con otra versión. Motivo: el 2º zip de Diana (4 oct 23:05) traía resultados del código viejo porque el lote los saltó.
+  Subir la fecha cada vez que cambien medidas, ciclos o fatiga.
 - `informe_nadador.py <resultados> --nadador X --estilo Y`: tablas y figuras por clip y por variable (solo vista lateral).
 - Variables redundantes fuera del modelo (v = SR·DPS; potencia ∝ v³).
 - El 99,99 % de accuracy de versiones antiguas era fuga de datos; la clasificación de estilo usa GroupKFold por vídeo.

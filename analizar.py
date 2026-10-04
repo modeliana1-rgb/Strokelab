@@ -21,7 +21,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from strokelab import fatiga, medidas, pose, video
+from strokelab import VERSION_ANALISIS, fatiga, medidas, pose, video
 
 MODELOS_COMPARATIVA = ['yolov8n-pose', 'yolo11n-pose', 'yolov8s-pose', 'movenet_lightning', 'movenet_thunder', 'mediapipe']
 
@@ -153,7 +153,7 @@ def main(argv=None):
         print('\n    Medias por ciclo:')
         print(ciclos.drop(columns=['ciclo', 't_inicio_s', 'estado'], errors='ignore').mean().round(2).to_string())
 
-    resumen = dict(video=vid.name, nadador=a.nadador, estilo=a.estilo, imgsz=ajustes[0], conf_det=ajustes[1], modelo_pose=a.modelo, cada=a.cada, giro=rot, angulos_3d=bool(usar_3d), vista=a.vista,
+    resumen = dict(version=VERSION_ANALISIS, video=vid.name, nadador=a.nadador, estilo=a.estilo, imgsz=ajustes[0], conf_det=ajustes[1], modelo_pose=a.modelo, cada=a.cada, giro=rot, angulos_3d=bool(usar_3d), vista=a.vista,
                    fps=fps, resolucion=f'{W}x{H}', duracion_s=round(len(kps) / fps, 2), ciclos_validos=len(ciclos),
                    pct_deteccion=round(float(100 * np.mean((conf[analizados] > 0.3).sum(1) >= 5)), 1),
                    s_analizable=round(float(np.mean(~np.isnan(sig)) * len(sig) / fps), 1),
