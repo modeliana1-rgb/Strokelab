@@ -5,3 +5,6 @@ __pycache__/
 *.npz
 *.npy
 .ipynb_checkpoints/
+resultados/
+modelos/
+*.pt

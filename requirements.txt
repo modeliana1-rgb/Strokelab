@@ -1,12 +1,17 @@
+# Uso local en CPU (analizar.py)
 numpy
 pandas
 scipy
 scikit-learn
 matplotlib
-opencv-python-headless
+opencv-python
 shap
-xgboost
 ruptures
+torch            # YOLO y MotionBERT
+ultralytics      # YOLO-Pose (modelo por defecto: yolov8n-pose)
+huggingface_hub  # descarga automática del modelo de MotionBERT
+# Opcionales: modelos alternativos de pose
+# tensorflow tensorflow_hub   -> MoveNet
+# mediapipe                   -> BlazePose
+# Solo para regenerar el notebook de Colab
 nbformat
-# solo en Colab, para la Vertical de Visión:
-# ultralytics
