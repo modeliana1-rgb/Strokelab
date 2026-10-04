@@ -121,7 +121,7 @@ class SeguidorMoveNet:
 
 md("""
 ## 3. Vertical 1 · Comparativa de modelos de pose (punto 5 del profesor)
-Mismo vídeo, mismos fotogramas (reducidos a 1280 px para no agotar la RAM). Métricas: **FPS**,
+Mismo vídeo, mismos fotogramas: 15 tramos de 10 fotogramas repartidos por todo el vídeo, reducidos a 1280 px para no agotar la RAM. Métricas: **FPS**,
 **tasa de detección** (% de fotogramas con al menos 5 articulaciones fiables) y **confianza media**.
 Se comparan MoveNet (Lightning y Thunder) y YOLO-Pose; la extracción usa `POSE_BACKEND`.
 """)
@@ -146,13 +146,18 @@ def cargar_movenet(variante):
     raise RuntimeError(f'No se pudo cargar MoveNet {variante}: {ultimo}')
 
 def leer_frames(path, n):
-    cap = cv2.VideoCapture(path); frames = []
-    while len(frames) < n:
-        ok, f = cap.read()
-        if not ok: break
-        if f.shape[1] > MAX_ANCHO:            # 4K -> 1280 px: evita agotar la RAM
-            f = cv2.resize(f, (MAX_ANCHO, int(f.shape[0] * MAX_ANCHO / f.shape[1])), interpolation=cv2.INTER_AREA)
-        frames.append(f)
+    # Tramos de 10 fotogramas seguidos repartidos por TODO el vídeo (el seguidor de MoveNet necesita continuidad),
+    # para no medir solo el inicio, cuando el nadador puede estar parado en la pared o fuera de cuadro.
+    cap = cv2.VideoCapture(path); total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)); frames = []
+    inicios = np.linspace(0, max(total - 10, 0), max(n // 10, 1)).astype(int)
+    for i in inicios:
+        cap.set(cv2.CAP_PROP_POS_FRAMES, int(i))
+        for _ in range(10):
+            ok, f = cap.read()
+            if not ok: break
+            if f.shape[1] > MAX_ANCHO:        # 4K -> 1280 px: evita agotar la RAM
+                f = cv2.resize(f, (MAX_ANCHO, int(f.shape[0] * MAX_ANCHO / f.shape[1])), interpolation=cv2.INTER_AREA)
+            frames.append(f)
     cap.release(); return frames
 
 bench_frames = leer_frames(VIDEO_PATH, N_FRAMES_BENCH)
@@ -168,7 +173,10 @@ def resumen(nombre, params, fps, confs_por_frame):
 def bench_movenet(variante):
     infer, tam = cargar_movenet(variante)
     seg = SeguidorMoveNet(infer, tam, bw, bh); seg(bench_frames[0])     # warm-up
-    seg.region = None; t0 = time.time(); confs = [seg(f)[1] for f in bench_frames]
+    t0 = time.time(); confs = []
+    for k, f in enumerate(bench_frames):
+        if k % 10 == 0: seg.region = None                # cada tramo empieza buscando en el fotograma completo
+        confs.append(seg(f)[1])
     return resumen(f'movenet_{variante}', None, len(bench_frames) / (time.time() - t0), confs)
 
 def bench_yolo(nombre):
