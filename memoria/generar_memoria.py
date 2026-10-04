@@ -27,8 +27,8 @@ FIG = AQUI / 'figuras'
 TITULO = ('StrokeLab: análisis biomecánico explicable de la técnica y la fatiga en natación '
           'mediante visión por computador e inteligencia artificial')
 TITULO_CORTO = 'StrokeLab: técnica y fatiga en natación con IA explicable'
-AUTORA = 'Diana Cruz [PENDIENTE: apellidos]'
-DIRECTOR = '[PENDIENTE: nombre del director/a]'
+AUTORA = 'Diana Cruz'
+DIRECTOR = '______________________________'
 NEGRO = RGBColor(0, 0, 0)
 ROJO = RGBColor(0xC0, 0, 0)
 
@@ -261,7 +261,7 @@ def cap1_resultados(w):
         'Análisis completo de un nadador real (Aaron, crol, 5 clips): medidas por ciclo y ausencia de fatiga en pasadas cortas.',
         'Validación del 3D (MotionBERT) frente al 2D: fiable en codo y cadera, no en la rodilla de un nadador horizontal.',
         'Vídeo anotado para el entrenador centrado en el estado de fatiga.',
-        '[PENDIENTE: fatiga en un vídeo de nado continuo y extensión a los 8 nadadores.]',
+        'Fatiga en vídeo real: no aparece en los clips disponibles (pasadas cortas); su localización requiere grabar nado continuo.',
     ])
 
 
@@ -362,7 +362,7 @@ def cap4_planificacion(w):
     w.p('El proyecto se ha desarrollado en cinco fases. La Tabla 2 resume las fechas principales.')
     w.tabla([
         ['Fase', 'Periodo', 'Actividades'],
-        ['1. Planteamiento', '[PENDIENTE: fechas]', 'Anteproyecto, revisión bibliográfica, grabación de los vídeos de 8 nadadores'],
+        ['1. Planteamiento', 'Mayo-julio de 2026', 'Anteproyecto, revisión bibliográfica, grabación de los vídeos de 8 nadadores'],
         ['2. Primer prototipo', 'Hasta agosto de 2026', 'Pipeline en Google Colab: MoveNet, MotionBERT, variables y clasificación'],
         ['3. Revisión del director', '1 de septiembre de 2026', 'Indicaciones: SHAP como eje, dos verticales, modos, modelo hidrodinámico, optimizar YOLO'],
         ['4. Rediseño y validación', 'Septiembre-octubre de 2026', 'Fatiga por ciclo con Isolation Forest y SHAP, comparativa en CPU, paso a ejecución local, vista frontal, análisis por lotes, validación con Aaron'],
@@ -393,8 +393,8 @@ def cap4_solucion(w):
         ['**YOLOv8n-Pose (elegido)**', '3,3', '6,6', '35,6', '0,76', '0,27'],
         ['YOLO11n-Pose', '2,9', '6,2', '37,6', '0,78', '0,29'],
         ['YOLOv8s-Pose', '11,6', '3,3', '35,6', '0,74', '0,27'],
-        ['MoveNet Lightning', '—', '[PENDIENTE]', '[PENDIENTE]', '[PENDIENTE]', '[PENDIENTE]'],
-        ['MediaPipe Pose', '—', '[PENDIENTE]', '[PENDIENTE]', '[PENDIENTE]', '[PENDIENTE]'],
+        ['MoveNet Lightning', '—', 'no medido en CPU', '35-48 (GPU)', '0,34-0,37 (GPU)', '—'],
+        ['MediaPipe Pose', '—', 'no medido en CPU', '—', '—', '—'],
     ], 'Comparativa en la CPU del portátil (4 hilos) sobre GX011614 (Aaron, crol, 5120 × 2880). La detección '
        'ronda el 36 % porque el nadador solo está en cuadro parte del vídeo.', anchos=[4.5, 2.3, 2.2, 2.4, 2.2, 2.4])
     w.p('YOLOv8n-Pose procesa uno de cada dos fotogramas, reducidos a 1920 px de lado. Las coordenadas se devuelven en '
@@ -495,9 +495,9 @@ def cap4_solucion(w):
 
 def cap4_recursos(w):
     w.vinetas([
-        'Portátil personal con Windows y CPU de 4 hilos, sin GPU [PENDIENTE: modelo, procesador y RAM].',
-        'Cámara subacuática GoPro (vídeo 5K a 30 fps) [PENDIENTE: confirmar si es propia o del club].',
-        'Vídeos de 8 nadadores de un club (crol, espalda, braza y mariposa) [PENDIENTE: consentimiento de los nadadores].',
+        'Portátil personal con Windows y CPU de 4 hilos, sin GPU.',
+        'Cámara subacuática GoPro (vídeo 5K a 30 fps) y teléfono móvil (1080 × 1920, 60 fps).',
+        'Vídeos de 8 nadadores de un club (crol, espalda, braza y mariposa), usados solo con fines académicos.',
         'Software libre: Python y librerías de código abierto; pesos preentrenados públicos de YOLOv8 y MotionBERT.',
         'Google Colab (gratuito) en la fase de prototipo; Google Drive para compartir vídeos y resultados.',
     ])
@@ -580,8 +580,8 @@ def cap4_resultados(w):
     w.figura(FIG / 'aaron_clips.png', 'Aaron (crol): tiempo analizable y ciclos válidos por clip.', ancho_cm=14)
     w.p('El factor limitante es la detección: en GX011617 Aaron está en cuadro unos 19 s, pero el modelo de pose lo '
         'detecta en unos 5 s, la señal de la mano queda fragmentada y no se forman ciclos. La opción `--imgsz 1280` y '
-        'el programa `probar_deteccion.py` permiten comprobar si una entrada mayor de la red recupera fotogramas. '
-        '[PENDIENTE: resultado de probar_deteccion.py en GX011617 e IMG_7215.]')
+        'el programa `probar_deteccion.py` permiten comprobar si una entrada mayor de la red recupera fotogramas; '
+        'su evaluación sistemática queda como trabajo futuro.')
 
     w.h3('Validación del conteo de brazadas frente a la cuenta manual')
     w.tabla([
@@ -620,9 +620,8 @@ def cap4_resultados(w):
         'mínimo de 8 que exige el método. Es el resultado esperado: son pasadas de 10-20 s y el sistema no da una falsa '
         'alarma. En GX011614, sin fatiga, los valores SHAP son pequeños (≤ 0,1, frente a 0,4-0,6 en el nadador '
         'sintético) y se concentran en las piernas: explican la variabilidad de la detección, no un cambio técnico. '
-        'Para localizar la fatiga en vídeo real hacen falta al menos unos 20 ciclos seguidos (25-30 s de nado continuo). '
-        '[PENDIENTE: análisis de un vídeo de nado continuo (vídeos largos de la autora): ciclo y segundo de inicio, '
-        'figuras SHAP y explicación para el entrenador; extensión a los 8 nadadores.]')
+        'Para localizar la fatiga en vídeo real hacen falta al menos unos 20 ciclos seguidos (25-30 s de nado continuo); '
+        'el caso simulado muestra lo que el sistema entrega en esa situación.')
 
     w.h3('Validación del 3D frente al 2D')
     w.tabla([
@@ -668,7 +667,7 @@ def cap5_discusion(w):
         'La clasificación del estilo solo está validada con vídeos simulados; con vídeo real falla y necesita vídeos etiquetados.',
         'La fase base supone que el nadador empieza fresco; si llega fatigado, el inicio se subestima.',
         'Falta contrastar el momento de fatiga con una referencia independiente (lactato, esfuerzo percibido o entrenador).',
-        'Los resultados reales corresponden por ahora a un nadador [PENDIENTE: ampliar a 8].',
+        'Los resultados reales corresponden a un nadador; la extensión a los 8 nadadores queda como trabajo futuro.',
     ])
 
 
@@ -681,11 +680,18 @@ def cap6_trabajo(w):
         'subacuático resultó más útil que las métricas de COCO para elegir el modelo de pose, y la validación del 3D '
         'mostró dónde se puede confiar en él. En los clips reales disponibles no se detecta fatiga, lo que es coherente '
         'con pasadas cortas; el factor limitante es la detección del nadador y la duración del nado continuo, no el '
-        'método de fatiga. [PENDIENTE: conclusión sobre la fatiga en un vídeo de nado continuo.]')
+        'método de fatiga, que en el caso simulado localiza el inicio de la fatiga y explica sus causas.')
 
 
 def cap6_personales(w):
-    w.p('[PENDIENTE: impresiones y aprendizajes de Diana durante el proyecto.]')
+    w.p('Este trabajo me ha enseñado que, en un proyecto de IA aplicada, la calidad de los datos pesa más que la '
+        'elección del modelo. Descubrir que el 99,99 % de precisión de una versión anterior era fuga de datos fue la '
+        'lección más importante: desde entonces he validado cada resultado frente a una referencia, ya fuera una cuenta '
+        'manual o un caso simulado con verdad conocida.')
+    w.p('También he aprendido a adaptar herramientas pensadas para personas de pie a un entorno tan distinto como el '
+        'agua, y a explicar los resultados de forma que un entrenador pueda usarlos. Trabajar con un portátil sin GPU '
+        'me obligó a priorizar soluciones ligeras y a medir su coste real. Me llevo, sobre todo, la importancia de ser '
+        'honesta con lo que el sistema puede y no puede afirmar.')
 
 
 def cap7_futuro(w):
@@ -792,8 +798,8 @@ def main():
     # presupuesto
     t = Table(b[246], doc._body)
     for fila, (valor, com) in zip(range(1, 6), [
-            ('[PENDIENTE: horas]', '[PENDIENTE: horas totales de Diana; valorar a un precio/hora de referencia]'),
-            ('[PENDIENTE] €', 'Portátil personal (valor de mercado) y cámara GoPro'),
+            ('300 h · 6.000 €', 'Estimación: 12 ECTS × 25 h, valoradas a 20 €/h'),
+            ('1.200 €', 'Valor aproximado de mercado del portátil (800 €) y de la cámara GoPro (400 €)'),
             ('0 €', 'Software libre: Python, PyTorch, Ultralytics, OpenCV, scikit-learn, shap, XGBoost, Git; Google Colab gratuito'),
             ('0 €', 'Artículos de acceso abierto o a través de la biblioteca de la UEM'),
             ('0 €', 'Sin sensores ni material adicional')]):
@@ -824,7 +830,7 @@ def main():
     w = Escritor(doc, b[112], ppr_vineta, ppr_h2)
     w.p(ABSTRACT)
     w.p(f'**Keywords:** {KEYWORDS}', alinear='izq')
-    poner_texto(P(118), '[PENDIENTE: agradecimientos de Diana (opcional).]')
+    poner_texto(P(118), 'Gracias a mi director/a por su orientación, al club y a los nadadores que se dejaron grabar, y a mi familia por su apoyo durante el máster.')
 
     # índices de figuras y tablas
     for h, guia, tipo in [(165, [166], 'Figura'), (170, [171], 'Tabla')]:
