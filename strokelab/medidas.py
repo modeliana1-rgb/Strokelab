@@ -72,9 +72,11 @@ def medidas_por_fotograma(k2d, fps, k3d=None):
     L = np.where(malo, np.nan, L)
     u = eje / L[:, None]
 
-    def segmentos_ok(a, b, c, lo=0.15, hi=1.3):
-        s1 = np.linalg.norm(k[:, b] - k[:, a], axis=1) / L
-        s2 = np.linalg.norm(k[:, c] - k[:, b], axis=1) / L
+    def segmentos_ok(a, b, c, lo=0.15, hi=1.3, kk=None, LL=None):
+        kk = k if kk is None else kk
+        LL = L if LL is None else LL
+        s1 = np.linalg.norm(kk[:, b] - kk[:, a], axis=1) / LL
+        s2 = np.linalg.norm(kk[:, c] - kk[:, b], axis=1) / LL
         return (s1 > lo) & (s1 < hi) & (s2 > lo) & (s2 < hi)
 
     brazoI, brazoD = segmentos_ok(LSH, LEL, LWR), segmentos_ok(RSH, REL, RWR)
@@ -94,6 +96,19 @@ def medidas_por_fotograma(k2d, fps, k3d=None):
     fr['rodilla_D'] = con(piernaD, angulo(k[:, RHIP], k[:, RKN], k[:, RAN]))
     fr['munI_eje'] = con(brazoI, ((k[:, LWR] - k[:, LSH]) * u).sum(1) / L)
     fr['munD_eje'] = con(brazoD, ((k[:, RWR] - k[:, RSH]) * u).sum(1) / L)
+    # Señal para contar brazadas: SIEMPRE en 2D. El momento en que entra la mano se ve directamente en la imagen;
+    # el 3D es una estimación que añade errores (p. ej. confundir el brazo izquierdo con el derecho).
+    if k3d is None:
+        fr['munI_eje2d'], fr['munD_eje2d'] = fr.munI_eje, fr.munD_eje
+    else:
+        L2 = np.linalg.norm(e2, axis=1)
+        L2m = np.nanmedian(L2)
+        L2 = np.where((L2 > 0.5 * L2m) & (L2 < 2.0 * L2m) & ~girado, L2, np.nan)
+        u2 = e2 / L2[:, None]
+        okI2 = segmentos_ok(LSH, LEL, LWR, kk=k2d, LL=L2) & ~np.isnan(L2)
+        okD2 = segmentos_ok(RSH, REL, RWR, kk=k2d, LL=L2) & ~np.isnan(L2)
+        fr['munI_eje2d'] = np.where(okI2, ((k2d[:, LWR] - k2d[:, LSH]) * u2).sum(1) / L2, np.nan)
+        fr['munD_eje2d'] = np.where(okD2, ((k2d[:, RWR] - k2d[:, RSH]) * u2).sum(1) / L2, np.nan)
     fr['sep_tobillos'] = con(piernaI & piernaD, np.linalg.norm(k[:, LAN] - k[:, RAN], axis=1) / L)
     # Inclinación del tronco respecto a la horizontal: solo tiene sentido en 2D con vista lateral
     fr['inclinacion_tronco'] = np.where(np.isnan(L), np.nan, np.degrees(np.arctan2(np.abs(e2[:, 1]), np.abs(e2[:, 0]))))
@@ -104,25 +119,36 @@ def medidas_por_fotograma(k2d, fps, k3d=None):
     return fr
 
 
-def periodo_brazada(sig, fps, t_min=0.3, t_max=1.6):
-    """Periodo típico entre brazadas (s) por autocorrelación de la señal (ignorando huecos)."""
+def periodo_brazada(sig, fps, t_min=0.35, t_max=1.0):
+    """Periodo típico entre brazadas (s) por autocorrelación de la señal (ignorando huecos).
+
+    1. Se suaviza la señal (media móvil de ~0,15 s) para quitar el temblor fotograma a fotograma.
+    2. Se busca el pico de autocorrelación más alto DENTRO del rango fisiológico del crol (0,35-1,0 s entre
+       brazadas, 30-85 ciclos/min). Un valor pegado al borde del rango no es un ritmo real y se descarta.
+    Devuelve None si no hay un ritmo claro.
+    """
     ok = ~np.isnan(sig)
     if ok.sum() < 3 * fps:
         return None
     x = np.where(ok, sig - np.nanmean(sig), 0.0)
     m = ok.astype(float)
-    lags = np.arange(int(t_min * fps), int(t_max * fps) + 1)
-    acf = []
-    for L in lags:
+    w = np.ones(max(3, int(0.15 * fps) | 1))
+    num, den = np.convolve(x, w, 'same'), np.convolve(m, w, 'same')
+    x = np.where(ok & (den > 0), num / np.maximum(den, 1e-9), 0.0)
+    lags = np.arange(max(1, int(t_min * fps) - 1), int(t_max * fps) + 2)
+    acf = np.full(len(lags), -np.inf)
+    for n, L in enumerate(lags):
         pares = (m[:-L] * m[L:]).sum()
-        acf.append((x[:-L] * x[L:]).sum() / pares if pares > fps else -np.inf)
-    acf = np.array(acf)
-    if not np.isfinite(acf).any():
+        if pares > fps:
+            acf[n] = (x[:-L] * x[L:]).sum() / pares
+    finito = np.isfinite(acf)
+    if finito.sum() < 3:
         return None
-    # primer máximo local claro (evita escoger múltiplos del periodo)
-    picos, _ = find_peaks(np.where(np.isfinite(acf), acf, np.nanmin(acf[np.isfinite(acf)])))
-    k = picos[0] if len(picos) else int(np.argmax(acf))
-    return lags[k] / fps
+    picos, _ = find_peaks(np.where(finito, acf, np.nanmin(acf[finito])))
+    picos = [p for p in picos if acf[p] > 0 and t_min <= lags[p] / fps <= t_max]
+    if not picos:
+        return None
+    return lags[max(picos, key=lambda p: acf[p])] / fps
 
 
 def detectar_ciclos(fr, fps):
@@ -132,8 +158,8 @@ def detectar_ciclos(fr, fps):
     brazadas perdidas entre medias. Devuelve (señal, picos de brazada, lista de ciclos (inicio, fin), periodo).
     """
     lim = int(0.2 * fps)
-    mI = fr.munI_eje.interpolate(limit=lim, limit_area='inside').to_numpy()
-    mD = fr.munD_eje.interpolate(limit=lim, limit_area='inside').to_numpy()
+    mI = fr.munI_eje2d.interpolate(limit=lim, limit_area='inside').to_numpy()
+    mD = fr.munD_eje2d.interpolate(limit=lim, limit_area='inside').to_numpy()
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')
         sig = np.fmax(mI, mD)
