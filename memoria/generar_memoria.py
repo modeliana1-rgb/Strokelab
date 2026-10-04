@@ -485,10 +485,9 @@ def cap4_solucion(w):
         '(Figura 3) muestra el estado FRESCO o FATIGA, el ciclo, la frecuencia y una barra temporal con la anomalía de '
         'cada ciclo, el umbral y el inicio de la fatiga. Los ángulos quedan en las tablas (`--panel completo` los muestra '
         'en el vídeo).')
-    w.p('La clasificación del estilo con XGBoost (Chen y Guestrin, 2016) y validación GroupKFold por vídeo queda '
-        'planteada pero no implementada en la versión local: el 99,99 % de precisión de una versión anterior se debía '
-        'a fuga de datos entre fotogramas de un mismo vídeo, y con los vídeos disponibles hay muy pocos por estilo. '
-        '[PENDIENTE: implementar y evaluar si da tiempo.]')
+    w.p('El estilo se clasifica con un bosque aleatorio sobre rasgos por ventana de 4 s, con validación agrupada por '
+        'vídeo (GroupKFold); el 99,99 % de precisión de una versión anterior se debía a fuga de datos entre fotogramas '
+        'de un mismo vídeo. Sus resultados se presentan en la Sección 4.6.')
     w.figura(FIG / 'panel_video.png', 'Panel del vídeo anotado (nadador sintético, t = 70 s; la fatiga empieza en 51,9 s).', ancho_cm=13)
     w.p('Herramientas: Python 3, Ultralytics (YOLO), PyTorch (MotionBERT), OpenCV, NumPy, pandas, scikit-learn, shap, '
         'Matplotlib y Git. El código incluye pruebas automáticas que se ejecutan antes de cada cambio (Anexo C).')
@@ -533,11 +532,42 @@ def cap4_resultados(w):
         '(valor real ≈ 50), el inicio de la fatiga se sitúa en t = 47,5 s y SHAP señala el alcance del brazo, la '
         'frecuencia y la asimetría, que son las variables alteradas.')
 
+    w.h3('Caso de demostración con un nadador simulado')
+    w.p('Para mostrar todas las capacidades con una verdad conocida se generó un **nadador ficticio** (no son datos '
+        'reales; `caso_ficticio.py`): crol durante 120 s, con cámara fija que cubre los 25 m (velocidad calibrada) y '
+        'fatiga programada que sube del 10 % al 90 % entre los segundos 59 y 81 (más frecuencia, menos velocidad y '
+        'distancia por ciclo, menos alcance, más flexión del codo, cadera hundida y asimetría). Se analizó en vista '
+        'lateral y frontal (Tabla 6).')
+    w.tabla([
+        ['Medida', 'Vista lateral', 'Vista frontal'],
+        ['Ciclos analizados', '91', '98'],
+        ['Error mediano de la frecuencia de ciclo', '4,7 %', '0,3 %'],
+        ['Error mediano de la velocidad', '1,3 %', 'no medible de frente'],
+        ['Error mediano de la distancia por ciclo', '4,3 %', 'no medible de frente'],
+        ['Inicio de la fatiga detectado', 't = 57,3 s (ciclo 42)', 't = 57,8 s (ciclo 45)'],
+        ['Causas principales según SHAP', 'apertura del hombro (173° → 151°), asimetría de brazos (3 % → 24 %), inclinación del tronco (2,7° → 7,9°)',
+         'frecuencia (46,2 → 52,9 ciclos/min), asimetría de brazos (1 % → 23 %), alcance del brazo (−32 %)'],
+        ['Estilo predicho', 'crol (98 %)', 'crol (95 %)'],
+    ], 'Caso ficticio: resultados del sistema frente a la verdad de la simulación.', anchos=[5, 5.5, 5.5])
+    w.p('El sistema detecta la fatiga al empezar la transición programada (aviso temprano, cuando el cambio aún es '
+        'pequeño) y SHAP señala variables que de verdad se alteraron. Velocidad, frecuencia y distancia por ciclo siguen '
+        'a la verdad (Figura 7). De frente no se mide la velocidad ni la inclinación, y los ángulos requieren el 3D.')
+    w.figura(FIG / 'caso_verdad_vs_sistema.png', 'Caso ficticio (lateral): velocidad, frecuencia y distancia por ciclo medidas frente a la verdad.')
+    w.p('**Clasificación del estilo.** Clasificador por ventanas de 4 s (bosque aleatorio) con rasgos que no dependen '
+        'del estilo: brazos a la vez o alternos, posición de la nariz (boca abajo o arriba), piernas juntas o alternas, '
+        'flexión máxima de rodilla, separación de pies, ondulación de la cadera y periodo de las manos. Con 64 vídeos '
+        'simulados (4 estilos × 2 vistas × 8 nadadores) y validación agrupada por vídeo (GroupKFold) clasifica bien el '
+        '100 % de los vídeos; SHAP muestra que la nariz separa crol y espalda, los brazos a la vez la mariposa y las '
+        'piernas juntas la braza (Figura 8). Aplicado a los tres clips reales de Aaron no acierta: en vídeo real el '
+        'modelo de pose copia brazos y piernas y la posición de la cabeza es menos marcada, así que hace falta '
+        'entrenarlo con vídeos reales etiquetados de los cuatro estilos.')
+    w.figura(FIG / 'caso_estilo.png', 'Clasificación del estilo en vídeos simulados: matriz de confusión y SHAP por estilo.')
+
     w.h3('Vídeo real: análisis completo de Aaron en crol')
     w.p('Se analizaron con `lote.py` los cinco clips de Aaron en crol: tres de GoPro bajo el agua en vista lateral '
         '(5120 × 2880, 30 fps) y dos de móvil en vista frontal (1080 × 1920, 60 fps). La vista frontal se identificó en '
         'los datos: en los clips de móvil el tronco aparece casi vertical en la imagen (78-102°) y mide 60-100 píxeles, '
-        'frente a 8-10° en la GoPro, donde Aaron cruza la imagen de lado a lado (Tabla 6 y Figura 7).')
+        'frente a 8-10° en la GoPro, donde Aaron cruza la imagen de lado a lado (Tabla 7 y Figura 9).')
     w.tabla([
         ['Clip', 'Vista', 'Duración', 'Analizable', 'Ciclos', 'Ritmo (ciclos/min)'],
         ['GX011614', 'lateral', '46,2 s', '12,7 s', '9', '50,5'],
@@ -567,7 +597,7 @@ def cap4_resultados(w):
 
     w.h3('Medidas de la técnica de Aaron')
     w.p('Las medidas se resumen solo con los clips laterales, porque los ángulos 2D de vistas distintas no son '
-        'comparables (Tabla 8 y Figura 8). Izquierda y derecha se promedian, porque en vista lateral el modelo copia el '
+        'comparables (Tabla 9 y Figura 10). Izquierda y derecha se promedian, porque en vista lateral el modelo copia el '
         'brazo visible en el oculto.')
     w.tabla([
         ['Medida', 'Media', 'Desviación', 'Variación (CV)'],
@@ -635,7 +665,7 @@ def cap5_discusion(w):
         'Detección parcial: con YOLOv8n en CPU, el nadador es analizable en torno a un tercio del vídeo y, de frente, se encuentran entre el 38 % y el 50 % de los ciclos.',
         'La vista (lateral o frontal) la indica el usuario en la lista de vídeos; si se equivoca, el conteo empeora (con la señal frontal en un clip lateral el error pasó del 6,5 % al 14 %).',
         'Los clips disponibles son pasadas cortas: no permiten observar la fatiga en vídeo real.',
-        'La clasificación del estilo no se ha implementado en la versión final.',
+        'La clasificación del estilo solo está validada con vídeos simulados; con vídeo real falla y necesita vídeos etiquetados.',
         'La fase base supone que el nadador empieza fresco; si llega fatigado, el inicio se subestima.',
         'Falta contrastar el momento de fatiga con una referencia independiente (lactato, esfuerzo percibido o entrenador).',
         'Los resultados reales corresponden por ahora a un nadador [PENDIENTE: ampliar a 8].',
@@ -661,7 +691,7 @@ def cap6_personales(w):
 def cap7_futuro(w):
     w.vinetas([
         'Analizar los 8 nadadores y comparar sus patrones de fatiga.',
-        'Implementar la clasificación del estilo (XGBoost con validación agrupada por vídeo) cuando haya suficientes vídeos por estilo.',
+        'Entrenar el clasificador de estilo con vídeos reales etiquetados de los cuatro estilos.',
         'Detectar la vista (lateral o frontal) automáticamente a partir de la orientación del tronco.',
         'Ajustar el modelo de pose con imágenes subacuáticas etiquetadas (SwimXYZ y fotogramas propios) para distinguir los dos brazos y detectar más fotogramas.',
         'Adaptar MotionBERT a natación para obtener ángulos 3D fiables en las piernas.',

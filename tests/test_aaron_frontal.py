@@ -23,7 +23,7 @@ def main():
         z = np.load(RAIZ / 'tests' / 'datos' / f'aaron_{clip}_keypoints.npz')
         fps = float(z['fps'])
         k2d, _ = medidas.limpiar(z['kps'], z['conf'], fps)
-        fr = medidas.medidas_por_fotograma(k2d, fps)
+        fr = medidas.medidas_por_fotograma(k2d, fps, vista='frontal')
         _, _, ciclos_ab, _ = medidas.detectar_ciclos(fr, fps, 'crol', 'frontal')
         cic = medidas.variables_por_ciclo(fr, fps, ciclos_ab, estilo='crol', vista='frontal')
         ref = 60 * n_manual / dur

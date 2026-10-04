@@ -47,7 +47,7 @@ def nadador_frontal(fps=30, dur=90, seed=1):
 def main():
     k, conf, fps = nadador_frontal()
     k2d, _ = medidas.limpiar(k, conf, fps)
-    fr = medidas.medidas_por_fotograma(k2d, fps)
+    fr = medidas.medidas_por_fotograma(k2d, fps, vista='frontal')
     _, _, ciclos_ab, _ = medidas.detectar_ciclos(fr, fps, 'crol', 'frontal')
     cic = medidas.variables_por_ciclo(fr, fps, ciclos_ab, estilo='crol', vista='frontal')
     sr = cic.SR_ciclos_min.mean()

@@ -126,7 +126,7 @@ def main(argv=None):
 
     print('\n[4] Medidas por fotograma y ciclos de brazada')
     usar_3d = k3d is not None and a.vista != 'lateral'
-    fr = medidas.medidas_por_fotograma(k2d, fps, k3d if usar_3d else None)
+    fr = medidas.medidas_por_fotograma(k2d, fps, k3d if usar_3d else None, a.vista)
     if k3d is not None and not usar_3d:        # el 3D se guarda aparte para comparar (columnas *_3d)
         f3 = medidas.medidas_por_fotograma(k2d, fps, k3d)
         for c in ['codo_I', 'codo_D', 'hombro_I', 'hombro_D', 'cadera_I', 'cadera_D', 'rodilla_I', 'rodilla_D']:
@@ -134,6 +134,10 @@ def main(argv=None):
     fr.to_csv(out / 'medidas_por_fotograma.csv', index=False)
     sig, picos, ciclos_ab, T_br = medidas.detectar_ciclos(fr, fps, a.estilo, a.vista)
     ciclos = medidas.variables_por_ciclo(fr, fps, ciclos_ab, a.metros_encuadre, W, a.estilo, a.vista)
+    if a.vista == 'frontal' and not usar_3d and len(ciclos):  # de frente, los ángulos 2D son proyecciones sin sentido
+        angulos = [c for c in ciclos if c.split('_')[0] in ('codo', 'hombro', 'cadera', 'rodilla')]
+        ciclos[angulos] = np.nan
+        print('    vista frontal sin 3D: los ángulos articulares no se calculan (hacen falta los de MotionBERT)')
     print(f'    ángulos en {"3D" if usar_3d else "2D"} (vista {a.vista}) · tronco implausible descartado: '
           f'{fr.attrs["pct_tronco_descartado"]:.1f}% (con tronco girado: {fr.attrs["pct_tronco_girado"]:.1f}%) · nadador analizable {np.mean(~np.isnan(sig)) * len(sig) / fps:.1f} s '
           f'de {len(sig) / fps:.1f} s · brazadas {len(picos)} (ritmo típico {T_br or 0:.2f} s) · ciclos válidos {len(ciclos)}')

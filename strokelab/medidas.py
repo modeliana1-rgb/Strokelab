@@ -41,8 +41,11 @@ def angulo(a, b, c):
     return np.degrees(np.arccos(np.clip(cos, -1, 1)))
 
 
-def medidas_por_fotograma(k2d, fps, k3d=None):
-    """Medidas por fotograma. k2d (T,17,2) limpio; k3d (T,17,3) opcional (MotionBERT, orden COCO)."""
+def medidas_por_fotograma(k2d, fps, k3d=None, vista='lateral'):
+    """Medidas por fotograma. k2d (T,17,2) limpio; k3d (T,17,3) opcional (MotionBERT, orden COCO).
+
+    De frente y en 2D el tronco aparece acortado: la escala del cuerpo para los filtros es el ancho de hombros.
+    """
     warnings.filterwarnings('ignore', 'Mean of empty slice')
     warnings.filterwarnings('ignore', 'All-NaN slice')
     k = k3d if k3d is not None else k2d
@@ -50,6 +53,8 @@ def medidas_por_fotograma(k2d, fps, k3d=None):
     cad = np.nanmean([k[:, LHIP], k[:, RHIP]], 0)
     eje = hom - cad
     L = np.linalg.norm(eje, axis=1)
+    if vista == 'frontal' and k3d is None:
+        L = np.linalg.norm(k[:, LSH] - k[:, RSH], axis=1)
 
     # Filtro de plausibilidad anatómica: tronco fuera de [0.5, 2] x mediana = cadera/hombro mal detectados
     L_med = np.nanmedian(L)
@@ -70,7 +75,7 @@ def medidas_por_fotograma(k2d, fps, k3d=None):
     girado = desv > 45
     malo = malo | girado
     L = np.where(malo, np.nan, L)
-    u = eje / L[:, None]
+    u = eje / np.where(np.isnan(L), np.nan, np.linalg.norm(eje, axis=1))[:, None]     # eje del tronco unitario
 
     def segmentos_ok(a, b, c, lo=0.15, hi=1.3, kk=None, LL=None):
         kk = k if kk is None else kk

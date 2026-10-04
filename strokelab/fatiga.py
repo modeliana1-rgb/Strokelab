@@ -8,7 +8,7 @@ NOMBRES = {
     'hombro_max_I': 'Apertura hombro izq. (°)', 'hombro_max_D': 'Apertura hombro dcho. (°)',
     'cadera_media_I': 'Ángulo cadera izq. (°)', 'cadera_media_D': 'Ángulo cadera dcha. (°)',
     'rodilla_min_I': 'Flexión rodilla izq. (°)', 'rodilla_min_D': 'Flexión rodilla dcha. (°)',
-    'alcance_I': 'Alcance brazo izq. (troncos)', 'alcance_D': 'Alcance brazo dcho. (troncos)',
+    'alcance_I': 'Alcance brazo izq. (relativo)', 'alcance_D': 'Alcance brazo dcho. (relativo)',
     'asimetria_brazos_pct': 'Asimetría de brazos (%)', 'inclinacion_tronco': 'Inclinación del tronco (°)',
     'amplitud_patada': 'Amplitud de patada (troncos)', 'patadas_por_ciclo': 'Patadas por ciclo',
     'DPS_m': 'Distancia por ciclo (m)',
