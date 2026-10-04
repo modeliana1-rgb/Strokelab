@@ -315,6 +315,8 @@ okI, okD = brazo_ok(LSH, LEL, LWR), brazo_ok(RSH, REL, RWR)
 fr = pd.DataFrame({'t': tiempo})
 fr['codo_I'] = np.where(okI, ang(kps[:, LSH], kps[:, LEL], kps[:, LWR]), np.nan)
 fr['codo_D'] = np.where(okD, ang(kps[:, RSH], kps[:, REL], kps[:, RWR]), np.nan)
+# Flexión de codo por debajo de 25° no es posible: muñeca detectada sobre el hombro
+fr.loc[fr.codo_I < 25, 'codo_I'] = np.nan; fr.loc[fr.codo_D < 25, 'codo_D'] = np.nan
 fr['munI_eje'] = np.where(okI, ((kps[:, LWR] - kps[:, LSH]) * u).sum(1) / L_tronco, np.nan)
 fr['munD_eje'] = np.where(okD, ((kps[:, RWR] - kps[:, RSH]) * u).sum(1) / L_tronco, np.nan)
 incl = np.degrees(np.arctan2(np.abs(eje[:, 1]), np.abs(eje[:, 0])))   # 0 = cuerpo horizontal
@@ -521,7 +523,7 @@ for t in range(T):
     if SC < 1: f = cv2.resize(f, (OW, OH), interpolation=cv2.INTER_AREA)
     i = ciclo_de_frame[t]; fat = i >= 0 and ciclos.estado.iloc[i] == 'fatigado'
     col = (0, 0, 255) if fat else (0, 200, 0)
-    for a, b in SKELETON:
+    for a, b in SKELETON if not np.isnan(L_tronco[t]) else []:   # solo detecciones anatómicamente válidas
         if not np.isnan(kps_v[t, [a, b]]).any():
             cv2.line(f, tuple(kps_v[t, a].astype(int)), tuple(kps_v[t, b].astype(int)), col, max(3, int(3*ESC)))
     cv2.rectangle(f, (10, 10), (int(560*ESC), int(150*ESC)), (0, 0, 0), -1)
