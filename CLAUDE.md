@@ -76,7 +76,11 @@ aparece la fatiga y por qué** (SHAP), y medidas de codos, hombros, caderas, rod
 - Entrega final: plantilla de la escuela `memoria/Plantilla_memoria_TFM.docx`, rellenada por
   `memoria/generar_memoria.py` -> `memoria/TFM_StrokeLab_borrador.docx`. Base antigua (sept., con resultados no
   válidos: 5 nadadores con potencia, 99,9 %, LSTM): `memoria/TFM_STROKELAB_ACTUALIZADO_base_sept.docx`.
-- Datos de la portada pendientes: apellidos de Diana, director/a, horas y presupuesto.
+- Borrador generado (4 oct 2026, 33 págs.): figuras en `memoria/figuras/` (sintético regenerado con el código actual:
+  fatiga en ciclo 40, t = 58,0 s; PELT ciclo 33; signo SHAP 0,999; Aaron 9 ciclos, 50,5 ciclos/min, error 6,5 %).
+  Al abrirlo, Word pide actualizar campos: «Sí» rehace índice, índice de figuras/tablas y numeración.
+- Datos de la portada pendientes: apellidos de Diana, director/a, horas y presupuesto, equipo, agradecimientos,
+  conclusiones personales, fechas de la fase 1, comparativa MoveNet/MediaPipe en CPU y resultado de fatiga real.
 
 ## Siguientes pasos
 
