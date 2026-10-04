@@ -47,6 +47,9 @@ La lista indica nadador, estilo (`crol`, `espalda`, `mariposa`, `braza`), vista 
 Salen `resumen_lote.csv`, `resumen_sesiones.csv` y `para_claude.zip` (todo menos los vídeos) en `..\resultados`.
 Con un solo vídeo, `--estilo` fija cuántas brazadas forman un ciclo: 2 en crol y espalda, 1 en mariposa y braza.
 
+Informe de un nadador y estilo (tras el lote): `python informe_nadador.py ..\resultados --nadador Aaron --estilo crol`.
+Si YOLO pierde al nadador: `python probar_deteccion.py VIDEO --desde S --hasta S` compara `--imgsz 640/1280` y `--conf-det 0,25/0,10`.
+
 Fatiga a lo largo de una sesión (varias pasadas del mismo nadador, en orden de grabación):
 
 ```powershell

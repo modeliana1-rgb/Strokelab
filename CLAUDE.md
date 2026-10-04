@@ -66,6 +66,15 @@ aparece la fatiga y por qué** (SHAP), y medidas de codos, hombros, caderas, rod
   brazadas); mariposa y braza 1 ciclo = 1 brazada (0,7-2,0/2,4 s). Validado solo en crol real; resto con sintético.
 - **Lote** (`lote.py`, 4 oct): sin vídeo anotado por defecto (`--con-video`) para ahorrar tiempo; sesión = mismo nombre
   en la lista (GoPro y móvil separados por defecto). Pendiente: clasificador de estilo (no implementado en local aún).
+- **Lote de Aaron crol (5 oct)**: 5 clips, 118,8 s grabados, 35,8 s analizables (30 %), 17 ciclos. GoPro (lateral):
+  GX011614 9 ciclos, GX011617 0 (sin 3 intervalos válidos: señal fragmentada), GX011618 1 → sesión 10 ciclos, sin fatiga.
+  Móvil IMG_7207/7215 (1080x1920, 60 fps): tronco casi vertical en la imagen (78°/102°) y tronco de 60-100 px →
+  NO es vista lateral (nada hacia la cámara o desde el borde): `vista otra` y fuera de las medidas (SR 80 no fiable).
+  Cuello de botella: YOLO detecta al nadador en ~25 % de los fotogramas en que está en cuadro. Prueba: `probar_deteccion.py`
+  (imgsz 640/1280 × conf 0,25/0,10); `--imgsz/--conf-det` en analizar y lote (`--rehacer-pose`).
+- **Mínimos/máximos por ciclo robustos** (percentil 10/90, `medidas.bajo/alto`): con el mínimo puro, un fotograma
+  malo daba rodillas de 12° en GX011614. Rodilla media por ciclo pasó de 107° a 149°.
+- `informe_nadador.py <resultados> --nadador X --estilo Y`: tablas y figuras por clip y por variable (solo vista lateral).
 - Variables redundantes fuera del modelo (v = SR·DPS; potencia ∝ v³).
 - El 99,99 % de accuracy de versiones antiguas era fuga de datos; la clasificación de estilo usa GroupKFold por vídeo.
 

@@ -190,6 +190,17 @@ def detectar_ciclos(fr, fps, estilo='crol'):
     return sig, picos, ciclos, T
 
 
+def bajo(x, q=0.10):
+    """Mínimo robusto del ciclo (percentil 10): un solo fotograma mal detectado no fija el valor del ciclo."""
+    x = x.dropna()
+    return float(x.quantile(q)) if len(x) >= 3 else np.nan
+
+
+def alto(x):
+    """Máximo robusto del ciclo (percentil 90)."""
+    return bajo(x, 0.90)
+
+
 def variables_por_ciclo(fr, fps, ciclos_ab, metros_ancho=None, ancho_px=None, estilo='crol'):
     """Una fila por ciclo válido (0.6-3 s, <= 30 % de datos ausentes en la señal de las muñecas)."""
     ppm = (ancho_px / metros_ancho) if metros_ancho and ancho_px else None
@@ -204,10 +215,10 @@ def variables_por_ciclo(fr, fps, ciclos_ab, metros_ancho=None, ancho_px=None, es
         sep = seg.sep_tobillos.interpolate(limit_area='inside').to_numpy()
         n_patadas = len(find_peaks(sep[~np.isnan(sep)], prominence=0.05)[0]) if np.sum(~np.isnan(sep)) > 5 else np.nan
         f = dict(ciclo=len(filas) + 1, t_inicio_s=round(a / fps, 2), duracion_s=dur, SR_ciclos_min=60 / dur,
-                 codo_min_I=seg.codo_I.min(), codo_min_D=seg.codo_D.min(),
-                 hombro_max_I=seg.hombro_I.max(), hombro_max_D=seg.hombro_D.max(),
+                 codo_min_I=bajo(seg.codo_I), codo_min_D=bajo(seg.codo_D),
+                 hombro_max_I=alto(seg.hombro_I), hombro_max_D=alto(seg.hombro_D),
                  cadera_media_I=seg.cadera_I.mean(), cadera_media_D=seg.cadera_D.mean(),
-                 rodilla_min_I=seg.rodilla_I.min(), rodilla_min_D=seg.rodilla_D.min(),
+                 rodilla_min_I=bajo(seg.rodilla_I), rodilla_min_D=bajo(seg.rodilla_D),
                  alcance_I=alcI, alcance_D=alcD,
                  asimetria_brazos_pct=100 * abs(alcI - alcD) / np.nanmean([alcI, alcD]),
                  inclinacion_tronco=seg.inclinacion_tronco.mean(),

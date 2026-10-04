@@ -103,6 +103,9 @@ def main(argv=None):
     ap.add_argument('--con-video', action='store_true', help='generar también el vídeo anotado (tarda unas 4× la duración)')
     ap.add_argument('--rehacer', action='store_true', help='repetir el análisis aunque ya exista (reutiliza la pose)')
     ap.add_argument('--solo', nargs='*', help='analizar solo estos archivos de la lista')
+    ap.add_argument('--imgsz', type=int, default=640, help='YOLO: 1280 detecta mejor nadadores pequeños (~4x más lento)')
+    ap.add_argument('--conf-det', type=float, default=0.25, help='YOLO: confianza mínima de la detección')
+    ap.add_argument('--rehacer-pose', action='store_true', help='volver a extraer la pose aunque ya exista (p. ej. con otro --imgsz)')
     a = ap.parse_args(argv)
 
     carpeta = Path(a.carpeta)
@@ -129,11 +132,12 @@ def main(argv=None):
         r = out / 'resumen.json'
         hecho = r.exists() and json.loads(r.read_text(encoding='utf-8')).get('estilo') == f['estilo'] \
             and json.loads(r.read_text(encoding='utf-8')).get('vista') == f['vista']
-        if a.rehacer or not hecho:
+        if a.rehacer or a.rehacer_pose or not hecho:
             pendientes.append(f)
-    total = sum(duracion_s(carpeta / f['archivo']) for f in pendientes if not (res_dir / Path(f['archivo']).stem / 'keypoints_raw.npz').exists())
+    total = sum(duracion_s(carpeta / f['archivo']) for f in pendientes
+                if a.rehacer_pose or not (res_dir / Path(f['archivo']).stem / 'keypoints_raw.npz').exists())
     print(f'{len(filas)} vídeos en la lista; {len(pendientes)} por analizar. Vídeo nuevo por procesar: {total / 60:.1f} min '
-          f'-> unas {7 * total / 3600 + 0.1 * len(pendientes):.1f} h en CPU{" (+ vídeo anotado)" if a.con_video else ""}.')
+          f'-> unas {(7 if a.imgsz <= 640 else 25) * total / 3600 + 0.1 * len(pendientes):.1f} h en CPU{" (+ vídeo anotado)" if a.con_video else ""}.')
 
     with open(res_dir / 'lote.log', 'a', encoding='utf-8') as log:
         log.write(f'\n===== lote {time.strftime("%Y-%m-%d %H:%M")} =====\n')
@@ -144,8 +148,8 @@ def main(argv=None):
                 continue
             print(f'\n######## [{n}/{len(pendientes)}] {f["archivo"]} · {f["nadador"]} · {f["estilo"]} · vista {f["vista"]}')
             cmd = [sys.executable, str(RAIZ / 'analizar.py'), str(video), '--salida', str(out), '--nadador', f['nadador'],
-                   '--estilo', f['estilo'], '--vista', f['vista']]
-            if (out / 'keypoints_raw.npz').exists():
+                   '--estilo', f['estilo'], '--vista', f['vista'], '--imgsz', str(a.imgsz), '--conf-det', str(a.conf_det)]
+            if (out / 'keypoints_raw.npz').exists() and not a.rehacer_pose:
                 cmd.append('--desde-keypoints')                 # la pose ya está extraída: solo se rehace el análisis
             if not a.con_video:
                 cmd.append('--sin-video')

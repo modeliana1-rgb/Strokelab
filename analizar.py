@@ -42,6 +42,8 @@ def main(argv=None):
                     help='estilo de nado: fija cuántas brazadas forman un ciclo y el ritmo plausible')
     ap.add_argument('--modelo', default='yolov8n-pose',
                     help='yolov8n-pose (defecto), yolo11n-pose, yolov8s-pose, movenet_lightning, movenet_thunder, mediapipe')
+    ap.add_argument('--imgsz', type=int, default=640, help='YOLO: lado de entrada de la red (1280 detecta mejor nadadores pequeños, ~4x más lento)')
+    ap.add_argument('--conf-det', type=float, default=0.25, help='YOLO: confianza mínima para aceptar la detección del nadador')
     ap.add_argument('--cada', type=int, default=2, help='analizar 1 de cada N fotogramas (2 = el doble de rápido)')
     ap.add_argument('--sin-3d', action='store_true', help='no usar MotionBERT (solo 2D)')
     ap.add_argument('--motionbert', help='ruta a best_epoch.bin de MotionBERT-Lite')
@@ -63,6 +65,7 @@ def main(argv=None):
     vid = Path(a.video)
     out = Path(a.salida) if a.salida else Path('resultados') / vid.stem
     out.mkdir(parents=True, exist_ok=True)
+    pose.YOLO_IMGSZ, pose.YOLO_CONF = a.imgsz, a.conf_det
     t_total = time.time()
     print(f'StrokeLab · {vid.name} -> {out}')
 
@@ -87,6 +90,7 @@ def main(argv=None):
         d = np.load(origen)
         kps, conf, fps, W, H = d['kps'], d['conf'], float(d['fps']), int(d['w']), int(d['h'])
         rot = int(d['giro']) if 'giro' in d.files else 0
+        ajustes = (int(d['imgsz']) if 'imgsz' in d.files else 640, float(d['conf_det']) if 'conf_det' in d.files else 0.25)
         if origen != npz:
             np.savez(npz, **{k: d[k] for k in d.files})
         print(f'\n[1] Pose 2D cargada de {origen}')
@@ -94,7 +98,8 @@ def main(argv=None):
         print(f'\n[1] Pose 2D con {a.modelo} (1 de cada {a.cada} fotogramas, giro {rot:+d}°)')
         t0 = time.time()
         kps, conf, fps, W, H = pose.extraer_keypoints(vid, a.modelo, cada=a.cada, rot=rot)
-        np.savez(npz, kps=kps, conf=conf, fps=fps, w=W, h=H, modelo=a.modelo, cada=a.cada, giro=rot)
+        ajustes = (a.imgsz, a.conf_det)
+        np.savez(npz, kps=kps, conf=conf, fps=fps, w=W, h=H, modelo=a.modelo, cada=a.cada, giro=rot, imgsz=a.imgsz, conf_det=a.conf_det)
         print(f'    {len(kps)} fotogramas, {W}x{H}, {fps:.2f} fps, en {time.time() - t0:.0f} s')
     analizados = conf.max(1) > 0
     print(f'    fotogramas analizados con >= 5 articulaciones fiables: '
@@ -147,7 +152,7 @@ def main(argv=None):
         print('\n    Medias por ciclo:')
         print(ciclos.drop(columns=['ciclo', 't_inicio_s', 'estado'], errors='ignore').mean().round(2).to_string())
 
-    resumen = dict(video=vid.name, nadador=a.nadador, estilo=a.estilo, modelo_pose=a.modelo, cada=a.cada, giro=rot, angulos_3d=bool(usar_3d), vista=a.vista,
+    resumen = dict(video=vid.name, nadador=a.nadador, estilo=a.estilo, imgsz=ajustes[0], conf_det=ajustes[1], modelo_pose=a.modelo, cada=a.cada, giro=rot, angulos_3d=bool(usar_3d), vista=a.vista,
                    fps=fps, resolucion=f'{W}x{H}', duracion_s=round(len(kps) / fps, 2), ciclos_validos=len(ciclos),
                    pct_deteccion=round(float(100 * np.mean((conf[analizados] > 0.3).sum(1) >= 5)), 1),
                    s_analizable=round(float(np.mean(~np.isnan(sig)) * len(sig) / fps), 1),

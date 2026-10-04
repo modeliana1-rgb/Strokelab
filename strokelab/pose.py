@@ -29,6 +29,10 @@ MOVENET_TAM = {'lightning': 192, 'thunder': 256}
 MP_MODELO_URL = ('https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/'
                  'float16/latest/pose_landmarker_full.task')
 
+# YOLO: tamaño de entrada de la red y confianza mínima de la caja. Con 640 px un nadador de un vídeo 5K queda muy
+# pequeño; 1280 px detecta mejor a cambio de ~4 veces más tiempo. analizar.py los cambia con --imgsz y --conf-det.
+YOLO_IMGSZ = 640
+YOLO_CONF = 0.25
 MAX_LADO = 1920   # los fotogramas 4K/5K se reducen a este lado mayor antes del modelo (los modelos usan 192-640 px)
 
 
@@ -188,7 +192,7 @@ class Estimador:
                 lm = r.pose_landmarks.landmark
             xy = np.array([[lm[i].x * w, lm[i].y * h] for i in MP_A_COCO])
             return xy, np.array([lm[i].visibility for i in MP_A_COCO])
-        r = self.yolo(frame, verbose=False, device='cpu')[0]
+        r = self.yolo(frame, verbose=False, device='cpu', imgsz=YOLO_IMGSZ, conf=YOLO_CONF)[0]
         if r.keypoints is None or r.keypoints.conf is None or len(r.boxes) == 0:
             return np.full((17, 2), np.nan), np.zeros(17)
         xy = r.keypoints.xy.cpu().numpy()
