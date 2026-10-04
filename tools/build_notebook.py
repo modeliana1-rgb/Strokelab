@@ -61,7 +61,8 @@ from scipy.signal import find_peaks, savgol_filter
 warnings.filterwarnings('ignore')
 
 CONF_KP = 0.30            # confianza mínima por keypoint
-N_FRAMES_BENCH = 300      # frames usados en la comparativa de modelos
+N_FRAMES_BENCH = 150      # frames usados en la comparativa de modelos
+MAX_ANCHO = 1280          # los vídeos 4K se reducen a este ancho donde no hace falta resolución completa
 BASELINE_FRAC = 0.30      # % inicial de ciclos considerado "fresco"
 os.makedirs(OUT_DIR, exist_ok=True)
 FIG = lambda name: os.path.join(OUT_DIR, name)
@@ -85,6 +86,8 @@ def leer_frames(path, n):
     while len(frames) < n:
         ok, f = cap.read()
         if not ok: break
+        if f.shape[1] > MAX_ANCHO:            # 4K -> 1280 px: evita agotar la RAM (YOLO usa 640 px igualmente)
+            f = cv2.resize(f, (MAX_ANCHO, int(f.shape[0] * MAX_ANCHO / f.shape[1])), interpolation=cv2.INTER_AREA)
         frames.append(f)
     cap.release(); return frames
 
@@ -400,21 +403,24 @@ else:
 
 md("## 10. Vídeo anotado (para la defensa)")
 code("""
-ESC = max(1.0, W / 1280)          # escala texto/caja para vídeos HD
+SC = min(1.0, MAX_ANCHO / W)          # el vídeo anotado se guarda como máximo a 1280 px de ancho
+OW, OH = int(W * SC), int(H * SC); ESC = max(1.0, OW / 1280)
+kps_v = kps * SC
 cap = cv2.VideoCapture(VIDEO_PATH)
 tmp = '/content/anotado_tmp.mp4'
-out = cv2.VideoWriter(tmp, cv2.VideoWriter_fourcc(*'mp4v'), FPS, (W, H))
+out = cv2.VideoWriter(tmp, cv2.VideoWriter_fourcc(*'mp4v'), FPS, (OW, OH))
 ciclo_de_frame = np.full(T, -1)
 for i, r in ciclos.iterrows():
     a = int(r.t_inicio_s * FPS); ciclo_de_frame[a:a + int(r.duracion_s * FPS)] = i
 for t in range(T):
     ok, f = cap.read()
     if not ok: break
+    if SC < 1: f = cv2.resize(f, (OW, OH), interpolation=cv2.INTER_AREA)
     i = ciclo_de_frame[t]; fat = i >= 0 and ciclos.estado.iloc[i] == 'fatigado'
     col = (0, 0, 255) if fat else (0, 200, 0)
     for a, b in SKELETON:
-        if not np.isnan(kps[t, [a, b]]).any():
-            cv2.line(f, tuple(kps[t, a].astype(int)), tuple(kps[t, b].astype(int)), col, max(3, int(3*ESC)))
+        if not np.isnan(kps_v[t, [a, b]]).any():
+            cv2.line(f, tuple(kps_v[t, a].astype(int)), tuple(kps_v[t, b].astype(int)), col, max(3, int(3*ESC)))
     cv2.rectangle(f, (10, 10), (int(470*ESC), int(150*ESC)), (0, 0, 0), -1)
     txt = [f'{NADADOR}  t={t/FPS:5.1f}s']
     if i >= 0:
