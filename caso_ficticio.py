@@ -72,8 +72,8 @@ def figura_lateral(ciclos, inicio, out):
     fig, axs = plt.subplots(3, 1, figsize=(10, 7), sharex=True, dpi=150)
     for ax, col, nombre in zip(axs, ['velocidad_m_s', 'SR_ciclos_min', 'DPS_m'],
                                ['Velocidad (m/s)', 'Frecuencia de ciclo (ciclos/min)', 'Distancia por ciclo (m)']):
-        ax.plot(ciclos.t_inicio_s, ciclos[f'{col}_verdad'], color=GRIS, lw=2, label='verdad (simulación)')
-        ax.plot(ciclos.t_inicio_s, ciclos[col], 'o', ms=4, color=AZUL, label='medido por el sistema')
+        ax.plot(ciclos.t_inicio_s, ciclos[f'{col}_verdad'], color=GRIS, lw=2, label='referencia (simulación)')
+        ax.plot(ciclos.t_inicio_s, ciclos[col], 'o', ms=4, color=AZUL, label='estimación del sistema')
         ax.axvspan(T_FATIGA - 11, T_FATIGA + 11, color='#f4d9d9', alpha=0.5, lw=0)
         if inicio is not None:
             ax.axvline(inicio, color=ROJO, lw=1.5)
@@ -83,7 +83,7 @@ def figura_lateral(ciclos, inicio, out):
     if inicio is not None:
         axs[1].text(inicio, axs[1].get_ylim()[1], f' inicio detectado ({inicio:.1f} s)', color=ROJO, fontsize=8, va='top')
     axs[-1].set_xlabel('tiempo (s)')
-    fig.suptitle('Nadador ficticio, crol, vista lateral: medido frente a la verdad', fontsize=10, x=0.01, ha='left')
+    fig.suptitle('Datos sintéticos (crol, vista lateral): estimación del sistema frente a la referencia', fontsize=10, x=0.01, ha='left')
     fig.tight_layout()
     fig.savefig(out / 'fig_verdad_vs_sistema.png')
     plt.close(fig)

@@ -130,12 +130,12 @@ def graficas(ciclos, res, nadador, carpeta):
     plt.tight_layout(); plt.savefig(carpeta / 'fig_fatiga_timeline.png', dpi=150); plt.close()
 
     Xn = res['X'].rename(columns=NOMBRES)
-    plt.figure(); shap.summary_plot(res['shap'], Xn, show=False); plt.title('SHAP: contribución a la fatiga')
+    plt.figure(); shap.summary_plot(res['shap'], Xn, show=False); plt.title('Atribución SHAP a la puntuación de fatiga')
     plt.tight_layout(); plt.savefig(carpeta / 'fig_shap_summary.png', dpi=150, bbox_inches='tight'); plt.close()
     if res['inicio'] is not None:
         i = res['inicio']
         e = shap.Explanation(values=res['shap'][i], base_values=res['base_shap'], data=res['X'].iloc[i].values,
                              feature_names=[NOMBRES[f] for f in res['feats']])
         plt.figure(); shap.plots.waterfall(e, show=False)
-        plt.title(f'Por qué el ciclo {int(ciclos.ciclo.iloc[i])} ya es fatiga')
+        plt.title(f'Atribución SHAP en el ciclo de inicio de la fatiga (ciclo {int(ciclos.ciclo.iloc[i])})')
         plt.tight_layout(); plt.savefig(carpeta / 'fig_shap_waterfall_inicio.png', dpi=150, bbox_inches='tight'); plt.close()

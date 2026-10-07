@@ -9,7 +9,7 @@ aparece la fatiga y por qué** (SHAP), y medidas de codos, hombros, caderas, rod
 - Todo se ejecuta **en local, en CPU**, en el portátil personal de Diana (Windows). No usar Colab salvo que lo pida.
 - Programa principal: `python analizar.py "<vídeo>" --nadador "<nombre>"` (ver README para opciones).
 - Pruebas antes de cada commit: `python tests/test_local.py`, `tests/test_sesion.py`, `tests/test_aaron.py`, `tests/test_movenet_recorte.py`,
-  `tests/test_estilos.py`, `tests/test_lote.py`, `tests/test_frontal.py` y `tests/test_aaron_frontal.py`.
+  `tests/test_estilos.py`, `tests/test_lote.py`, `tests/test_frontal.py`, `tests/test_aaron_frontal.py` y `tests/test_simulador_estilo.py`.
 - Todos los vídeos: `python lote.py --carpeta <videos> [--crear-lista]` (lista editable `lista_videos.csv`; reanudable).
 - Responder siempre en español. Explicar las decisiones técnicas en lenguaje claro: Diana las defiende ante un tribunal.
 - No inventar resultados: lo que no se haya medido se marca como pendiente.
@@ -101,10 +101,12 @@ aparece la fatiga y por qué** (SHAP), y medidas de codos, hombros, caderas, rod
 - Entrega final: plantilla de la escuela `memoria/Plantilla_memoria_TFM.docx`, rellenada por
   `memoria/generar_memoria.py` -> `memoria/TFM_StrokeLab_borrador.docx`. Base antigua (sept., con resultados no
   válidos: 5 nadadores con potencia, 99,9 %, LSTM): `memoria/TFM_STROKELAB_ACTUALIZADO_base_sept.docx`.
-- Borrador generado (5 oct 2026, 37 págs.): figuras en `memoria/figuras/` regeneradas con el código actual
-  (sintético: fatiga ciclo 35, t = 51,9 s; PELT ciclo 33; signo SHAP 0,999; frontal sintético 48,9 ciclos/min, t = 47,5 s).
-  Incluye análisis completo de Aaron (5 clips, tablas y figuras de informe_nadador) y las 3 validaciones manuales.
-  La clasificación de estilo figura como NO implementada. Al abrirlo en Word: «Sí» a actualizar campos (índices).
+- **Versión revisada (7 oct, comentarios del director)**: 54 págs. Título nuevo («StrokeLab: desarrollo de un sistema de
+  análisis biomecánico explicable…»); registro científico; participante P1 (no nombres); «datos sintéticos»; marco teórico
+  de ML/visión (CNN, pose, OKS/PCK/mAP, Isolation Forest, PELT, Random Forest, SHAP, PCA) y justificación de no usar
+  modelo propio y de no calcular mAP/PCK/OKS (sin anotaciones); 19 ecuaciones OMML numeradas con índice; citas IEEE
+  numeradas con enlace; Gantt; tablas sin partir; Cap. 7 en prosa. `generar_memoria.py` hace 2 pasadas y llama a
+  `actualizar_indices.py` (LibreOffice + libreoffice-math) -> `TFM_StrokeLab_final.docx`. Pruebas: + test_simulador_estilo.
 - Datos de la portada pendientes: apellidos de Diana, director/a, horas y presupuesto, equipo, agradecimientos,
   conclusiones personales, fechas de la fase 1, comparativa MoveNet/MediaPipe en CPU y resultado de fatiga real.
 

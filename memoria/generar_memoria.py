@@ -1,57 +1,172 @@
-"""Rellena la plantilla de memoria de la UEM con el contenido actual del TFM StrokeLab.
+"""Rellena la plantilla de memoria de la UEM con el contenido del TFM StrokeLab.
 
 Uso:  python memoria/generar_memoria.py
-Salida: memoria/TFM_StrokeLab_borrador.docx
+Salida: memoria/TFM_StrokeLab_borrador.docx y, si LibreOffice está instalado, memoria/TFM_StrokeLab_final.docx
+(índices, índice de figuras, de tablas y de ecuaciones ya calculados).
 
-El texto vive en este archivo: al tener resultados nuevos se cambia aquí y se vuelve a generar.
-Marcado del texto: **negrita**, *cursiva*; lo que va entre [PENDIENTE ...] sale en rojo.
-Al abrir el .docx, Word pregunta si actualiza los campos: responder «Sí» para rehacer índices y números de página.
+El texto vive en este archivo. Marcado:
+  **negrita**, *cursiva*, `código`, _{subíndice}, ^{superíndice};
+  [@clave] o [@a; @b]  -> cita numerada [n] con enlace a la referencia (orden de primera aparición, estilo IEEE);
+  {fig:x}, {tab:x}, {eq:x} -> número de la figura, tabla o ecuación con esa etiqueta.
+  «StrokeLab» se escribe siempre en cursiva (nombre propio).
+Se generan dos pasadas: la primera fija el orden de las citas y los números de figuras, tablas y ecuaciones.
 """
 import copy
 import re
+import shutil
+import subprocess
+import sys
 from pathlib import Path
 
 import docx
-from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT, WD_TAB_LEADER
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
-from docx.shared import Cm, Pt, RGBColor
+from docx.shared import Cm, Pt
 from docx.table import Table
 from docx.text.paragraph import Paragraph
+from lxml import etree
 
 AQUI = Path(__file__).resolve().parent
 PLANTILLA = AQUI / 'Plantilla_memoria_TFM.docx'
 SALIDA = AQUI / 'TFM_StrokeLab_borrador.docx'
+FINAL = AQUI / 'TFM_StrokeLab_final.docx'
 FIG = AQUI / 'figuras'
 
-TITULO = ('StrokeLab: análisis biomecánico explicable de la técnica y la fatiga en natación '
-          'mediante visión por computador e inteligencia artificial')
-TITULO_CORTO = 'StrokeLab: técnica y fatiga en natación con IA explicable'
+TITULO = ('StrokeLab: desarrollo de un sistema de análisis biomecánico explicable para la evaluación de la técnica '
+          'y la fatiga en natación mediante visión por computador e inteligencia artificial')
+TITULO_CORTO = 'StrokeLab: análisis biomecánico explicable de la técnica y la fatiga en natación'
 AUTORA = 'Diana Cruz'
 DIRECTOR = '______________________________'
-NEGRO = RGBColor(0, 0, 0)
-ROJO = RGBColor(0xC0, 0, 0)
+AZUL_ENLACE = '1F4E79'
+M_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/math'
+
+# Estado compartido entre las dos pasadas
+EST = dict(citas=[], citas_pasada=[], num={}, cont={}, marcador=100)
+
+
+# ---------------------------------------------------------------- referencias (estilo IEEE)
+
+REFS = {
+    'craig1979': 'A. B. Craig y D. R. Pendergast, «Relationships of stroke rate, distance per stroke, and velocity in competitive swimming», *Medicine and Science in Sports*, vol. 11, n.º 3, pp. 278-283, 1979.',
+    'costill1985': 'D. L. Costill, J. Kovaleski, D. Porter, J. Kirwan, R. Fielding y D. King, «Energy expenditure during front crawl swimming: predicting success in middle-distance events», *International Journal of Sports Medicine*, vol. 6, n.º 5, pp. 266-270, 1985.',
+    'toussaint1992': 'H. M. Toussaint y P. J. Beek, «Biomechanics of competitive front crawl swimming», *Sports Medicine*, vol. 13, n.º 1, pp. 8-24, 1992.',
+    'chollet2000': 'D. Chollet, S. Chalies y J. C. Chatard, «A new index of coordination for the crawl: description and usefulness», *International Journal of Sports Medicine*, vol. 21, n.º 1, pp. 54-59, 2000.',
+    'alberty2005': 'M. Alberty, M. Sidney, F. Huot-Marchand, J. M. Hespel y P. Pelayo, «Intracyclic velocity variations and arm coordination during exhaustive exercise in front crawl stroke», *International Journal of Sports Medicine*, vol. 26, n.º 6, pp. 471-475, 2005.',
+    'lecun2015': 'Y. LeCun, Y. Bengio y G. Hinton, «Deep learning», *Nature*, vol. 521, n.º 7553, pp. 436-444, 2015.',
+    'redmon2016': 'J. Redmon, S. Divvala, R. Girshick y A. Farhadi, «You only look once: unified, real-time object detection», en *Proc. IEEE Conference on Computer Vision and Pattern Recognition (CVPR)*, 2016, pp. 779-788.',
+    'pan2010': 'S. J. Pan y Q. Yang, «A survey on transfer learning», *IEEE Transactions on Knowledge and Data Engineering*, vol. 22, n.º 10, pp. 1345-1359, 2010.',
+    'lin2014': 'T.-Y. Lin et al., «Microsoft COCO: common objects in context», en *European Conference on Computer Vision (ECCV)*, 2014, pp. 740-755.',
+    'cao2017': 'Z. Cao, T. Simon, S.-E. Wei y Y. Sheikh, «Realtime multi-person 2D pose estimation using part affinity fields», en *Proc. IEEE CVPR*, 2017, pp. 7291-7299.',
+    'sun2019': 'K. Sun, B. Xiao, D. Liu y J. Wang, «Deep high-resolution representation learning for human pose estimation», en *Proc. IEEE CVPR*, 2019, pp. 5693-5703.',
+    'maji2022': 'D. Maji, S. Nagori, M. Mathew y D. Poddar, «YOLO-Pose: enhancing YOLO for multi person pose estimation using object keypoint similarity loss», en *Proc. IEEE CVPR Workshops*, 2022.',
+    'jocher2023': 'G. Jocher, A. Chaurasia y J. Qiu, *Ultralytics YOLOv8* (software y documentación de modelos), GitHub, 2023.',
+    'google2021': 'Google, *MoveNet: ultra fast and accurate pose detection model*, TensorFlow Hub, 2021.',
+    'bazarevsky2020': 'V. Bazarevsky, I. Grishchenko, K. Raveendran, T. Zhu, F. Zhang y M. Grundmann, «BlazePose: on-device real-time body pose tracking», arXiv:2006.10204, 2020.',
+    'vaswani2017': 'A. Vaswani et al., «Attention is all you need», en *Advances in Neural Information Processing Systems (NeurIPS)*, vol. 30, 2017.',
+    'xu2022': 'Y. Xu, J. Zhang, Q. Zhang y D. Tao, «ViTPose: simple vision transformer baselines for human pose estimation», en *Advances in Neural Information Processing Systems (NeurIPS)*, vol. 35, 2022.',
+    'andriluka2014': 'M. Andriluka, L. Pishchulin, P. Gehler y B. Schiele, «2D human pose estimation: new benchmark and state of the art analysis», en *Proc. IEEE CVPR*, 2014, pp. 3686-3693.',
+    'martinez2017': 'J. Martinez, R. Hossain, J. Romero y J. J. Little, «A simple yet effective baseline for 3D human pose estimation», en *Proc. IEEE International Conference on Computer Vision (ICCV)*, 2017, pp. 2640-2649.',
+    'ionescu2014': 'C. Ionescu, D. Papava, V. Olaru y C. Sminchisescu, «Human3.6M: large scale datasets and predictive methods for 3D human sensing in natural environments», *IEEE Transactions on Pattern Analysis and Machine Intelligence*, vol. 36, n.º 7, pp. 1325-1339, 2014.',
+    'zhu2023': 'W. Zhu, X. Ma, Z. Liu, L. Liu, W. Wu e Y. Wang, «MotionBERT: a unified perspective on learning human motion representations», en *Proc. IEEE/CVF ICCV*, 2023, pp. 15085-15099.',
+    'einfalt2018': 'M. Einfalt, D. Zecha y R. Lienhart, «Activity-conditioned continuous human pose estimation for performance analysis of athletes using the example of swimming», en *Proc. IEEE Winter Conference on Applications of Computer Vision (WACV)*, 2018, pp. 446-455.',
+    'fiche2023': 'G. Fiche, V. Sevestre, C. Gonzalez-Barral, S. Leglaive y R. Séguier, «SwimXYZ: a large-scale dataset of synthetic swimming motions and videos», en *ACM SIGGRAPH Conference on Motion, Interaction and Games (MIG)*, 2023.',
+    'chandola2009': 'V. Chandola, A. Banerjee y V. Kumar, «Anomaly detection: a survey», *ACM Computing Surveys*, vol. 41, n.º 3, art. 15, 2009.',
+    'liu2008': 'F. T. Liu, K. M. Ting y Z.-H. Zhou, «Isolation forest», en *Proc. IEEE International Conference on Data Mining (ICDM)*, 2008, pp. 413-422.',
+    'killick2012': 'R. Killick, P. Fearnhead e I. A. Eckley, «Optimal detection of changepoints with a linear computational cost», *Journal of the American Statistical Association*, vol. 107, n.º 500, pp. 1590-1598, 2012.',
+    'breiman2001': 'L. Breiman, «Random forests», *Machine Learning*, vol. 45, n.º 1, pp. 5-32, 2001.',
+    'kaufman2012': 'S. Kaufman, S. Rosset, C. Perlich y O. Stitelman, «Leakage in data mining: formulation, detection, and avoidance», *ACM Transactions on Knowledge Discovery from Data*, vol. 6, n.º 4, art. 15, 2012.',
+    'chen2016': 'T. Chen y C. Guestrin, «XGBoost: a scalable tree boosting system», en *Proc. 22nd ACM SIGKDD Conference on Knowledge Discovery and Data Mining*, 2016, pp. 785-794.',
+    'shapley1953': 'L. S. Shapley, «A value for n-person games», en *Contributions to the Theory of Games II*, Annals of Mathematics Studies 28, Princeton University Press, 1953, pp. 307-317.',
+    'lundberg2017': 'S. M. Lundberg y S.-I. Lee, «A unified approach to interpreting model predictions», en *Advances in Neural Information Processing Systems (NeurIPS)*, vol. 30, 2017, pp. 4765-4774.',
+    'lundberg2020': 'S. M. Lundberg et al., «From local explanations to global understanding with explainable AI for trees», *Nature Machine Intelligence*, vol. 2, pp. 56-67, 2020.',
+    'savitzky1964': 'A. Savitzky y M. J. E. Golay, «Smoothing and differentiation of data by simplified least squares procedures», *Analytical Chemistry*, vol. 36, n.º 8, pp. 1627-1639, 1964.',
+    'jolliffe2016': 'I. T. Jolliffe y J. Cadima, «Principal component analysis: a review and recent developments», *Philosophical Transactions of the Royal Society A*, vol. 374, n.º 2065, 20150202, 2016.',
+}
 
 
 # ---------------------------------------------------------------- utilidades de formato
 
+def _run_xml(texto, size=None, italic=False, bold=False, color=None, vert=None, mono=False):
+    r = OxmlElement('w:r')
+    rpr = OxmlElement('w:rPr')
+    if mono:
+        f = OxmlElement('w:rFonts'); f.set(qn('w:ascii'), 'Consolas'); f.set(qn('w:hAnsi'), 'Consolas'); rpr.append(f)
+    if bold:
+        rpr.append(OxmlElement('w:b'))
+    if italic:
+        rpr.append(OxmlElement('w:i'))
+    if color:
+        c = OxmlElement('w:color'); c.set(qn('w:val'), color); rpr.append(c)
+    if size:
+        s = OxmlElement('w:sz'); s.set(qn('w:val'), str(int(size * 2))); rpr.append(s)
+    if vert:
+        v = OxmlElement('w:vertAlign'); v.set(qn('w:val'), vert); rpr.append(v)
+    if len(rpr):
+        r.append(rpr)
+    if texto == '\t':
+        r.append(OxmlElement('w:tab'))
+        return r
+    t = OxmlElement('w:t'); t.set(qn('xml:space'), 'preserve'); t.text = texto
+    r.append(t)
+    return r
+
+
+def _num_ref(tipo, clave):
+    return str(EST['num'].get((tipo, clave), '?'))
+
+
+def _cita(par, claves, size):
+    numeros = []
+    for k in claves:
+        assert k in REFS, f'referencia desconocida: {k}'
+        if k not in EST['citas_pasada']:
+            EST['citas_pasada'].append(k)
+        n = EST['citas'].index(k) + 1 if k in EST['citas'] else 0
+        numeros.append((n, k))
+    par._p.append(_run_xml('[', size))
+    for i, (n, k) in enumerate(sorted(numeros)):
+        if i:
+            par._p.append(_run_xml(', ', size))
+        h = OxmlElement('w:hyperlink'); h.set(qn('w:anchor'), f'ref_{k}'); h.set(qn('w:history'), '1')
+        h.append(_run_xml(str(n or '?'), size, color=AZUL_ENLACE))
+        par._p.append(h)
+    par._p.append(_run_xml(']', size))
+
+
+TOKENS = re.compile(r'(\*\*.+?\*\*|\*[^*\n]+?\*|`[^`]+`|\[@[^\]]+\]|\{(?:fig|tab|eq):[a-z0-9_]+\}|_\{[^}]*\}|\^\{[^}]*\}|\[PENDIENTE[^\]]*\])')
+
+
+def _texto_plano(par, texto, size, bold=False):
+    """Texto normal; «StrokeLab» siempre en cursiva."""
+    for trozo in re.split(r'(StrokeLab)', texto):
+        if trozo:
+            par._p.append(_run_xml(trozo, size, italic=trozo == 'StrokeLab', bold=bold))
+
+
 def runs_con_formato(p, texto, size=None):
-    """Añade runs a p interpretando **negrita**, *cursiva* y [PENDIENTE ...] (rojo)."""
-    for trozo in re.split(r'(\*\*.+?\*\*|\*[^*]+?\*|\[PENDIENTE[^\]]*\]|`[^`]+`)', texto):
+    for trozo in TOKENS.split(texto):
         if not trozo:
             continue
         if trozo.startswith('**'):
-            r = p.add_run(trozo[2:-2]); r.bold = True
+            _texto_plano(p, trozo[2:-2], size, bold=True)
         elif trozo.startswith('[PENDIENTE'):
-            r = p.add_run(trozo); r.font.color.rgb = ROJO; r.bold = True
+            p._p.append(_run_xml(trozo, size, bold=True, color='C00000'))
         elif trozo.startswith('`'):
-            r = p.add_run(trozo[1:-1]); r.font.name = 'Consolas'
+            p._p.append(_run_xml(trozo[1:-1], size, mono=True))
+        elif trozo.startswith('[@'):
+            _cita(p, [c.strip().lstrip('@') for c in trozo[1:-1].split(';')], size)
+        elif trozo.startswith('{'):
+            tipo, clave = trozo[1:-1].split(':')
+            p._p.append(_run_xml(_num_ref(tipo, clave), size))
+        elif trozo.startswith('_{'):
+            p._p.append(_run_xml(trozo[2:-1], size, vert='subscript'))
+        elif trozo.startswith('^{'):
+            p._p.append(_run_xml(trozo[2:-1], size, vert='superscript'))
         elif trozo.startswith('*') and len(trozo) > 2:
-            r = p.add_run(trozo[1:-1]); r.italic = True
+            p._p.append(_run_xml(trozo[1:-1], size, italic=True))
         else:
-            r = p.add_run(trozo)
-        if size:
-            r.font.size = Pt(size)
+            _texto_plano(p, trozo, size)
 
 
 def poner_texto(p, texto, size=None):
@@ -60,31 +175,99 @@ def poner_texto(p, texto, size=None):
     rpr = copy.deepcopy(runs[0]._r.rPr) if runs and runs[0]._r.rPr is not None else None
     for r in runs:
         r._r.getparent().remove(r._r)
-    antes = len(p.runs)
+    antes = len(p._p.findall(qn('w:r')))
     runs_con_formato(p, texto, size)
-    for r in p.runs[antes:]:
-        if rpr is not None:
-            nuevo = copy.deepcopy(rpr)
-            for tag in ('w:color', 'w:b', 'w:i'):
-                for e in nuevo.findall(qn(tag)):
-                    if tag == 'w:color' or r.bold or r.italic:
-                        nuevo.remove(e)
-            viejo = r._r.rPr
-            if viejo is not None:                        # negrita/cursiva/rojo del marcado prevalecen
-                for e in viejo:
-                    nuevo.append(e)
-                r._r.remove(viejo)
-            r._r.insert(0, nuevo)
-        if r.font.color.rgb is None:
-            r.font.color.rgb = NEGRO
+    for r in p._p.findall(qn('w:r'))[antes:]:
+        propio = r.find(qn('w:rPr'))
+        nuevo = copy.deepcopy(rpr) if rpr is not None else OxmlElement('w:rPr')
+        for tag in ('w:color', 'w:i', 'w:sz', 'w:szCs'):
+            for e in nuevo.findall(qn(tag)):
+                if tag in ('w:color', 'w:i') or (propio is not None and propio.find(qn(tag)) is not None):
+                    nuevo.remove(e)
+        if propio is not None:
+            for e in propio:
+                nuevo.append(e)
+            r.remove(propio)
+        if nuevo.find(qn('w:color')) is None:
+            c = OxmlElement('w:color'); c.set(qn('w:val'), '000000'); nuevo.append(c)
+        r.insert(0, nuevo)
 
+
+# ---------------------------------------------------------------- ecuaciones (OMML, editables en Word)
+
+def _m(tag, padre=None, **attrs):
+    e = etree.SubElement(padre, f'{{{M_NS}}}{tag}') if padre is not None else etree.Element(f'{{{M_NS}}}{tag}', nsmap={'m': M_NS})
+    for k, v in attrs.items():
+        e.set(f'{{{M_NS}}}{k}', v)
+    return e
+
+
+GRIEGAS = set('αβγδεζηθικλμνξπρστυφχψωΔΣΦΩΓΛΠΘ')
+
+
+def _om(x, padre):
+    """Construye OMML: str (texto), lista (concatenación) o tupla (operador)."""
+    if isinstance(x, list):
+        for y in x:
+            _om(y, padre)
+        return
+    if isinstance(x, str):
+        if not x:
+            return
+        r = _m('r', padre)
+        if len(x) > 1 and x.isalpha() and not set(x) <= GRIEGAS:          # palabras (exp, arccos, mín): rectas
+            rp = _m('rPr', r); _m('sty', rp, val='p')
+        t = _m('t', r); t.text = x
+        t.set('{http://www.w3.org/XML/1998/namespace}space', 'preserve')
+        return
+    op = x[0]
+    if op in ('sub', 'sup'):
+        e = _m('sSub' if op == 'sub' else 'sSup', padre)
+        _om(x[1], _m('e', e)); _om(x[2], _m(op, e))
+    elif op == 'subsup':
+        e = _m('sSubSup', padre)
+        _om(x[1], _m('e', e)); _om(x[2], _m('sub', e)); _om(x[3], _m('sup', e))
+    elif op == 'frac':
+        e = _m('f', padre)
+        _om(x[1], _m('num', e)); _om(x[2], _m('den', e))
+    elif op in ('sum', 'int'):
+        e = _m('nary', padre)
+        pr = _m('naryPr', e); _m('chr', pr, val='∑' if op == 'sum' else '∫')
+        _m('limLoc', pr, val='undOvr' if op == 'sum' else 'subSup')
+        if x[2] is None:
+            _m('supHide', pr, val='1')
+        _om(x[1] or '', _m('sub', e)); _om(x[2] or '', _m('sup', e)); _om(x[3], _m('e', e))
+    elif op in ('par', 'bar', 'norm', 'cor', 'llave'):
+        e = _m('d', padre)
+        pr = _m('dPr', e)
+        par = {'par': ('(', ')'), 'bar': ('|', '|'), 'norm': ('‖', '‖'), 'cor': ('[', ']'), 'llave': ('{', '}')}[op]
+        _m('begChr', pr, val=par[0]); _m('endChr', pr, val=par[1])
+        _om(x[1], _m('e', e))
+    elif op == 'acc':
+        e = _m('acc', padre)
+        pr = _m('accPr', e); _m('chr', pr, val=x[2])
+        _om(x[1], _m('e', e))
+    elif op == 'media':                                     # raya superior (media)
+        e = _m('bar', padre)
+        pr = _m('barPr', e); _m('pos', pr, val='top')
+        _om(x[1], _m('e', e))
+    else:
+        raise ValueError(op)
+
+
+def omml(expr):
+    para = _m('oMathPara')
+    _om(expr, _m('oMath', para))
+    return para
+
+
+# ---------------------------------------------------------------- escritor de bloques
 
 class Escritor:
     """Inserta bloques de contenido uno detrás de otro a partir de un elemento de la plantilla."""
 
-    def __init__(self, doc, ancla, ppr_vineta, ppr_h2):
-        self.doc, self.ultimo = doc, ancla
-        self.ppr_vineta, self.ppr_h2 = ppr_vineta, ppr_h2
+    def __init__(self, doc, ancla, ppr_vineta):
+        self.doc, self.ultimo, self.ppr_vineta = doc, ancla, ppr_vineta
 
     def _poner(self, elem):
         self.ultimo.addnext(elem)
@@ -106,6 +289,7 @@ class Escritor:
         for t in items:
             par = self.p(t, alinear='izq')
             par._p.insert(0, copy.deepcopy(self.ppr_vineta))
+            par.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
 
     def h2(self, texto):
         self.p(texto, estilo='Heading 2', alinear='izq')
@@ -113,38 +297,48 @@ class Escritor:
     def h3(self, texto):
         self.p(texto, estilo='Heading 3', alinear='izq')
 
-    def ecuacion(self, texto):
-        self.p(texto, alinear='centro').runs[0].italic = True
-
-    def leyenda(self, tipo, texto):
-        """Leyenda con número automático (campo SEQ), para los índices de figuras y tablas."""
+    def leyenda(self, tipo, texto, clave=None):
+        """Leyenda con número automático (campo SEQ), para los índices de figuras, tablas y ecuaciones."""
+        n = EST['cont'][tipo] = EST['cont'].get(tipo, 0) + 1
+        if clave:
+            EST['num'][({'Figura': 'fig', 'Tabla': 'tab', 'Ecuación': 'eq'}[tipo], clave)] = n
         par = self.p('', estilo='Caption', alinear='centro')
-        par.add_run(f'{tipo} ')
-        campo(par, f'SEQ {tipo} \\* ARABIC', '1')
-        par.add_run('. ')
+        par._p.append(_run_xml(f'{tipo} '))
+        campo(par, f'SEQ {tipo} \\* ARABIC', str(n))
+        par._p.append(_run_xml('. '))
         runs_con_formato(par, texto)
+        return par
 
-    def figura(self, ruta, texto, ancho_cm=15):
+    def figura(self, ruta, texto, clave=None, ancho_cm=15):
         par = self.p('', alinear='centro')
         par.paragraph_format.keep_with_next = True
         par.add_run().add_picture(str(ruta), width=Cm(ancho_cm))
-        self.leyenda('Figura', texto)
+        self.leyenda('Figura', texto, clave)
 
-    def tabla(self, filas, texto, anchos=None, size=9):
-        """filas[0] = cabecera. La leyenda va encima, como es habitual en tablas."""
-        self.leyenda('Tabla', texto)
+    def tabla(self, filas, texto, clave=None, anchos=None, size=9):
+        """filas[0] = cabecera. La leyenda va encima. La tabla no se parte entre páginas."""
+        cap = self.leyenda('Tabla', texto, clave)
+        cap.paragraph_format.keep_with_next = True
         t = self.doc.add_table(rows=len(filas), cols=len(filas[0]))
         t.style = self.doc.styles['Table Grid']
         for i, fila in enumerate(filas):
+            trpr = t.rows[i]._tr.get_or_add_trPr()
+            trpr.append(OxmlElement('w:cantSplit'))
+            if i == 0:
+                trpr.append(OxmlElement('w:tblHeader'))
             for j, txt in enumerate(fila):
                 celda = t.cell(i, j)
                 par = celda.paragraphs[0]
                 par.paragraph_format.space_before = Pt(1)
                 par.paragraph_format.space_after = Pt(1)
+                par.paragraph_format.keep_with_next = i < len(filas) - 1
                 runs_con_formato(par, str(txt), size)
                 if i == 0:
-                    for r in par.runs:
-                        r.bold = True
+                    for r in par._p.iter(qn('w:r')):
+                        rp = r.find(qn('w:rPr'))
+                        if rp is None:
+                            rp = OxmlElement('w:rPr'); r.insert(0, rp)
+                        rp.insert(0, OxmlElement('w:b'))
                     sombra = OxmlElement('w:shd')
                     sombra.set(qn('w:val'), 'clear'); sombra.set(qn('w:color'), 'auto'); sombra.set(qn('w:fill'), 'D9E2F3')
                     celda._tc.get_or_add_tcPr().append(sombra)
@@ -152,6 +346,20 @@ class Escritor:
                     celda.width = Cm(anchos[j])
         self._poner(t._tbl)
         self.p('', size=4)
+
+    def ecuacion(self, clave, expr, titulo, simbolos=None):
+        """Ecuación de Word numerada, con título y lista de símbolos (significado y unidades)."""
+        par = self.p('', alinear='centro')
+        par.paragraph_format.keep_with_next = True
+        par._p.append(omml(expr))
+        cap = self.leyenda('Ecuación', titulo, clave)
+        if simbolos:
+            cap.paragraph_format.keep_with_next = True
+            self.p('donde:', alinear='izq').paragraph_format.keep_with_next = True
+            for i, (s, d) in enumerate(simbolos):
+                par = self.p(f'{s}: {d}', alinear='izq')
+                par._p.insert(0, copy.deepcopy(self.ppr_vineta))
+                par.paragraph_format.keep_with_next = i < len(simbolos) - 1
 
 
 def campo(par, instr, texto_previo=''):
@@ -162,7 +370,7 @@ def campo(par, instr, texto_previo=''):
     r = OxmlElement('w:r'); it = OxmlElement('w:instrText'); it.set(qn('xml:space'), 'preserve'); it.text = f' {instr} '
     r.append(it); par._p.append(r)
     par._p.append(fc('separate'))
-    r = OxmlElement('w:r'); t = OxmlElement('w:t'); t.text = texto_previo; r.append(t); par._p.append(r)
+    par._p.append(_run_xml(texto_previo))
     par._p.append(fc('end'))
 
 
@@ -170,558 +378,919 @@ def borrar(elem):
     elem.getparent().remove(elem)
 
 
-# ---------------------------------------------------------------- contenido
+# ---------------------------------------------------------------- resumen
 
 RESUMEN = (
-    'StrokeLab es un sistema que, a partir de un vídeo convencional de nado, responde a tres preguntas del '
-    'entrenador: qué tan eficiente es la brazada, en qué momento aparece la fatiga técnica y por qué. Se organiza '
-    'en dos verticales de inteligencia artificial. La vertical de visión estima la pose 2D del nadador con '
-    'YOLOv8n-Pose en la CPU de un portátil, elegido tras una comparativa con otros modelos, y la eleva a 3D con '
-    'MotionBERT. La vertical tabular cuenta las brazadas, con una señal propia para la vista lateral y otra para la '
-    'frontal, calcula por ciclo medidas de codos, hombros, caderas, rodillas y pies, y modela con Isolation Forest '
-    'el estado fresco del propio nadador. La desviación sostenida respecto a ese estado marca el inicio de la '
-    'fatiga y SHAP la explica variable a variable. El modelo hidrodinámico se presenta como conocimiento previo, no '
-    'como IA. Con un nadador sintético, el sistema localiza la fatiga introducida y SHAP señala las variables '
-    'alteradas. Con vídeo real de un nadador de crol, la frecuencia de ciclo se aleja entre un 6,5 % y un 8,2 % de '
-    'la cuenta manual en tres clips, en vista lateral y frontal. En los cinco clips disponibles de ese nadador no se '
-    'detecta fatiga, un resultado coherente con pasadas cortas; localizarla en vídeo real exige grabar nado continuo.')
-PALABRAS_CLAVE = ('natación, estimación de pose, detección de fatiga, Isolation Forest, SHAP, '
-                  'inteligencia artificial explicable')
+    'La evaluación de la técnica de nado y de la aparición de la fatiga se basa habitualmente en la observación '
+    'subjetiva del entrenador o en sistemas instrumentados de coste elevado. Este trabajo presenta StrokeLab, un '
+    'sistema de análisis biomecánico explicable que, a partir de vídeo monocular convencional, cuantifica la '
+    'eficiencia de la técnica de nado, detecta el inicio de la fatiga técnica e identifica las variables que la '
+    'explican. La arquitectura combina una vertical de visión por computador, que estima la pose humana en dos y tres '
+    'dimensiones, con una vertical de datos tabulares que segmenta el nado en ciclos de brazada, calcula indicadores '
+    'cinemáticos por ciclo y modela mediante aprendizaje no supervisado el patrón técnico de referencia de cada '
+    'nadador. La desviación sostenida respecto a ese patrón define el inicio de la fatiga y su atribución a cada '
+    'variable se obtiene con valores de Shapley. Con vídeo real de un participante de crol, la frecuencia de ciclo '
+    'estimada presenta un error relativo del 6,5 % al 8,2 % frente al conteo manual en vista lateral y frontal. Con '
+    'datos sintéticos de referencia conocida, el error mediano es del 4,7 % en la frecuencia de ciclo, del 1,3 % en '
+    'la velocidad y del 4,3 % en la distancia por ciclo; el inicio de la fatiga se detecta al comienzo de la '
+    'transición programada, las variables con mayor atribución coinciden con las alteradas y el estilo de nado se '
+    'clasifica con una exactitud del 100 % por vídeo bajo validación agrupada. En las secuencias reales disponibles, '
+    'de corta duración, no se detecta fatiga sostenida. El sistema se ejecuta en un ordenador personal sin GPU. La '
+    'principal limitación es la escasez de datos reales anotados y la ausencia de una validación experimental de la '
+    'fatiga en nadadores reales.')
+PALABRAS_CLAVE = ('visión por computador; estimación de pose humana; aprendizaje no supervisado; detección de '
+                  'anomalías; inteligencia artificial explicable; biomecánica de la natación')
 ABSTRACT = (
-    'StrokeLab is a system that, from an ordinary swimming video, answers three coaching questions: how '
-    'efficient the stroke is, when technical fatigue begins, and why. It is organised in two artificial '
-    'intelligence verticals. The vision vertical estimates the swimmer’s 2D pose with YOLOv8n-Pose on a laptop CPU, '
-    'chosen after comparing several models, and lifts it to 3D with MotionBERT. The tabular vertical counts strokes, '
-    'with one signal for side views and another for front views, computes per-cycle elbow, shoulder, hip, knee and '
-    'foot measures, and models the swimmer’s own fresh state with an Isolation Forest. A sustained deviation from '
-    'that state marks the onset of fatigue, and SHAP explains it feature by feature. The hydrodynamic model is '
-    'presented as domain knowledge, not as AI. On a synthetic swimmer the system locates the injected fatigue and '
-    'SHAP points to the altered variables. On real video of a front-crawl swimmer, the stroke rate is within 6.5 % to '
-    '8.2 % of a manual count in three clips, in side and front views. No fatigue is detected in the five available '
-    'clips of that swimmer, which is consistent with short passes; locating it in real video requires continuous swimming.')
-KEYWORDS = 'swimming, pose estimation, fatigue detection, Isolation Forest, SHAP, explainable artificial intelligence'
+    'Swimming technique and the onset of fatigue are usually assessed through the coach’s subjective observation or '
+    'through costly instrumented systems. This work presents StrokeLab, an explainable biomechanical analysis system '
+    'that, from conventional monocular video, quantifies swimming technique efficiency, detects the onset of '
+    'technical fatigue and identifies the variables that explain it. The architecture combines a computer vision '
+    'vertical, which estimates two- and three-dimensional human pose, with a tabular vertical that segments swimming '
+    'into stroke cycles, computes per-cycle kinematic indicators and models each swimmer’s reference technique '
+    'through unsupervised learning. A sustained deviation from that reference defines fatigue onset, and its '
+    'attribution to each variable is obtained with Shapley values. On real video of a front-crawl participant, the '
+    'estimated stroke rate shows a relative error of 6.5 % to 8.2 % against manual counts in side and front views. On '
+    'synthetic data with known ground truth, the median error is 4.7 % for stroke rate, 1.3 % for velocity and 4.3 % '
+    'for distance per stroke; fatigue onset is detected at the start of the programmed transition, the variables with '
+    'the highest attribution match the altered ones, and swimming style is classified with 100 % per-video accuracy '
+    'under grouped validation. No sustained fatigue is detected in the available real sequences, which are short. '
+    'The system runs on a personal computer without a GPU. The main limitation is the scarcity of annotated real data '
+    'and the lack of an experimental validation of fatigue in real swimmers.')
+KEYWORDS = ('computer vision; human pose estimation; unsupervised learning; anomaly detection; explainable '
+            'artificial intelligence; swimming biomechanics')
 
-REFERENCIAS = [
-    'Alberty, M., Sidney, M., Huot-Marchand, F., Hespel, J. M. y Pelayo, P. (2005). Intracyclic velocity variations and arm coordination during exhaustive exercise in front crawl stroke. *International Journal of Sports Medicine*, 26(6), 471-475.',
-    'Bazarevsky, V., Grishchenko, I., Raveendran, K., Zhu, T., Zhang, F. y Grundmann, M. (2020). BlazePose: On-device real-time body pose tracking. *arXiv:2006.10204*.',
-    'Chen, T. y Guestrin, C. (2016). XGBoost: A scalable tree boosting system. *Proceedings of KDD 2016*, 785-794.',
-    'Chollet, D., Chalies, S. y Chatard, J. C. (2000). A new index of coordination for the crawl: description and usefulness. *International Journal of Sports Medicine*, 21(1), 54-59.',
-    'Costill, D. L., Kovaleski, J., Porter, D., Kirwan, J., Fielding, R. y King, D. (1985). Energy expenditure during front crawl swimming: predicting success in middle-distance events. *International Journal of Sports Medicine*, 6(5), 266-270.',
-    'Craig, A. B. y Pendergast, D. R. (1979). Relationships of stroke rate, distance per stroke, and velocity in competitive swimming. *Medicine and Science in Sports*, 11(3), 278-283.',
-    'Einfalt, M., Zecha, D. y Lienhart, R. (2018). Activity-conditioned continuous human pose estimation for performance analysis of athletes using the example of swimming. *IEEE WACV 2018*.',
-    'Fiche, G., Sevestre, V., Gonzalez-Barral, C., Leglaive, S. y Séguier, R. (2023). SwimXYZ: A large-scale dataset of synthetic swimming motions and videos. *ACM SIGGRAPH Conference on Motion, Interaction and Games (MIG)*.',
-    'Google (2021). MoveNet: Ultra fast and accurate pose detection model. *TensorFlow Hub*.',
-    'Jocher, G., Chaurasia, A. y Qiu, J. (2023). *Ultralytics YOLOv8*. GitHub.',
-    'Killick, R., Fearnhead, P. y Eckley, I. A. (2012). Optimal detection of changepoints with a linear computational cost. *Journal of the American Statistical Association*, 107(500), 1590-1598.',
-    'Lin, T.-Y. et al. (2014). Microsoft COCO: Common objects in context. *ECCV 2014*.',
-    'Liu, F. T., Ting, K. M. y Zhou, Z.-H. (2008). Isolation Forest. *IEEE ICDM 2008*, 413-422.',
-    'Lundberg, S. M. y Lee, S.-I. (2017). A unified approach to interpreting model predictions. *NeurIPS 2017*.',
-    'Lundberg, S. M. et al. (2020). From local explanations to global understanding with explainable AI for trees. *Nature Machine Intelligence*, 2, 56-67.',
-    'Maji, D., Nagori, S., Mathew, M. y Poddar, D. (2022). YOLO-Pose: Enhancing YOLO for multi person pose estimation using object keypoint similarity loss. *CVPR Workshops 2022*.',
-    'Savitzky, A. y Golay, M. J. E. (1964). Smoothing and differentiation of data by simplified least squares procedures. *Analytical Chemistry*, 36(8), 1627-1639.',
-    'Toussaint, H. M. y Beek, P. J. (1992). Biomechanics of competitive front crawl swimming. *Sports Medicine*, 13(1), 8-24.',
-    'Xu, Y., Zhang, J., Zhang, Q. y Tao, D. (2022). ViTPose: Simple vision transformer baselines for human pose estimation. *NeurIPS 2022*.',
-    'Zhu, W., Ma, X., Liu, Z., Liu, L., Wu, W. y Wang, Y. (2023). MotionBERT: A unified perspective on learning human motion representations. *ICCV 2023*.',
-]
 
+# ---------------------------------------------------------------- capítulo 1
 
 def cap1_contexto(w):
-    w.p('En natación, la velocidad depende de mantener una técnica eficiente durante toda la prueba. Con la fatiga, '
-        'el nadador suele aumentar la frecuencia de brazada, acorta la distancia por ciclo y su técnica se degrada '
-        '(Craig y Pendergast, 1979; Alberty et al., 2005). El entrenador percibe estos cambios a simple vista, de forma '
-        'subjetiva y sin poder precisar cuándo empiezan ni qué aspecto cambia primero.')
-    w.p('La física del agua explica por qué importa la eficiencia: la resistencia al avance crece con el cuadrado de la '
-        'velocidad y la potencia necesaria, con el cubo. Cuando la fatiga reduce la potencia disponible, el nadador '
-        'solo puede sostener la velocidad con una técnica más eficiente. Este modelo hidrodinámico se usa en el trabajo '
-        'como conocimiento previo del dominio (Capítulo 2), no como parte de la inteligencia artificial.')
+    w.p('El rendimiento en natación depende de la capacidad del nadador para mantener una técnica eficiente durante '
+        'toda la prueba. Con la fatiga, la técnica se degrada: aumenta la frecuencia de ciclo, disminuye la distancia '
+        'recorrida en cada ciclo y cambia la coordinación de los brazos [@craig1979; @alberty2005]. En el entrenamiento '
+        'habitual, estos cambios se valoran mediante observación visual, un procedimiento subjetivo que no permite '
+        'determinar con precisión el instante en que comienzan ni la variable técnica que se altera en primer lugar.')
+    w.p('La relación entre técnica y rendimiento tiene una base física: la resistencia hidrodinámica crece con el '
+        'cuadrado de la velocidad y la potencia necesaria para vencerla, con su cubo. En consecuencia, cuando la fatiga '
+        'reduce la potencia disponible, el nadador solo puede sostener la velocidad mejorando la eficiencia de su '
+        'técnica. Este modelo hidrodinámico se presenta en el Capítulo 2 como conocimiento previo del dominio y no forma '
+        'parte de los modelos de inteligencia artificial del sistema.')
+    w.p('Los avances recientes en visión por computador, en particular la estimación de la pose humana mediante redes '
+        'neuronales profundas, permiten obtener la posición de las articulaciones a partir de vídeo convencional, sin '
+        'marcadores ni sensores. Este trabajo aprovecha esa capacidad para construir un sistema accesible de análisis '
+        'de la técnica y de la fatiga en natación.')
 
 
 def cap1_problema(w):
-    w.p('No existe una herramienta accesible que, a partir de un único vídeo y sin sensores ni marcadores, responda '
-        'al entrenador **qué tan eficiente es la brazada, en qué momento aparece la fatiga y por qué**, es decir, qué '
-        'variables técnicas han cambiado. Los sistemas comerciales requieren equipamiento específico y entregan '
-        'métricas sin explicar su relación con el rendimiento.')
-    w.p('El proyecto se plantea como un trabajo de investigación aplicada con un producto funcional, sin colaboración '
-        'con empresa. Los datos son vídeos subacuáticos de ocho nadadores de un club, grabados con cámara GoPro.')
+    w.p('No se dispone de una herramienta accesible que, a partir de un único vídeo y sin instrumentación adicional, '
+        'cuantifique la **eficiencia de la técnica de nado**, realice la **detección del inicio de la fatiga técnica** '
+        'y proporcione la **atribución de esa fatiga a variables biomecánicas interpretables** por el entrenador. Los '
+        'sistemas comerciales requieren sensores inerciales, varias cámaras o marcadores, y entregan métricas sin '
+        'explicar su relación con el estado del nadador.')
+    w.p('El proyecto se plantea como un trabajo de investigación aplicada que da lugar a un producto funcional, sin '
+        'colaboración con empresa. Los datos consisten en vídeos subacuáticos y de superficie de ocho nadadores de un '
+        'club, registrados con una cámara GoPro y con un teléfono móvil.')
 
 
 def cap1_objetivos(w):
-    w.p('El objetivo general es desarrollar un sistema de IA explicable que, a partir de vídeo, cuantifique la '
-        'eficiencia de la brazada, localice el inicio de la fatiga y explique sus causas mediante SHAP, y que funcione '
-        'en un ordenador personal sin GPU. Los objetivos específicos (Capítulo 3) cubren la selección del modelo de '
-        'pose, el conteo de brazadas, la detección no supervisada de la fatiga, su explicación y la clasificación del estilo.')
+    w.p('El objetivo general es desarrollar un sistema de inteligencia artificial explicable que, a partir de vídeo, '
+        'cuantifique la eficiencia de la técnica de nado, detecte el inicio de la fatiga técnica y atribuya sus causas '
+        'a variables biomecánicas mediante valores de Shapley, con ejecución en un ordenador personal sin unidad de '
+        'procesamiento gráfico (GPU). Los objetivos específicos, detallados en el Capítulo 3, abarcan la selección del '
+        'modelo de estimación de pose, la segmentación del nado en ciclos, la detección no supervisada de la fatiga, su '
+        'explicación y la clasificación del estilo de nado.')
 
 
 def cap1_resultados(w):
     w.vinetas([
-        'Sistema completo ejecutable en la CPU de un portátil, para un vídeo (`analizar.py`) o una carpeta entera (`lote.py`), con pruebas automáticas.',
-        'Comparativa de modelos de pose en CPU sobre vídeo real: YOLOv8n-Pose es el más equilibrado (6,6 FPS, confianza 0,76).',
-        'Conteo de brazadas en vista lateral y frontal, validado con la cuenta manual en tres clips reales: error del 6,5 %, 7,6 % y 8,2 %.',
-        'Detección de la fatiga y explicación SHAP validadas con un nadador sintético, de lado y de frente.',
-        'Análisis completo de un nadador real (Aaron, crol, 5 clips): medidas por ciclo y ausencia de fatiga en pasadas cortas.',
-        'Validación del 3D (MotionBERT) frente al 2D: fiable en codo y cadera, no en la rodilla de un nadador horizontal.',
-        'Vídeo anotado para el entrenador centrado en el estado de fatiga.',
-        'Fatiga en vídeo real: no aparece en los clips disponibles (pasadas cortas); su localización requiere grabar nado continuo.',
+        'Sistema completo de análisis, ejecutable en la CPU de un ordenador personal, para un vídeo o para un conjunto de vídeos, con pruebas automáticas.',
+        'Comparativa de modelos de estimación de pose sobre vídeo subacuático real y selección justificada del modelo.',
+        'Segmentación del nado en ciclos de brazada en vista lateral y frontal, con un error relativo de la frecuencia de ciclo del 6,5 %, 7,6 % y 8,2 % frente al conteo manual en tres secuencias reales.',
+        'Detección del inicio de la fatiga y atribución por variable validadas con datos sintéticos de referencia conocida: errores medianos del 4,7 % (frecuencia de ciclo), 1,3 % (velocidad) y 4,3 % (distancia por ciclo).',
+        'Clasificación del estilo de nado con una exactitud del 100 % por vídeo en datos sintéticos, bajo validación agrupada.',
+        'Análisis biomecánico completo de un participante real (P1, crol, cinco secuencias) y ausencia de falsos positivos de fatiga en secuencias cortas.',
+        'Evaluación de la reconstrucción 3D frente a la 2D, con identificación de sus límites en la extremidad inferior.',
     ])
 
 
 def cap1_estructura(w):
-    w.p('El Capítulo 2 revisa el estado del arte y el modelo hidrodinámico. El Capítulo 3 detalla los objetivos. El '
-        'Capítulo 4 describe la planificación, la solución (vertical de visión y vertical tabular), los recursos, el '
-        'presupuesto y los resultados. El Capítulo 5 discute las decisiones y limitaciones, el Capítulo 6 recoge las '
-        'conclusiones y el Capítulo 7 las líneas futuras. Los anexos incluyen la guía de ejecución y la estructura del código.')
+    w.p('El Capítulo 2 presenta el marco teórico: la biomecánica de la natación, los fundamentos de visión por '
+        'computador y estimación de pose, las métricas de evaluación, la detección de anomalías, la clasificación '
+        'supervisada y la explicabilidad, además del modelo hidrodinámico. El Capítulo 3 formula los objetivos. El '
+        'Capítulo 4 describe la planificación, la solución desarrollada, los recursos, el presupuesto y los resultados. '
+        'El Capítulo 5 discute las decisiones metodológicas y las limitaciones, el Capítulo 6 recoge las conclusiones y '
+        'el Capítulo 7 las líneas de trabajo futuras. Los anexos incluyen la guía de ejecución, la estructura del código '
+        'y las pruebas automáticas.')
 
+
+# ---------------------------------------------------------------- capítulo 2
 
 def cap2_estado(w):
-    w.p('Esta sección revisa los cuatro campos en los que se apoya el sistema: la biomecánica del crol, la fatiga en '
-        'natación, la estimación de pose humana y la detección de anomalías con explicación SHAP.')
-    w.h3('Biomecánica del crol y eficiencia')
-    w.p('La velocidad media de nado es el producto de la frecuencia de ciclo (SR) y la distancia por ciclo (DPS): '
-        'v = SR · DPS (Craig y Pendergast, 1979). Los nadadores más eficientes alcanzan una velocidad dada con mayor DPS '
-        'y menor SR. El Índice de Brazada (SI = v · DPS) se asocia a la economía del nado (Costill et al., 1985). También '
-        'se relacionan con la eficiencia la flexión del codo en el agarre, el alcance de la brazada, la simetría entre '
-        'brazos y la alineación del cuerpo (Toussaint y Beek, 1992; Chollet et al., 2000).')
-    w.h3('Fatiga en natación')
-    w.p('Con la fatiga se observa un descenso de la DPS, a menudo compensado con un aumento de la SR, junto con cambios '
-        'en la coordinación de brazos (Alberty et al., 2005). Estos cambios son individuales: cada nadador se fatiga a su '
-        'manera. Por eso tiene sentido comparar al nadador consigo mismo y no con una norma poblacional.')
-    w.h3('Estimación de pose humana')
-    w.p('Los modelos de estimación de pose localizan las articulaciones en la imagen. Este trabajo usa el formato COCO '
-        'de 17 puntos (Lin et al., 2014). La Tabla 1 resume los modelos considerados.')
+    w.p('Este capítulo introduce los conceptos en los que se apoya StrokeLab. En cada apartado se presenta la teoría y '
+        'el estado del arte; el Capítulo 4 describe cómo se ha adaptado cada técnica al análisis de la natación.')
+
+    w.h3('Biomecánica del crol y eficiencia de la técnica de nado')
+    w.p('El nado se describe mediante ciclos de brazada. En crol, un ciclo comprende dos brazadas, una de cada brazo. '
+        'Las tres magnitudes básicas son la frecuencia de ciclo, SR (*stroke rate*, frecuencia de brazada), la distancia '
+        'por ciclo, DPS (*distance per stroke*, distancia por ciclo) y la velocidad media de nado, que se relacionan '
+        'según la Ecuación {eq:vel} [@craig1979].')
+    w.ecuacion('vel', ['v', '=', ('frac', ['SR', '·', 'DPS'], '60')],
+               'Velocidad media de nado a partir de la frecuencia y la distancia por ciclo',
+               [('*v*', 'velocidad media de nado (m/s)'),
+                ('SR', 'frecuencia de ciclo (*stroke rate*), en ciclos por minuto (ciclos/min); el factor 60 la convierte a ciclos por segundo'),
+                ('DPS', 'distancia recorrida en un ciclo (*distance per stroke*), en metros (m)')])
+    w.p('Para una misma velocidad, los nadadores más eficientes emplean una frecuencia menor y una distancia por ciclo '
+        'mayor. Costill et al. [@costill1985] propusieron el índice de brazada, SI (*stroke index*, índice de brazada), '
+        'como indicador de la economía del nado (Ecuación {eq:si}).')
+    w.ecuacion('si', ['SI', '=', 'v', '·', 'DPS'], 'Índice de brazada (stroke index)',
+               [('SI', 'índice de brazada (m²/s); valores mayores indican una técnica más económica'),
+                ('*v*', 'velocidad media (m/s)'), ('DPS', 'distancia por ciclo (m)')])
+    w.p('Otros factores asociados a la eficiencia propulsiva son la flexión del codo durante el agarre (*catch*, fase '
+        'en que la mano empieza a empujar el agua), la amplitud de la brazada, la simetría entre ambos brazos y la '
+        'alineación horizontal del cuerpo, que reduce el área frontal y, con ella, la resistencia [@toussaint1992; '
+        '@chollet2000].')
+
+    w.h3('La fatiga en natación')
+    w.p('La fatiga técnica se manifiesta como un cambio progresivo del patrón de nado: disminuye la distancia por ciclo, '
+        'que a menudo se compensa con un aumento de la frecuencia, y se alteran la coordinación entre brazos y la '
+        'variación de la velocidad dentro del ciclo [@alberty2005]. Estos cambios son individuales: cada nadador se fatiga '
+        'de manera distinta. Por ello, una referencia poblacional resulta menos informativa que la comparación del '
+        'nadador con su propio estado de partida, enfoque que adopta este trabajo.')
+
+    w.h3('Visión por computador y aprendizaje profundo')
+    w.p('La visión por computador es la disciplina que extrae información de imágenes y vídeos de forma automática. '
+        'Una imagen digital se representa como un tensor de dimensiones alto × ancho × canales, cuyos valores son las '
+        'intensidades de cada píxel. Desde 2012, el campo está dominado por el aprendizaje profundo (*deep learning*), '
+        'en el que una red neuronal con muchas capas aprende directamente de los datos las representaciones necesarias '
+        'para la tarea [@lecun2015].')
+    w.p('La arquitectura de referencia es la red neuronal convolucional, CNN (*convolutional neural network*). Cada '
+        'capa convolucional aplica filtros pequeños que se desplazan por la imagen y producen mapas de características '
+        '(*feature maps*): las primeras capas responden a bordes y texturas, y las más profundas a partes del cuerpo o '
+        'a objetos completos. Las funciones de activación no lineales y las capas de reducción de resolución permiten '
+        'combinar información local en descriptores cada vez más globales. Más recientemente, los *transformers*, '
+        'basados en mecanismos de atención que relacionan todas las partes de la entrada entre sí [@vaswani2017], se '
+        'han trasladado a la visión con resultados de referencia.')
+    w.p('El entrenamiento de estas redes requiere grandes conjuntos de imágenes anotadas. Cuando los datos de la tarea '
+        'son escasos, se recurre al aprendizaje por transferencia (*transfer learning*): se parte de un modelo ya '
+        'entrenado en un conjunto amplio y genérico y se reutiliza, directamente o con un ajuste fino (*fine-tuning*), '
+        'en el problema concreto [@pan2010]. Esta es la estrategia adoptada en StrokeLab.')
+
+    w.h3('Estimación de la pose humana')
+    w.p('La estimación de la pose humana consiste en localizar en la imagen un conjunto predefinido de puntos '
+        'anatómicos (*keypoints*, puntos clave), como hombros, codos, muñecas, caderas, rodillas y tobillos. El formato '
+        'más extendido es el del conjunto COCO (*Common Objects in Context*), con 17 puntos por persona [@lin2014]. '
+        'Existen dos paradigmas principales:')
+    w.vinetas([
+        '**Descendente** (*top-down*): primero se detecta cada persona con un detector de objetos y después se estiman sus puntos dentro del recuadro. Es más preciso, pero su coste crece con el número de personas.',
+        '**Ascendente** (*bottom-up*): se detectan todos los puntos de la imagen y después se agrupan por persona, como en OpenPose, que emplea campos de afinidad entre partes [@cao2017].',
+    ])
+    w.p('En cuanto a la salida de la red, los métodos basados en mapas de calor (*heatmaps*) predicen para cada '
+        'articulación una imagen de probabilidad cuyo máximo indica su posición, como HRNet, que mantiene '
+        'representaciones de alta resolución en toda la red [@sun2019]. Los métodos de regresión predicen '
+        'directamente las coordenadas. La familia YOLO (*You Only Look Once*) resuelve la detección de objetos en una '
+        'única pasada de la red [@redmon2016]; YOLO-Pose extiende esta idea y predice, en la misma pasada, el recuadro '
+        'de cada persona y sus puntos, con una función de pérdida basada en la similitud de puntos clave [@maji2022]. '
+        'Ultralytics distribuye versiones de distintos tamaños (*nano*, *small*, *medium*) preentrenadas en COCO '
+        '[@jocher2023].')
+    w.p('Para dispositivos con recursos limitados se han desarrollado modelos ligeros de una sola persona: MoveNet, con '
+        'una red MobileNetV2 y entrada de 192 × 192 píxeles en su versión *Lightning* [@google2021], y BlazePose, que '
+        'estima 33 puntos [@bazarevsky2020]. En el extremo opuesto, ViTPose emplea un *transformer* de visión y alcanza '
+        'los mejores resultados en COCO a costa de un elevado coste computacional [@xu2022]. La Tabla {tab:modelos} '
+        'resume los modelos considerados.')
     w.tabla([
-        ['Modelo', 'Tipo', 'Características relevantes'],
-        ['YOLO-Pose / YOLOv8-Pose (Maji et al., 2022; Jocher et al., 2023)', 'Detección + puntos en una etapa', 'Multipersona; tamaños n, s, m; coordenadas en píxeles originales'],
-        ['MoveNet Lightning (Google, 2021)', 'Una persona, entrada 192 × 192', 'Muy ligero; necesita recorte de seguimiento en vídeo de alta resolución'],
-        ['BlazePose / MediaPipe (Bazarevsky et al., 2020)', 'Una persona, 33 puntos', 'Orientado a móvil; se convierte a COCO-17'],
-        ['ViTPose (Xu et al., 2022)', 'Transformer, dos etapas', 'Mayor precisión en COCO; coste alto en CPU'],
-        ['MotionBERT (Zhu et al., 2023)', 'Elevación 2D → 3D', 'Transformer temporal; entrenado con personas de pie (Human3.6M)'],
-    ], 'Modelos de estimación de pose considerados.', anchos=[5.5, 4, 6.5])
-    w.p('En natación, la estimación de pose es más difícil por la refracción, las burbujas, la oclusión y la escasez de '
-        'datos etiquetados (Einfalt et al., 2018). El conjunto sintético SwimXYZ (Fiche et al., 2023) ofrece vídeos de '
-        'los cuatro estilos para entrenar y evaluar.')
-    w.h3('Detección de anomalías y explicabilidad')
-    w.p('Isolation Forest (Liu et al., 2008) aísla observaciones con particiones aleatorias: las anómalas se aíslan en '
-        'menos particiones. Puede entrenarse solo con datos «normales», algo adecuado cuando no hay etiquetas de fatiga. '
-        'El algoritmo PELT (Killick et al., 2012) localiza puntos de cambio en una serie y se usa como contraste. SHAP '
-        '(Lundberg y Lee, 2017) reparte la salida de un modelo entre sus variables con valores de Shapley; para modelos '
-        'de árboles, TreeSHAP los calcula de forma exacta (Lundberg et al., 2020).')
+        ['Modelo', 'Paradigma', 'Arquitectura', 'AP en COCO', 'Papel en este trabajo'],
+        ['OpenPose [@cao2017]', 'Ascendente', 'CNN y campos de afinidad', '61,8 (test-dev)', 'Referencia histórica'],
+        ['HRNet-W48 [@sun2019]', 'Descendente', 'CNN de alta resolución', '75,5 (test-dev)', 'No usado (coste en CPU)'],
+        ['YOLOv8n-Pose [@jocher2023]', 'Una etapa', 'CNN detector y puntos', '50,4 (val)', 'Modelo elegido'],
+        ['YOLO11n-Pose [@jocher2023]', 'Una etapa', 'CNN detector y puntos', '50,0 (val)', 'Comparado'],
+        ['YOLOv8s-Pose [@jocher2023]', 'Una etapa', 'CNN detector y puntos', '60,0 (val)', 'Comparado'],
+        ['MoveNet Lightning [@google2021]', 'Una persona', 'MobileNetV2', 'Sin AP comparable publicada', 'Comparado; opción'],
+        ['BlazePose [@bazarevsky2020]', 'Una persona', 'CNN ligera, 33 puntos', 'Evaluado con PCK propio', 'Opción'],
+        ['ViTPose-G [@xu2022]', 'Descendente', 'Transformer de visión', '80,9 (test-dev)', 'Trabajo futuro'],
+    ], 'Modelos de estimación de pose considerados. AP: precisión media en COCO según las publicaciones originales.',
+        clave='modelos', anchos=[3.8, 2.4, 3.4, 2.8, 3.6], size=8)
+    w.p('La estimación de pose en natación presenta dificultades específicas: refracción, burbujas, iluminación '
+        'variable, oclusión parcial del cuerpo por la superficie del agua y escasez de imágenes anotadas [@einfalt2018]. '
+        'El conjunto sintético SwimXYZ ofrece secuencias generadas por ordenador de los cuatro estilos para entrenar y '
+        'evaluar modelos en este dominio [@fiche2023].')
+
+    w.h3('Métricas de evaluación de la estimación de pose')
+    w.p('La precisión de un modelo de pose se mide comparando los puntos estimados con anotaciones manuales de '
+        'referencia (*ground truth*). La métrica oficial de COCO es la similitud de puntos clave, OKS (*Object Keypoint '
+        'Similarity*), que desempeña el papel de la intersección sobre la unión en la detección de objetos [@lin2014] '
+        '(Ecuación {eq:oks}).')
+    w.ecuacion('oks', ['OKS', '=', ('frac',
+                       ('sum', 'i', None, ['exp', ('par', ['−', ('frac', ('sup', ('sub', 'd', 'i'), '2'),
+                                                                     ['2', ('sup', 's', '2'), ('sup', ('sub', 'k', 'i'), '2')])]),
+                                          'δ', ('par', [('sub', 'v', 'i'), '>', '0'])]),
+                       ('sum', 'i', None, ['δ', ('par', [('sub', 'v', 'i'), '>', '0'])]))],
+               'Similitud de puntos clave (OKS)',
+               [('*d*_{i}', 'distancia euclídea entre el punto estimado y el anotado de la articulación *i* (píxeles)'),
+                ('*s*', 'escala del objeto, raíz cuadrada del área de la persona (píxeles)'),
+                ('*k*_{i}', 'constante de tolerancia propia de cada articulación (adimensional)'),
+                ('*v*_{i}', 'indicador de visibilidad de la articulación en la anotación; δ(·) vale 1 si se cumple la condición y 0 en otro caso'),
+                ('OKS', 'similitud entre 0 (sin coincidencia) y 1 (coincidencia perfecta)')])
+    w.p('Otra métrica habitual es el porcentaje de puntos correctos, PCK (*Percentage of Correct Keypoints*), que '
+        'cuenta los puntos situados a menos de una fracción α de una longitud de referencia, como el tronco o la cabeza '
+        '(PCKh) [@andriluka2014] (Ecuación {eq:pck}).')
+    w.ecuacion('pck', [('sub', 'PCK', 'α'), '=', ('frac', '1', 'N'),
+                       ('sum', ['i', '=', '1'], 'N', ['𝟙', ('par', [('norm', [('acc', ('sub', 'p', 'i'), '̂'), '−', ('sub', 'p', 'i')]), '≤',
+                                                                 'α', '·', ('sub', 'd', 'ref')])])],
+               'Porcentaje de puntos correctos (PCK)',
+               [('*N*', 'número total de puntos evaluados'),
+                ('*p̂*_{i}, *p*_{i}', 'posición estimada y posición de referencia del punto *i* (píxeles)'),
+                ('*d*_{ref}', 'longitud de referencia del cuerpo, por ejemplo el tronco (píxeles)'),
+                ('α', 'umbral relativo de tolerancia (habitualmente 0,2 o 0,5); 𝟙(·) vale 1 si la condición se cumple'),
+                ('PCK_{α}', 'proporción de puntos correctos, entre 0 y 1')])
+    w.p('A partir de la OKS se calcula la precisión media, AP (*Average Precision*): para un umbral de OKS se '
+        'consideran correctas las detecciones que lo superan y se integra la curva de precisión frente a exhaustividad. '
+        'COCO promedia la AP sobre diez umbrales de OKS entre 0,50 y 0,95, valor que se denomina mAP (*mean Average '
+        'Precision*) (Ecuación {eq:ap}).')
+    w.ecuacion('ap', [('sub', 'AP', 't'), '=', ('int', '0', '1', [('sub', 'P', 't'), ('par', 'R'), 'dR']), ',     ',
+                      'mAP', '=', ('frac', '1', ('bar', 'T')), ('sum', ['t', '∈', 'T'], None, ('sub', 'AP', 't'))],
+               'Precisión media (AP) y su promedio sobre umbrales de OKS (mAP)',
+               [('*P*_{t}(*R*)', 'precisión en función de la exhaustividad *R* cuando una detección se considera correcta si su OKS ≥ *t*'),
+                ('*T*', 'conjunto de umbrales de OKS {0,50; 0,55; …; 0,95}; |*T*| = 10'),
+                ('AP, mAP', 'valores entre 0 y 1, que suelen expresarse en porcentaje')])
+    w.p('Todas estas métricas requieren un conjunto de imágenes con las articulaciones anotadas manualmente. Su '
+        'aplicabilidad a los datos de este trabajo se discute en el Capítulo 4.')
+
+    w.h3('Elevación de la pose a tres dimensiones')
+    w.p('La estimación 3D a partir de una sola cámara es un problema mal planteado, porque infinitas posturas 3D '
+        'producen la misma proyección. La estrategia más extendida es la elevación (*lifting*): un modelo recibe la '
+        'secuencia de puntos 2D y predice su profundidad, aprovechando las regularidades del cuerpo humano aprendidas '
+        'de grandes conjuntos con captura de movimiento [@martinez2017]. El conjunto de referencia es Human3.6M, con '
+        'actores en un laboratorio realizando acciones cotidianas de pie [@ionescu2014]. MotionBERT emplea un '
+        '*transformer* con atención espacial y temporal alternada (DSTformer) preentrenado para recuperar movimiento '
+        'a partir de entradas 2D ruidosas [@zhu2023]. Al haberse entrenado con personas de pie en tierra, su '
+        'transferencia a un nadador horizontal bajo el agua no está garantizada, aspecto que se evalúa en este trabajo.')
+
+    w.h3('Detección de anomalías y aprendizaje no supervisado')
+    w.p('El aprendizaje no supervisado busca estructura en datos sin etiquetas. Una de sus tareas es la detección de '
+        'anomalías, que identifica observaciones que se apartan del comportamiento normal [@chandola2009]. Es el '
+        'planteamiento adecuado para la fatiga, ya que no se dispone de etiquetas que indiquen en qué ciclo está '
+        'fatigado un nadador, pero sí de un periodo inicial en el que se le puede suponer descansado.')
+    w.p('*Isolation Forest* (bosque de aislamiento) [@liu2008] parte de una idea sencilla: las observaciones anómalas '
+        'son escasas y distintas, por lo que se aíslan con menos particiones aleatorias que las normales. El algoritmo '
+        'construye un conjunto de árboles de aislamiento; en cada nodo elige al azar una variable y un valor de corte '
+        'entre su mínimo y su máximo, y divide los datos hasta aislar cada observación. La longitud del camino *h*(*x*) '
+        'desde la raíz hasta la hoja de una observación es corta si esta es anómala. La puntuación de anomalía se '
+        'normaliza según la Ecuación {eq:ifscore}.')
+    w.ecuacion('ifscore', ['s', ('par', ['x', ',', 'n']), '=', ('sup', '2', ['−', ('frac', ['E', ('cor', ['h', ('par', 'x')])],
+                                                                                     ['c', ('par', 'n')])])],
+               'Puntuación de anomalía de Isolation Forest',
+               [('*s*(*x*, *n*)', 'puntuación de anomalía de la observación *x*, entre 0 y 1; valores próximos a 1 indican anomalía y valores inferiores a 0,5, normalidad'),
+                ('*E*[*h*(*x*)]', 'longitud media del camino de *x* en el conjunto de árboles (número de particiones)'),
+                ('*c*(*n*)', 'longitud media esperada del camino en un árbol construido con *n* observaciones (Ecuación {eq:ifc})')])
+    w.ecuacion('ifc', ['c', ('par', 'n'), '=', '2', 'H', ('par', ['n', '−', '1']), '−', ('frac', ['2', ('par', ['n', '−', '1'])], 'n'),
+                       ',     ', 'H', ('par', 'i'), '≈', 'ln', ('par', 'i'), '+', 'γ'],
+               'Factor de normalización de Isolation Forest',
+               [('*n*', 'número de observaciones con que se construye cada árbol'),
+                ('*H*(*i*)', 'número armónico, aproximado mediante el logaritmo neperiano'),
+                ('γ', 'constante de Euler-Mascheroni (≈ 0,5772)')])
+    w.p('El algoritmo tiene coste lineal, no necesita suponer una distribución de los datos y puede entrenarse solo '
+        'con observaciones normales, propiedades que justifican su elección.')
+
+    w.h3('Detección de puntos de cambio')
+    w.p('La detección de puntos de cambio (*change point detection*) localiza los instantes en que cambian las '
+        'propiedades estadísticas de una serie temporal. El algoritmo PELT (*Pruned Exact Linear Time*) encuentra de '
+        'forma exacta la segmentación que minimiza el coste de la Ecuación {eq:pelt} con un coste computacional lineal, '
+        'gracias a una regla de poda de candidatos [@killick2012].')
+    w.ecuacion('pelt', [('sub', 'mín', ['m', ',', 'τ']), ('sum', ['i', '=', '1'], ['m', '+', '1'],
+                        ['C', ('par', ('sub', 'y', [('sub', 'τ', ['i', '−', '1']), '+', '1', ':', ('sub', 'τ', 'i')]))]),
+                        '+', 'β', 'm', ',     ', 'C', ('par', 'y'), '=', ('sum', 't', None, ('sup', ('par', [('sub', 'y', 't'), '−', ('media', 'y')]), '2'))],
+               'Función objetivo de PELT con coste cuadrático',
+               [('*m*', 'número de puntos de cambio; τ_{1}, …, τ_{m} son sus posiciones en la serie'),
+                ('*C*(·)', 'coste de un segmento; con coste cuadrático (L2) es la suma de desviaciones cuadráticas respecto a su media *ȳ*'),
+                ('β', 'penalización por cada punto de cambio adicional; en este trabajo β = 2 ln *n*, con *n* la longitud de la serie')])
+
+    w.h3('Clasificación supervisada con conjuntos de árboles')
+    w.p('En el aprendizaje supervisado, el modelo aprende la relación entre unas variables de entrada y una etiqueta '
+        'conocida. Un árbol de decisión divide recursivamente el espacio de las variables con preguntas del tipo '
+        '«¿variable *j* ≤ umbral?», eligiendo en cada nodo la división que más reduce la impureza de las clases, medida '
+        'habitualmente con el índice de Gini (Ecuación {eq:gini}).')
+    w.ecuacion('gini', ['G', '=', '1', '−', ('sum', ['k', '=', '1'], 'K', ('sup', ('sub', 'p', 'k'), '2'))],
+               'Índice de impureza de Gini de un nodo',
+               [('*K*', 'número de clases (en este trabajo, cuatro estilos de nado)'),
+                ('*p*_{k}', 'proporción de observaciones de la clase *k* en el nodo; *G* = 0 indica un nodo puro')])
+    w.p('Un árbol aislado se ajusta en exceso a los datos de entrenamiento. El bosque aleatorio (*Random Forest*) '
+        'combina muchos árboles entrenados sobre muestras con reemplazo de los datos (*bagging*) y con un subconjunto '
+        'aleatorio de variables en cada división, y decide por votación; así reduce la varianza sin aumentar el sesgo '
+        '[@breiman2001]. Los métodos de *boosting*, como XGBoost, construyen los árboles de forma secuencial para '
+        'corregir los errores de los anteriores [@chen2016].')
+    w.p('La evaluación de un clasificador debe estimar su rendimiento con datos no vistos. La validación cruzada '
+        'divide los datos en *k* particiones y entrena y evalúa *k* veces. Cuando las observaciones están agrupadas '
+        '(por ejemplo, muchos fotogramas o ventanas de un mismo vídeo), la partición aleatoria provoca fuga de datos '
+        '(*data leakage*): observaciones casi idénticas acaban en entrenamiento y en prueba, y el rendimiento se '
+        'sobreestima [@kaufman2012]. La validación cruzada agrupada (*GroupKFold*) asigna cada grupo completo a una '
+        'única partición y evita este problema.')
+
+    w.h3('Inteligencia artificial explicable')
+    w.p('La inteligencia artificial explicable, XAI (*explainable artificial intelligence*), reúne métodos que '
+        'permiten entender por qué un modelo produce una salida. Los valores de Shapley, procedentes de la teoría de '
+        'juegos cooperativos [@shapley1953], reparten el resultado de una coalición entre sus jugadores de forma justa. '
+        'Aplicados a un modelo, los jugadores son las variables de entrada y el resultado es la predicción (Ecuación '
+        '{eq:shapley}).')
+    w.ecuacion('shapley', [('sub', 'φ', 'j'), '=', ('sum', ['S', '⊆', 'F', '∖', ('llave', 'j')], None,
+                           [('frac', [('bar', 'S'), '!', ('par', [('bar', 'F'), '−', ('bar', 'S'), '−', '1']), '!'], [('bar', 'F'), '!']),
+                            ('cor', [('sub', 'f', 'x'), ('par', ['S', '∪', ('llave', 'j')]), '−', ('sub', 'f', 'x'), ('par', 'S')])])],
+               'Valor de Shapley de la variable j',
+               [('φ_{j}', 'contribución de la variable *j* a la predicción para la observación *x* (en unidades de la salida del modelo)'),
+                ('*F*', 'conjunto de todas las variables; *S* es un subconjunto que no contiene *j*'),
+                ('*f*_{x}(*S*)', 'predicción del modelo para *x* cuando solo se conocen las variables de *S*')])
+    w.p('SHAP (*SHapley Additive exPlanations*) [@lundberg2017] expresa cada predicción como la suma de un valor base '
+        'y de las contribuciones de cada variable (Ecuación {eq:shapadd}), lo que permite explicaciones locales (una '
+        'observación) y globales (todo el conjunto). Para modelos basados en árboles, TreeSHAP calcula los valores '
+        'exactos en tiempo polinómico [@lundberg2020], lo que lo hace aplicable tanto a Isolation Forest como al bosque '
+        'aleatorio.')
+    w.ecuacion('shapadd', ['f', ('par', 'x'), '=', ('sub', 'φ', '0'), '+', ('sum', ['j', '=', '1'], 'M', ('sub', 'φ', 'j'))],
+               'Descomposición aditiva de SHAP',
+               [('*f*(*x*)', 'salida del modelo para la observación *x*'),
+                ('φ_{0}', 'valor base: salida media del modelo en los datos de referencia'),
+                ('*M*', 'número de variables de entrada')])
+
+    w.h3('Procesado de señales temporales')
+    w.p('Las coordenadas de las articulaciones a lo largo del tiempo forman señales ruidosas. El filtro de '
+        'Savitzky-Golay ajusta por mínimos cuadrados un polinomio de grado bajo en una ventana deslizante y conserva '
+        'mejor los máximos y mínimos que una media móvil [@savitzky1964]. El análisis de componentes principales, PCA '
+        '(*principal component analysis*), obtiene las direcciones de máxima varianza de un conjunto de datos; la '
+        'primera componente es la dirección en la que los datos se mueven más [@jolliffe2016]. Ambas técnicas se emplean '
+        'en la segmentación del nado en ciclos.')
 
 
 def cap2_contexto(w):
-    w.p('El director del trabajo indicó (1 de septiembre de 2026) que el modelo hidrodinámico debía figurar como '
-        'conocimiento previo y no como IA. Es la física que justifica por qué importa la eficiencia técnica. La fuerza '
-        'de arrastre que se opone al avance es:')
-    w.ecuacion('F = ½ · ρ · C_D · A · v²')
-    w.p('donde ρ es la densidad del agua (≈ 1000 kg/m³), C_D el coeficiente de arrastre, A el área frontal y v la '
-        'velocidad. La potencia necesaria para vencerla crece con el cubo de la velocidad:')
-    w.ecuacion('P = F · v = ½ · ρ · C_D · A · v³')
-    w.p('Nadar un 10 % más rápido exige un 33 % más de potencia (1,1³ ≈ 1,33). Cuando la fatiga reduce la potencia '
-        'disponible, el nadador solo mantiene la velocidad si mejora la eficiencia (Toussaint y Beek, 1992). C_D y A '
-        'varían con cada nadador y no se pueden medir con fiabilidad desde un vídeo 2D, así que la potencia no se usa '
-        'como variable de los modelos: se usan indicadores cinemáticos medibles, interpretados a la luz de esta relación.')
-    w.p('La aportación del proyecto es combinar, en un sistema de bajo coste que funciona en un portátil, una detección '
-        'no supervisada del momento de fatiga y una explicación por variable comprensible para el entrenador. Los '
-        'trabajos revisados miden la técnica o detectan la fatiga, pero no ofrecen ambas cosas a la vez.')
+    w.p('El modelo hidrodinámico constituye conocimiento previo del dominio y no un componente de inteligencia '
+        'artificial. Explica por qué la eficiencia técnica es determinante. La fuerza de arrastre que se opone al '
+        'avance del nadador viene dada por la Ecuación {eq:arrastre}.')
+    w.ecuacion('arrastre', [('sub', 'F', 'D'), '=', ('frac', '1', '2'), 'ρ', ('sub', 'C', 'D'), 'A', ('sup', 'v', '2')],
+               'Fuerza de arrastre hidrodinámico',
+               [('*F*_{D}', 'fuerza de arrastre (N)'), ('ρ', 'densidad del agua (≈ 1000 kg/m³)'),
+                ('*C*_{D}', 'coeficiente de arrastre, adimensional, que depende de la forma y la posición del cuerpo'),
+                ('*A*', 'área frontal proyectada del nadador (m²)'), ('*v*', 'velocidad de nado (m/s)')])
+    w.p('La potencia necesaria para vencer el arrastre es el producto de la fuerza por la velocidad (Ecuación '
+        '{eq:potencia}).')
+    w.ecuacion('potencia', ['P', '=', ('sub', 'F', 'D'), 'v', '=', ('frac', '1', '2'), 'ρ', ('sub', 'C', 'D'), 'A', ('sup', 'v', '3')],
+               'Potencia necesaria para vencer el arrastre',
+               [('*P*', 'potencia mecánica (W)'), ('restantes símbolos', 'como en la Ecuación {eq:arrastre}')])
+    w.p('Por la dependencia cúbica, nadar un 10 % más rápido exige un 33 % más de potencia (1,1³ ≈ 1,33). Cuando la '
+        'fatiga reduce la potencia disponible, el nadador solo mantiene la velocidad si reduce *C*_{D} o *A*, es decir, '
+        'si mejora su técnica [@toussaint1992]. Como *C*_{D} y *A* varían entre nadadores y no pueden medirse con '
+        'fiabilidad desde un vídeo 2D, la potencia no se emplea como variable de los modelos: se usan indicadores '
+        'cinemáticos directamente medibles, interpretados a la luz de esta relación.')
+    w.p('La revisión del estado del arte muestra que los trabajos existentes miden la técnica o detectan la fatiga, '
+        'pero no combinan, en un sistema de bajo coste que funcione en un ordenador personal, una detección no '
+        'supervisada del inicio de la fatiga con una atribución por variable interpretable por el entrenador. Esa es la '
+        'aportación de StrokeLab.')
 
 
 def cap2_problema(w):
-    w.p('El problema se concreta en tres preguntas: (1) cómo extraer la pose de un nadador bajo el agua con un modelo '
-        'que funcione en CPU; (2) cómo convertir esa pose en ciclos de brazada y variables con significado biomecánico; '
-        '(3) cómo decidir, sin etiquetas de fatiga, cuándo la técnica de un nadador se ha degradado y explicar por qué. '
-        'La tercera pregunta es la central y se aborda con detección de anomalías respecto al estado fresco del propio '
-        'nadador y explicación con SHAP.')
+    w.p('El problema se concreta en tres preguntas de investigación: (1) cómo obtener la pose de un nadador bajo el '
+        'agua con un modelo que funcione en CPU; (2) cómo transformar esa pose en ciclos de brazada y variables con '
+        'significado biomecánico; y (3) cómo determinar, sin etiquetas de fatiga, el ciclo en que la técnica se degrada '
+        'y qué variables explican ese cambio. La tercera es la central y se aborda mediante detección de anomalías '
+        'respecto al estado inicial del propio nadador y explicación con valores de Shapley.')
 
+
+# ---------------------------------------------------------------- capítulo 3
 
 def cap3_generales(w):
     w.p('El objetivo general del presente trabajo es desarrollar un sistema de inteligencia artificial explicable '
-        'que, a partir de un vídeo de nado y en un ordenador personal sin GPU, cuantifique la eficiencia de la '
-        'brazada, localice el momento en que aparece la fatiga técnica y explique sus causas mediante SHAP.')
+        'que, a partir de un vídeo de nado y en un ordenador personal sin GPU, cuantifique la eficiencia de la técnica '
+        'de nado, detecte el inicio de la fatiga técnica y atribuya sus causas a variables biomecánicas interpretables.')
 
 
 def cap3_especificos(w):
     w.vinetas([
-        'OE1. Comparar empíricamente modelos de estimación de pose (YOLO en varios tamaños, MoveNet y MediaPipe) sobre vídeo subacuático real y en CPU, y seleccionar el más adecuado.',
-        'OE2. Elevar la pose a 3D con MotionBERT para vistas frontales y oblicuas, y validar el 3D frente al 2D.',
-        'OE3. Segmentar automáticamente el nado en ciclos de brazada y validarlo frente a una cuenta manual.',
-        'OE4. Calcular por ciclo indicadores de eficiencia y medidas de codos, hombros, caderas, rodillas y pies.',
-        'OE5. Detectar el inicio de la fatiga como desviación sostenida respecto a la técnica fresca del propio nadador.',
-        'OE6. Explicar cada detección con SHAP y traducirla a un texto comprensible para el entrenador.',
+        'OE1. Comparar modelos de estimación de pose (YOLO en varios tamaños, MoveNet y MediaPipe) sobre vídeo subacuático real y en CPU, y seleccionar el más adecuado de forma justificada.',
+        'OE2. Elevar la pose a 3D para vistas frontales y oblicuas, y evaluar la reconstrucción 3D frente a la 2D.',
+        'OE3. Segmentar automáticamente el nado en ciclos de brazada y validar la frecuencia de ciclo frente a un conteo manual.',
+        'OE4. Calcular por ciclo indicadores de eficiencia y medidas articulares de codos, hombros, caderas, rodillas y pies.',
+        'OE5. Detectar el inicio de la fatiga como desviación sostenida respecto al patrón técnico inicial del propio nadador.',
+        'OE6. Atribuir cada detección a variables biomecánicas mediante valores de Shapley y expresarla en un texto comprensible para el entrenador.',
         'OE7. Clasificar el estilo de nado con validación agrupada por vídeo.',
-        'OE8. Generar un vídeo anotado que muestre al entrenador el estado de fatiga a lo largo del nado.',
+        'OE8. Generar un vídeo anotado que muestre el estado de fatiga a lo largo del nado.',
+        'OE9. Evaluar el sistema con datos sintéticos de referencia conocida ante la ausencia de datos reales etiquetados.',
     ])
 
 
 def cap3_beneficios(w):
-    w.p('El entrenador obtiene, con una cámara que ya tiene, una medida objetiva de cuándo y cómo se degrada la técnica '
-        'de cada nadador, y qué aspecto conviene trabajar. Al ejecutarse en un portátil, el sistema no depende de '
-        'servicios de pago ni de enviar los vídeos fuera del club. En el plano académico, el trabajo muestra cómo '
-        'aplicar detección de anomalías explicable a un problema deportivo sin etiquetas.')
+    w.p('El entrenador obtiene, con una cámara ya disponible, una medida objetiva de cuándo y cómo se degrada la '
+        'técnica de cada nadador y de qué aspecto conviene trabajar. La ejecución local evita depender de servicios de '
+        'pago y de transferir los vídeos fuera del club. En el plano académico, el trabajo muestra cómo aplicar la '
+        'detección de anomalías explicable a un problema deportivo sin etiquetas y cómo validar un sistema de visión '
+        'por computador cuando los datos anotados son escasos.')
 
+
+# ---------------------------------------------------------------- capítulo 4
 
 def cap4_planificacion(w):
-    w.p('El proyecto se ha desarrollado en cinco fases. La Tabla 2 resume las fechas principales.')
-    w.tabla([
-        ['Fase', 'Periodo', 'Actividades'],
-        ['1. Planteamiento', 'Mayo-julio de 2026', 'Anteproyecto, revisión bibliográfica, grabación de los vídeos de 8 nadadores'],
-        ['2. Primer prototipo', 'Hasta agosto de 2026', 'Pipeline en Google Colab: MoveNet, MotionBERT, variables y clasificación'],
-        ['3. Revisión del director', '1 de septiembre de 2026', 'Indicaciones: SHAP como eje, dos verticales, modos, modelo hidrodinámico, optimizar YOLO'],
-        ['4. Rediseño y validación', 'Septiembre-octubre de 2026', 'Fatiga por ciclo con Isolation Forest y SHAP, comparativa en CPU, paso a ejecución local, vista frontal, análisis por lotes, validación con Aaron'],
-        ['5. Resultados y memoria', 'Hasta el 15 de octubre de 2026', 'Análisis de vídeos largos, 8 nadadores, redacción y entrega'],
-    ], 'Planificación del proyecto.', anchos=[3.5, 4, 8.5])
+    w.p('El proyecto se ha desarrollado en cinco fases entre mayo y octubre de 2026: planteamiento, primer prototipo, '
+        'revisión por parte del director, rediseño y validación, y redacción de la memoria. La revisión del 1 de '
+        'septiembre marcó un punto de inflexión: se reorganizó el sistema en dos verticales, la explicabilidad pasó a ser '
+        'el eje del producto y el modelo hidrodinámico se trasladó al marco teórico. La Figura {fig:gantt} muestra la '
+        'distribución temporal de las tareas.')
+    w.figura(FIG / 'gantt.png', 'Planificación temporal del proyecto (diagrama de Gantt).', clave='gantt')
 
 
 def cap4_solucion(w):
-    w.p('StrokeLab se organiza en dos verticales de IA conectadas por un formato intermedio común: una secuencia de 17 '
-        'puntos articulares por fotograma (Figura 1). La vertical de visión convierte el vídeo en puntos; la vertical '
-        'tabular convierte los puntos en ciclos, variables, eficiencia y fatiga explicada con SHAP.')
-    w.figura(FIG / 'arquitectura.png', 'Arquitectura de StrokeLab: dos verticales de IA.')
-    w.p('El sistema admite tres modos de entrada. El modo **vídeo** recorre las dos verticales. El modo **tabular** recibe '
-        'variables por ciclo ya calculadas (CSV) y entra directamente en la vertical tabular. El modo **audio** '
-        '(sonido de brazadas y respiración) queda como trabajo futuro. Todo se ejecuta en local con un único programa:')
-    w.p('python analizar.py "<vídeo>" --nadador "<nombre>"', alinear='centro', size=9)
+    w.h3('Arquitectura y modos de funcionamiento')
+    w.p('StrokeLab se organiza en dos verticales de inteligencia artificial conectadas por un formato intermedio común: '
+        'una secuencia de 17 puntos articulares por fotograma (Figura {fig:arq}). La vertical de visión transforma el '
+        'vídeo en puntos 2D y 3D; la vertical tabular transforma los puntos en ciclos, variables, eficiencia, inicio de '
+        'la fatiga y su atribución.')
+    w.figura(FIG / 'arquitectura.png', 'Arquitectura de StrokeLab: vertical de visión y vertical tabular.', clave='arq')
+    w.p('El sistema admite tres modos de entrada. El modo **vídeo** recorre las dos verticales. El modo **tabular** '
+        'recibe variables por ciclo ya calculadas y entra directamente en la vertical tabular. El modo **audio** '
+        '(sonido de las brazadas y de la respiración) se plantea como trabajo futuro. Todo el proceso se ejecuta en '
+        'local con un único programa (`analizar.py`) o, para un conjunto de vídeos, con `lote.py`.')
+
+    w.h3('Uso de modelos preentrenados frente a un modelo propio')
+    w.p('No se ha entrenado un modelo de estimación de pose propio por tres razones. En primer lugar, por los datos: '
+        'entrenar desde cero una red de pose requiere decenas de miles de imágenes con las articulaciones anotadas; COCO '
+        'contiene más de 200 000 imágenes y 250 000 personas anotadas [@lin2014], mientras que en este trabajo no se '
+        'dispone de ningún fotograma subacuático anotado. En segundo lugar, por la capacidad de cómputo: el sistema debe '
+        'funcionar en un ordenador personal sin GPU, donde el entrenamiento de una red profunda no es viable en el plazo '
+        'del proyecto. En tercer lugar, por el estado del arte: los modelos preentrenados ya capturan la estructura del '
+        'cuerpo humano y el aprendizaje por transferencia permite reutilizar ese conocimiento [@pan2010].')
+    w.p('La contribución del trabajo no reside en el detector, sino en lo que se construye sobre él: la adaptación a '
+        'la natación (filtros anatómicos, normalización de la pose para el 3D, señales de brazada por vista) y la '
+        'vertical tabular explicable. El ajuste fino con imágenes de natación, sintéticas o propias, se plantea como '
+        'línea futura (Capítulo 7).')
 
     w.h3('Vertical de visión: selección del modelo de pose')
-    w.p('Para optimizar el modelo de visión se midieron los candidatos sobre los mismos fotogramas, repartidos por todo '
-        'el vídeo, con cuatro métricas: fotogramas por segundo en la CPU, tasa de detección, confianza media de los puntos '
-        'y una puntuación combinada (detección × confianza). Al principio se eligió MoveNet por su fluidez en CPU. Al '
-        'medir sobre los vídeos subacuáticos, YOLO detectó al nadador con el doble de confianza (0,73-0,77 frente a '
-        '0,34-0,37) y produjo 15 ciclos válidos frente a 3. Como el vídeo anotado se genera después del análisis, la '
-        'ventaja de fluidez de MoveNet dejó de ser relevante. Se eligió la variante más ligera que no pierde detección: '
-        'YOLOv8n-Pose (Tabla 3). MoveNet y MediaPipe quedan como opciones (`--modelo`); ViTPose se descartó por su coste en CPU.')
+    w.p('Las métricas estándar de estimación de pose (OKS, PCK y mAP, Ecuaciones {eq:oks} a {eq:ap}) exigen anotaciones '
+        'manuales de las articulaciones, de las que no se dispone para vídeo subacuático. Anotar un conjunto '
+        'representativo de fotogramas 5K, con articulaciones ocultas por el propio cuerpo o por la superficie, excede el '
+        'alcance del proyecto. Por ello, la comparación se ha realizado con métricas operativas medibles sin anotación y '
+        'se ha complementado con dos tipos de evidencia:')
+    w.vinetas([
+        '**Rendimiento de referencia publicado** en COCO para cada modelo (Tabla {tab:modelos}), que indica su precisión en condiciones estándar.',
+        '**Validación orientada a la tarea**: el error de la frecuencia de ciclo frente al conteo manual (Tabla {tab:validacion}), que mide de forma indirecta si la calidad de la pose es suficiente para el análisis.',
+    ])
+    w.p('Las métricas operativas, calculadas sobre 15 tramos de 10 fotogramas repartidos por el vídeo, son: '
+        'fotogramas procesados por segundo en CPU (FPS); tasa de detección, definida como el porcentaje de fotogramas '
+        'con al menos cinco articulaciones de confianza superior a 0,30; confianza media de las articulaciones '
+        'detectadas; y una puntuación combinada igual al producto de la tasa de detección y la confianza. MoveNet se '
+        'eligió inicialmente por su fluidez en CPU, pero sobre vídeo subacuático YOLO detectó al nadador con '
+        'aproximadamente el doble de confianza (0,73-0,77 frente a 0,34-0,37) y produjo 15 ciclos válidos frente a 3. '
+        'Como el vídeo anotado se genera tras el análisis, la ventaja de fluidez de MoveNet dejó de ser determinante. '
+        'Se eligió la variante más ligera que no pierde capacidad de detección, YOLOv8n-Pose (Tabla {tab:cpu}); '
+        'ViTPose se descartó por su coste computacional en CPU.')
     w.tabla([
         ['Modelo', 'Parámetros (M)', 'FPS en CPU', 'Detección (%)', 'Confianza', 'Puntuación'],
         ['**YOLOv8n-Pose (elegido)**', '3,3', '6,6', '35,6', '0,76', '0,27'],
         ['YOLO11n-Pose', '2,9', '6,2', '37,6', '0,78', '0,29'],
         ['YOLOv8s-Pose', '11,6', '3,3', '35,6', '0,74', '0,27'],
-        ['MoveNet Lightning', '—', 'no medido en CPU', '35-48 (GPU)', '0,34-0,37 (GPU)', '—'],
-        ['MediaPipe Pose', '—', 'no medido en CPU', '—', '—', '—'],
-    ], 'Comparativa en la CPU del portátil (4 hilos) sobre GX011614 (Aaron, crol, 5120 × 2880). La detección '
-       'ronda el 36 % porque el nadador solo está en cuadro parte del vídeo.', anchos=[4.5, 2.3, 2.2, 2.4, 2.2, 2.4])
-    w.p('YOLOv8n-Pose procesa uno de cada dos fotogramas, reducidos a 1920 px de lado. Las coordenadas se devuelven en '
-        'píxeles del vídeo original. La opción `--girar auto` prueba el fotograma sin girar y girado ±90°, porque YOLO se '
-        'entrenó con personas de pie; en el vídeo de Aaron detectó mejor sin girar.')
+        ['MoveNet Lightning', '—', 'No medido', '35-48 (GPU)', '0,34-0,37 (GPU)', '—'],
+        ['MediaPipe Pose', '—', 'No medido', '—', '—', '—'],
+    ], 'Comparativa en la CPU del ordenador personal (4 hilos) sobre la secuencia GX011614 (5120 × 2880 píxeles). La '
+       'detección ronda el 36 % porque el nadador solo está en el encuadre durante parte del vídeo.',
+        clave='cpu', anchos=[4.5, 2.3, 2.2, 2.4, 2.2, 2.4])
+    w.p('YOLOv8n-Pose procesa uno de cada dos fotogramas, reducidos a 1920 píxeles en su lado mayor; las coordenadas '
+        'se devuelven en píxeles del vídeo original. Como el modelo se entrenó con personas de pie, el sistema prueba '
+        'el fotograma sin girar y girado ±90° y conserva la orientación que mejor detecta; en las secuencias del '
+        'participante P1 la mejor fue la original.')
 
     w.h3('Vertical de visión: limpieza y filtros anatómicos')
     w.vinetas([
-        'Se descartan los puntos con confianza inferior a 0,30; se interpolan los huecos de hasta 0,4 s y se suaviza con un filtro Savitzky-Golay (Savitzky y Golay, 1964).',
-        '**Plausibilidad anatómica.** Bajo el agua, el modelo a veces sitúa la cadera casi sobre el hombro. Se descartan los fotogramas con un tronco fuera de [0,5, 2] veces su mediana, los brazos y piernas de longitud imposible y los codos por debajo de 25°.',
-        '**Tronco girado.** YOLO a veces dibuja un esqueleto vertical bajo la cabeza de un nadador horizontal. Se descartan los fotogramas cuyo tronco se desvía más de 45° de la dirección habitual del nadador. En el vídeo de Aaron eliminó el 11,5 % de los fotogramas y la inclinación media pasó de 42° a 9°.',
+        'Se descartan los puntos con confianza inferior a 0,30, se interpolan los huecos de hasta 0,4 s y cada tramo se suaviza con un filtro de Savitzky-Golay de ventana ≈ 0,2 s y grado 2 [@savitzky1964].',
+        '**Plausibilidad anatómica.** Bajo el agua, el modelo sitúa a veces la cadera casi sobre el hombro. Se descartan los fotogramas cuyo tronco mide fuera de [0,5; 2] veces su mediana, los segmentos de brazo o pierna de longitud imposible y los codos con ángulo inferior a 25°. En vista frontal sin 3D, la escala del cuerpo es el ancho de hombros, porque el tronco aparece acortado por la perspectiva.',
+        '**Tronco girado.** El modelo dibuja en ocasiones un esqueleto vertical bajo la cabeza de un nadador horizontal. Se descartan los fotogramas cuyo tronco se desvía más de 45° de la orientación habitual, calculada como mediana axial. En la secuencia GX011614 se eliminó el 11,5 % de los fotogramas y la inclinación media del tronco pasó de 42° a 9°.',
     ])
 
-    w.h3('Vertical de visión: elevación a 3D con MotionBERT')
-    w.p('La pose 2D se eleva a 3D con MotionBERT-Lite en CPU (unos 25 s por vídeo). Como el modelo se entrenó con '
-        'personas de pie, cada fotograma se centra en la pelvis, se gira hasta dejar el tronco vertical y se normaliza '
-        'por el tamaño del cuerpo; los ángulos articulares no cambian con ese giro. El 3D se mantiene porque hay vídeos '
-        'frontales y de varios ángulos. Su validación se presenta en la Sección 4.6.')
+    w.h3('Vertical de visión: elevación a 3D')
+    w.p('La pose 2D se eleva a 3D con MotionBERT-Lite en CPU (≈ 25 s por vídeo). Como el modelo se entrenó con '
+        'personas de pie [@ionescu2014; @zhu2023], cada fotograma se centra en la pelvis, se gira hasta dejar el tronco '
+        'vertical y se normaliza por el tamaño del cuerpo; los ángulos articulares son invariantes a ese giro. El 3D se '
+        'mantiene porque parte de los vídeos se registró de frente o en diagonal, donde las medidas 2D se deforman por '
+        'la perspectiva. Su evaluación se presenta en la Sección 4.6.')
 
-    w.h3('Vertical tabular: ciclos de brazada')
-    w.p('El análisis se hace por ciclo de brazada, no por fotograma: cada observación tiene sentido biomecánico y se '
-        'evita la correlación entre fotogramas consecutivos. La señal para contar brazadas es la **profundidad de la '
-        'mano más profunda** respecto al eje del cuerpo, en 2D y en longitudes de tronco (Figura 2). Esta elección '
-        'surgió del vídeo real: en vista lateral, el modelo copia el brazo visible en el oculto, así que no se puede '
-        'confiar en distinguir el brazo izquierdo del derecho. El ritmo típico es la mediana de los intervalos entre '
-        'brazadas dentro del rango fisiológico (0,35-1,0 s en crol). Un ciclo son dos brazadas; si se pierde una, el intervalo '
-        'doble se reconoce y se cuenta.')
-    w.figura(FIG / 'aaron_brazadas.png', 'Señal de profundidad de la mano y brazadas detectadas en el vídeo de Aaron (GX011614).')
-    w.p('**Vista frontal.** Cuando el nadador viene hacia la cámara o se le graba desde el borde, la profundidad de la '
-        'mano respecto al cuerpo no se ve. En esa vista (`--vista frontal`) la señal es el recorrido de cada muñeca '
-        'respecto al centro de los hombros, en la dirección en que más se mueve (componente principal, con cada brazo '
-        'centrado) y dividido por el ancho de hombros, que de frente es más estable que el tronco. De frente sí se '
-        'distinguen los dos brazos, así que la asimetría es más fiable que de lado. En esta vista no se calculan la '
-        'inclinación del tronco ni la velocidad, y los ángulos se toman del 3D.')
-    w.p('**Estilo.** El estilo fija cuántas brazadas forman un ciclo y el ritmo plausible (Tabla 4).')
+    w.h3('Vertical tabular: ángulos articulares')
+    w.p('Los ángulos articulares se calculan a partir de tres puntos consecutivos de la cadena cinemática (Ecuación '
+        '{eq:angulo}): por ejemplo, el codo con hombro, codo y muñeca.')
+    w.ecuacion('angulo', ['θ', '=', 'arccos', ('par', ('frac', [('par', ['a', '−', 'b']), '·', ('par', ['c', '−', 'b'])],
+                                                   [('norm', ['a', '−', 'b']), ('norm', ['c', '−', 'b'])]))],
+               'Ángulo articular en el punto b',
+               [('θ', 'ángulo de la articulación (grados, °); 180° corresponde al segmento completamente extendido'),
+                ('*a*, *b*, *c*', 'posiciones 2D o 3D de tres articulaciones consecutivas, con *b* la articulación medida (píxeles o unidades del modelo 3D)')])
+    w.p('Los valores mínimos y máximos de cada ciclo se toman como percentiles 10 y 90: con el mínimo absoluto, un único '
+        'fotograma mal detectado fijaba el valor del ciclo (en GX011614 daba flexiones de rodilla de 12°).')
+
+    w.h3('Vertical tabular: segmentación en ciclos de brazada')
+    w.p('El análisis se realiza por ciclo de brazada y no por fotograma: cada observación tiene significado biomecánico '
+        'y se reduce la fuerte correlación entre fotogramas consecutivos. En **vista lateral**, la señal para contar '
+        'brazadas es la profundidad de la mano más profunda respecto al eje del cuerpo (Ecuación {eq:profundidad}).')
+    w.ecuacion('profundidad', ['p', ('par', 't'), '=', ('sub', 'máx', ['j', '∈', ('llave', 'I, D')]),
+                               ('frac', [('par', [('sub', 'w', 'j'), ('par', 't'), '−', 'h', ('par', 't')]), '·', 'n', ('par', 't')],
+                                ['L', ('par', 't')])],
+               'Señal de profundidad de la mano en vista lateral',
+               [('*p*(*t*)', 'profundidad de la mano en el instante *t*, en longitudes de tronco (adimensional)'),
+                ('*w*_{j}(*t*)', 'posición 2D de la muñeca izquierda (I) o derecha (D) (píxeles)'),
+                ('*h*(*t*)', 'punto medio de los hombros (píxeles)'),
+                ('*n*(*t*)', 'vector unitario perpendicular al eje del tronco orientado hacia el fondo de la piscina'),
+                ('*L*(*t*)', 'longitud del tronco, distancia entre el punto medio de los hombros y el de las caderas (píxeles)')])
+    w.p('En cada brazada la mano desciende por debajo del cuerpo durante la tracción y vuelve a subir, de modo que cada '
+        'máximo de *p*(*t*) corresponde a una brazada (Figura {fig:brazadas}). Se toma la mano más profunda de las dos '
+        'porque, en vista lateral, el modelo de pose asigna casi las mismas coordenadas a ambas muñecas: copia el brazo '
+        'visible en el que queda oculto por el cuerpo. El ritmo típico es la mediana de los intervalos entre brazadas '
+        'consecutivas dentro del rango fisiológico, lo que lo hace robusto a los huecos de detección.')
+    w.figura(FIG / 'aaron_brazadas.png', 'Señal de profundidad de la mano y brazadas detectadas (participante P1, secuencia GX011614).', clave='brazadas')
+    w.p('En **vista frontal** (el nadador se aproxima a la cámara o se le registra desde el borde) la profundidad respecto '
+        'al cuerpo no es observable. La señal pasa a ser el recorrido de cada muñeca respecto al centro de los hombros, '
+        'proyectado sobre la dirección de máximo movimiento, obtenida como primera componente principal (PCA) de las '
+        'posiciones de las muñecas con cada brazo centrado (Ecuación {eq:frontal}).')
+    w.ecuacion('frontal', [('sub', 'q', 'j'), ('par', 't'), '=', ('frac', [('par', [('sub', 'w', 'j'), ('par', 't'), '−', 'h', ('par', 't')]), '·', ('sub', 'u', '1')],
+                                                                ('sub', 'W', 'h'))],
+               'Señal de recorrido de la muñeca en vista frontal',
+               [('*q*_{j}(*t*)', 'recorrido de la muñeca *j* en anchos de hombros (adimensional)'),
+                ('*u*_{1}', 'vector unitario de la primera componente principal del movimiento de las muñecas, orientado hacia abajo en la imagen'),
+                ('*W*_{h}', 'ancho de hombros mediano en el vídeo (píxeles), más estable de frente que el tronco')])
+    w.p('El estilo de nado determina cuántas brazadas forman un ciclo y el rango de tiempo plausible entre brazadas '
+        '(Tabla {tab:estilos}).')
     w.tabla([
         ['Estilo', 'Brazadas por ciclo', 'Tiempo entre brazadas'],
         ['Crol', '2 (brazos alternos)', '0,35-1,0 s'],
         ['Espalda', '2 (brazos alternos)', '0,35-1,2 s'],
-        ['Mariposa', '1 (brazos a la vez)', '0,7-2,0 s'],
-        ['Braza', '1 (brazos a la vez)', '0,7-2,4 s'],
-    ], 'Definición del ciclo según el estilo. Validado con vídeo real solo en crol; el resto, con datos sintéticos.', anchos=[4, 5, 5])
+        ['Mariposa', '1 (brazos simultáneos)', '0,7-2,0 s'],
+        ['Braza', '1 (brazos simultáneos)', '0,7-2,4 s'],
+    ], 'Definición del ciclo de brazada según el estilo de nado.', clave='estilos', anchos=[4, 5, 5])
 
     w.h3('Vertical tabular: variables por ciclo')
+    w.p('Para cada ciclo válido (duración entre 0,6 y 3,0 s y como máximo un 30 % de datos ausentes) se calculan las '
+        'variables de la Tabla {tab:variables}.')
     w.tabla([
-        ['Variable', 'Definición', 'Relación con eficiencia y fatiga'],
+        ['Variable', 'Definición', 'Relación con la eficiencia y la fatiga'],
         ['Frecuencia de ciclo, SR (ciclos/min)', '60 / duración del ciclo', 'Aumenta como compensación con la fatiga'],
-        ['DPS (m) y SI (m²/s)', 'v · duración; v · DPS (requieren calibración)', 'Principales indicadores de eficiencia'],
-        ['Flexión del codo (°), izq. y dcho.', 'Percentil 10 del ángulo hombro-codo-muñeca', 'Eficacia de la fase subacuática'],
+        ['DPS (m) y SI (m²/s)', 'Ecuaciones {eq:vel} y {eq:si}; requieren calibración', 'Principales indicadores de eficiencia'],
+        ['Flexión del codo (°), izquierda y derecha', 'Percentil 10 del ángulo hombro-codo-muñeca', 'Eficacia de la fase subacuática'],
         ['Apertura del hombro (°)', 'Percentil 90 del ángulo codo-hombro-cadera', 'Extensión del brazo en la entrada'],
-        ['Ángulo de cadera (°)', 'Ángulo medio hombro-cadera-rodilla', 'Alineación del cuerpo y arrastre'],
+        ['Ángulo de cadera (°)', 'Media del ángulo hombro-cadera-rodilla', 'Alineación del cuerpo y arrastre'],
         ['Flexión de rodilla (°)', 'Percentil 10 del ángulo cadera-rodilla-tobillo', 'Calidad de la patada'],
-        ['Alcance del brazo (troncos)', 'Recorrido de la muñeca sobre el eje del cuerpo', 'Longitud de la brazada'],
+        ['Alcance del brazo (relativo)', 'Recorrido de la muñeca sobre el eje del cuerpo (lateral) o recorrido *q* (frontal)', 'Longitud de la brazada'],
         ['Asimetría de brazos (%)', '100 · |alcance izq. − dcho.| / media', 'Descompensación lateral'],
-        ['Inclinación del tronco (°)', 'Ángulo cadera-hombro respecto a la horizontal', 'Hundimiento de cadera, más arrastre'],
-        ['Amplitud de patada y patadas por ciclo (pies)', 'Separación de tobillos y número de máximos', 'Contribución y ritmo de la patada'],
-    ], 'Variables calculadas por ciclo de brazada.', anchos=[4.8, 5.4, 5.8])
-    w.p('Los mínimos y máximos de cada ciclo se toman como percentiles 10 y 90: con el mínimo puro, un solo fotograma '
-        'mal detectado fijaba el valor del ciclo (en GX011614 daba rodillas de 12°). Los ángulos y las distancias '
-        'relativas al tronco no necesitan calibración. La velocidad, la DPS y el SI solo se calculan si la cámara es '
-        'fija y se conoce la anchura en metros del encuadre (`--metros-encuadre`).')
+        ['Inclinación del tronco (°)', 'Ángulo cadera-hombro respecto a la horizontal', 'Hundimiento de la cadera'],
+        ['Amplitud de patada y patadas por ciclo', 'Separación de tobillos y número de máximos', 'Contribución y ritmo de la patada'],
+    ], 'Variables calculadas por ciclo de brazada.', clave='variables', anchos=[4.8, 5.4, 5.8])
+    w.p('Los ángulos y las distancias relativas no necesitan calibración. La velocidad, la DPS y el SI solo se calculan '
+        'con cámara fija y anchura del encuadre conocida en metros; la velocidad se estima con la mediana del '
+        'desplazamiento de la cadera entre fotogramas, robusta a los saltos de detección.')
 
     w.h3('Vertical tabular: detección del inicio de la fatiga')
-    w.p('No hay etiquetas de fatiga, así que se plantea como detección de anomalías respecto al estado fresco del propio nadador:')
-    w.vinetas([
-        'Fase base: el primer 30 % de los ciclos (mínimo 5) se toma como técnica fresca; las variables se estandarizan con ella.',
-        'Modelo: Isolation Forest de 500 árboles entrenado solo con la fase base; cada ciclo recibe una puntuación de anomalía.',
-        'Umbral: percentil 95 de las puntuaciones de la fase base.',
-        'Inicio de la fatiga: primer ciclo a partir del cual la media móvil de 3 ciclos supera el umbral durante 3 ciclos seguidos.',
-        'Contraste: PELT (implementación propia, coste L2) sobre la serie de puntuaciones.',
-        'Variables redundantes fuera del modelo: como v = SR · DPS y la potencia es ∝ v³, no se usan ni la velocidad, ni el SI, ni la potencia.',
-    ])
+    w.p('Ante la ausencia de etiquetas, la fatiga se modela como una anomalía respecto al estado inicial del propio '
+        'nadador. El primer 30 % de los ciclos (como mínimo cinco) constituye la fase base, que se supone fresca. Cada '
+        'variable se estandariza con la media y la desviación típica de esa fase (Ecuación {eq:z}).')
+    w.ecuacion('z', [('sub', 'z', 'j'), '=', ('frac', [('sub', 'x', 'j'), '−', ('sub', 'μ', 'j')], ('sub', 'σ', 'j'))],
+               'Estandarización respecto a la fase base',
+               [('*x*_{j}', 'valor de la variable *j* en un ciclo (en sus unidades)'),
+                ('μ_{j}, σ_{j}', 'media y desviación típica de la variable *j* en la fase base (mismas unidades)'),
+                ('*z*_{j}', 'valor estandarizado, adimensional')])
+    w.p('Sobre las variables estandarizadas se entrena un Isolation Forest de 500 árboles solo con la fase base, y cada '
+        'ciclo recibe la puntuación de anomalía de la Ecuación {eq:ifscore}. El umbral es el percentil 95 de las '
+        'puntuaciones de la fase base. El inicio de la fatiga es el primer ciclo posterior a la fase base a partir del '
+        'cual la media móvil de tres ciclos supera el umbral durante al menos tres ciclos consecutivos. Como contraste '
+        'independiente se aplica PELT (Ecuación {eq:pelt}) sobre la serie de puntuaciones; la coincidencia de ambos '
+        'métodos refuerza la detección.')
+    w.p('Para que la atribución sea interpretable se excluyen las variables redundantes: como la velocidad es el '
+        'producto de SR y DPS (Ecuación {eq:vel}) y la potencia depende del cubo de la velocidad (Ecuación '
+        '{eq:potencia}), el modelo no incluye la velocidad, el SI ni la potencia.')
 
-    w.h3('Vertical tabular: explicación con SHAP')
-    w.p('Sobre el Isolation Forest se calculan valores SHAP exactos con TreeSHAP, con el signo cambiado para que un '
-        'valor positivo signifique «empuja hacia la fatiga». En cada ejecución se comprueba que la suma de los SHAP '
-        'se correlaciona positivamente con la puntuación de anomalía. Se generan tres salidas: un gráfico global de qué '
-        'variables explican la fatiga, un gráfico de cascada del ciclo de inicio y un texto para el entrenador con las '
-        'cuatro variables que más contribuyen y su cambio respecto a la fase fresca.')
+    w.h3('Vertical tabular: atribución de la fatiga con SHAP')
+    w.p('Sobre el Isolation Forest se calculan los valores SHAP exactos con TreeSHAP (Ecuaciones {eq:shapley} y '
+        '{eq:shapadd}), con el signo invertido para que un valor positivo indique que la variable aproxima el ciclo a la '
+        'fatiga. En cada ejecución se comprueba que la suma de los valores SHAP está positivamente correlacionada con la '
+        'puntuación de anomalía. El sistema genera una explicación global (variables que más contribuyen a lo largo del '
+        'nado), una explicación local del ciclo de inicio y un texto para el entrenador con las cuatro variables de '
+        'mayor contribución y su cambio respecto a la fase base.')
+
+    w.h3('Vertical tabular: clasificación del estilo de nado')
+    w.p('El estilo se clasifica por ventanas de 4 s (desplazadas cada 2 s) con rasgos que no dependen de la definición '
+        'del ciclo, para no introducir la etiqueta en su cálculo: correlación entre la señal de ambas manos (brazos '
+        'simultáneos o alternos), posición de la nariz respecto a los hombros (decúbito prono o supino), correlación '
+        'entre piernas, flexión máxima de la rodilla, separación de los pies, ondulación vertical de la cadera, periodo '
+        'dominante del movimiento de las manos (obtenido por autocorrelación) y vista. El modelo es un bosque aleatorio '
+        'de 300 árboles [@breiman2001] con imputación de valores ausentes por la mediana, evaluado con validación '
+        'cruzada agrupada por vídeo (*GroupKFold*) para evitar la fuga de datos [@kaufman2012]; el estilo de un vídeo se '
+        'obtiene promediando las probabilidades de sus ventanas. La atribución por estilo se calcula con TreeSHAP.')
+
+    w.h3('Generación de datos sintéticos')
+    w.p('Para evaluar el sistema con una referencia conocida se ha desarrollado un generador de datos sintéticos '
+        '(`strokelab/simulador.py`). Produce los 17 puntos COCO de un nadador en vista lateral (cámara fija que abarca '
+        'los 25 m de la piscina) o frontal, en cualquiera de los cuatro estilos. Brazos y piernas se calculan con '
+        'cinemática inversa de dos segmentos para respetar las longitudes anatómicas. A partir de un instante '
+        'programado, una función logística introduce la fatiga: aumenta la frecuencia de ciclo, disminuyen la velocidad, '
+        'la distancia por ciclo y el alcance, se flexiona más el codo, se hunde la cadera y aparece asimetría. Se añaden '
+        'ruido de posición, pérdida aleatoria de puntos, huecos de detección, virajes en las paredes y, opcionalmente, la '
+        'copia del brazo oculto observada en los datos reales. El generador devuelve la referencia (frecuencia, '
+        'velocidad y distancia por ciclo en cada instante), lo que permite medir el error del sistema.')
 
     w.h3('Análisis por sesión, por lotes y vídeo anotado')
-    w.p('Cada clip de GoPro suele recoger una sola pasada (10-20 s de nado), demasiado poco para ver fatiga. `sesion.py` '
-        'une los ciclos de varias pasadas de un mismo nadador en orden de grabación y aplica el mismo modelo; indica en '
-        'qué pasada y en qué segundo del clip aparece la fatiga. `lote.py` analiza todos los vídeos de una carpeta a '
-        'partir de una lista editable (nadador, estilo, vista y sesión), une las sesiones y se puede interrumpir y '
-        'reanudar; cada resultado guarda la versión del análisis y se rehace si el código cambia. `informe_nadador.py` '
-        'resume un nadador y un estilo: tiempo analizable y ciclos por clip y medidas por ciclo. El vídeo anotado '
-        '(Figura 3) muestra el estado FRESCO o FATIGA, el ciclo, la frecuencia y una barra temporal con la anomalía de '
-        'cada ciclo, el umbral y el inicio de la fatiga. Los ángulos quedan en las tablas (`--panel completo` los muestra '
-        'en el vídeo).')
-    w.p('El estilo se clasifica con un bosque aleatorio sobre rasgos por ventana de 4 s, con validación agrupada por '
-        'vídeo (GroupKFold); el 99,99 % de precisión de una versión anterior se debía a fuga de datos entre fotogramas '
-        'de un mismo vídeo. Sus resultados se presentan en la Sección 4.6.')
-    w.figura(FIG / 'panel_video.png', 'Panel del vídeo anotado (nadador sintético, t = 70 s; la fatiga empieza en 51,9 s).', ancho_cm=13)
+    w.p('Cada secuencia de la cámara subacuática suele recoger una sola pasada de 10-20 s, insuficiente para observar '
+        'fatiga. `sesion.py` concatena los ciclos de varias pasadas de un mismo nadador en orden de registro y aplica el '
+        'mismo modelo. `lote.py` analiza todos los vídeos de una carpeta a partir de una lista editable (nadador, '
+        'estilo, vista y sesión), puede reanudarse y rehace los análisis obtenidos con una versión anterior del código. '
+        '`informe_nadador.py` resume un nadador y un estilo. El vídeo anotado (Figura {fig:panel}) muestra el estado '
+        'FRESCO o FATIGA, el ciclo, la frecuencia y una barra temporal con la puntuación de cada ciclo, el umbral y el '
+        'inicio de la fatiga.')
+    w.figura(FIG / 'panel_video.png', 'Panel del vídeo anotado sobre datos sintéticos (t = 70 s; inicio de la fatiga en t = 51,9 s).', clave='panel', ancho_cm=13)
     w.p('Herramientas: Python 3, Ultralytics (YOLO), PyTorch (MotionBERT), OpenCV, NumPy, pandas, scikit-learn, shap, '
         'Matplotlib y Git. El código incluye pruebas automáticas que se ejecutan antes de cada cambio (Anexo C).')
 
 
 def cap4_recursos(w):
     w.vinetas([
-        'Portátil personal con Windows y CPU de 4 hilos, sin GPU.',
-        'Cámara subacuática GoPro (vídeo 5K a 30 fps) y teléfono móvil (1080 × 1920, 60 fps).',
-        'Vídeos de 8 nadadores de un club (crol, espalda, braza y mariposa), usados solo con fines académicos.',
-        'Software libre: Python y librerías de código abierto; pesos preentrenados públicos de YOLOv8 y MotionBERT.',
-        'Google Colab (gratuito) en la fase de prototipo; Google Drive para compartir vídeos y resultados.',
+        'Ordenador personal con Windows y CPU de 4 hilos, sin GPU.',
+        'Cámara subacuática GoPro (vídeo 5K a 30 fps) y teléfono móvil (1080 × 1920 píxeles, 60 fps).',
+        'Vídeos de ocho nadadores de un club en los cuatro estilos, empleados exclusivamente con fines académicos.',
+        'Software libre: Python y bibliotecas de código abierto; pesos preentrenados públicos de YOLOv8 y MotionBERT.',
+        'Google Colab (gratuito) en la fase de prototipo y Google Drive para el intercambio de vídeos y resultados.',
     ])
 
 
 def cap4_presupuesto(w):
-    w.p('El presupuesto valora el tiempo invertido y el equipo utilizado, aunque no haya sido necesario comprarlo. '
-        'Todo el software es libre, por lo que su coste es 0 €.')
+    w.p('El presupuesto valora el tiempo invertido y el equipo utilizado, aunque no haya sido necesario adquirirlo. '
+        'Todo el software es libre, por lo que su coste es nulo.').paragraph_format.keep_with_next = True
 
 
 def cap4_viabilidad(w):
-    w.p('El sistema es técnicamente viable en el equipo de un club: funciona en un portátil sin GPU y procesa un vídeo '
-        '5K de 46 s en unos 9 minutos (288 s de pose, 25 s de 3D y unos 205 s del vídeo anotado), sin coste de licencias. '
-        'La principal condición es la grabación: hace falta al menos un minuto de nado continuo, o varias pasadas de una '
-        'misma sesión, para que la fatiga pueda aparecer. Los vídeos deben tratarse con el consentimiento de los nadadores.')
+    w.p('El sistema es técnicamente viable con el equipo de un club: funciona en un ordenador personal sin GPU y '
+        'procesa un vídeo 5K de 46 s en unos 9 minutos (288 s de estimación de pose, 25 s de elevación 3D y unos 205 s '
+        'de vídeo anotado), sin coste de licencias. La principal condición es el protocolo de grabación: se necesita al '
+        'menos un minuto de nado continuo, o varias pasadas de una misma sesión, para que la fatiga pueda manifestarse. '
+        'El uso de los vídeos requiere el consentimiento de los nadadores.')
 
 
 def cap4_resultados(w):
-    w.h3('Validación del método con un nadador sintético')
-    w.p('Antes del vídeo real, el método se validó con un nadador sintético de 90 s a 30 fps con una fatiga progresiva '
-        'centrada en t = 55 s (más frecuencia, menos alcance, más flexión del codo, más inclinación y asimetría creciente). '
-        'Se añadieron ruido, puntos de baja confianza, un hueco de detección, caderas sobre el hombro, esqueletos de pie y '
-        'confusiones entre brazos. Resultados: 67 ciclos válidos; **inicio de la fatiga en el ciclo 35 (t = 51,9 s)**, '
-        'dentro de la transición introducida; PELT sitúa el cambio en el ciclo 33 (t = 49,4 s); la correlación de '
-        'comprobación del signo de SHAP es 0,999 (Figuras 4 a 6).')
-    w.figura(FIG / 'sintetico_fatiga_timeline.png', 'Nadador sintético: anomalía por ciclo, umbral e inicio de la fatiga.')
-    w.p('SHAP identifica como causas variables que se alteraron: alcance del brazo derecho (1,78 → 1,05 troncos), '
-        'asimetría de brazos (2 % → 23 %) y amplitud de patada (0,31 → 0,21 troncos).')
-    w.figura(FIG / 'sintetico_shap_summary.png', 'SHAP global: variables que explican la fatiga del nadador sintético.', ancho_cm=12)
-    w.figura(FIG / 'sintetico_shap_waterfall_inicio.png', 'SHAP local: por qué el ciclo 35 ya es fatiga.', ancho_cm=12)
-    w.p('Con un nadador sintético visto de frente (`tests/test_frontal.py`), la frecuencia estimada es 48,9 ciclos/min '
-        '(valor real ≈ 50), el inicio de la fatiga se sitúa en t = 47,5 s y SHAP señala el alcance del brazo, la '
-        'frecuencia y la asimetría, que son las variables alteradas.')
+    w.h3('Métricas de evaluación')
+    w.p('La exactitud de las magnitudes estimadas se mide con el error relativo frente a una referencia (Ecuación '
+        '{eq:error}), que en los datos reales es el conteo manual y en los sintéticos el valor programado.')
+    w.ecuacion('error', ['ε', '=', ('frac', ('bar', [('acc', 'x', '̂'), '−', 'x']), 'x'), '·', '100'],
+               'Error relativo de una magnitud estimada',
+               [('ε', 'error relativo (%)'), ('*x̂*', 'valor estimado por el sistema'), ('*x*', 'valor de referencia, en las mismas unidades')])
+    w.p('La variabilidad de una medida entre ciclos se expresa con el coeficiente de variación (Ecuación {eq:cv}). La '
+        'clasificación del estilo se evalúa con la exactitud (proporción de aciertos) por ventana y por vídeo, y con la '
+        'matriz de confusión.')
+    w.ecuacion('cv', ['CV', '=', ('frac', 'σ', 'μ'), '·', '100'], 'Coeficiente de variación',
+               [('CV', 'coeficiente de variación (%)'), ('μ, σ', 'media y desviación típica de la medida entre ciclos (en sus unidades)')])
 
-    w.h3('Caso de demostración con un nadador simulado')
-    w.p('Para mostrar todas las capacidades con una verdad conocida se generó un **nadador ficticio** (no son datos '
-        'reales; `caso_ficticio.py`): crol durante 120 s, con cámara fija que cubre los 25 m (velocidad calibrada) y '
-        'fatiga programada que sube del 10 % al 90 % entre los segundos 59 y 81 (más frecuencia, menos velocidad y '
-        'distancia por ciclo, menos alcance, más flexión del codo, cadera hundida y asimetría). Se analizó en vista '
-        'lateral y frontal (Tabla 6).')
+    w.h3('Validación con datos sintéticos: secuencia de 90 s')
+    w.p('Se generó una secuencia sintética de crol de 90 s a 30 fps con fatiga progresiva centrada en t = 55 s y con los '
+        'errores típicos del vídeo real: ruido, puntos de baja confianza, un hueco de detección, caderas sobre el hombro, '
+        'esqueletos verticales y confusiones entre brazos. El sistema obtuvo 67 ciclos válidos y situó el **inicio de la '
+        'fatiga en el ciclo 35 (t = 51,9 s)**, dentro de la transición introducida; PELT situó el cambio en el ciclo 33 '
+        '(t = 49,4 s) y la correlación de comprobación del signo de SHAP fue 0,999 (Figuras {fig:sint_t} a {fig:sint_w}).')
+    w.figura(FIG / 'sintetico_fatiga_timeline.png', 'Datos sintéticos: puntuación de anomalía por ciclo, umbral e inicio de la fatiga.', clave='sint_t')
+    w.p('La atribución SHAP identifica como causas variables efectivamente alteradas: el alcance del brazo derecho '
+        '(1,78 → 1,05 troncos), la asimetría de brazos (2 % → 23 %) y la amplitud de patada (0,31 → 0,21 troncos).')
+    w.figura(FIG / 'sintetico_shap_summary.png', 'Datos sintéticos: atribución SHAP global de la puntuación de fatiga.', clave='sint_s', ancho_cm=12)
+    w.figura(FIG / 'sintetico_shap_waterfall_inicio.png', 'Datos sintéticos: atribución SHAP local en el ciclo de inicio de la fatiga.', clave='sint_w', ancho_cm=12)
+
+    w.h3('Validación con datos sintéticos: caso completo con referencia conocida')
+    w.p('Para evaluar todas las capacidades se generó una secuencia sintética de crol de 120 s con cámara fija que '
+        'abarca los 25 m (velocidad calibrada) y fatiga programada que pasa del 10 % al 90 % de su intensidad entre '
+        't = 59 s y t = 81 s. Se analizó en vista lateral y frontal (Tabla {tab:caso}).')
     w.tabla([
         ['Medida', 'Vista lateral', 'Vista frontal'],
         ['Ciclos analizados', '91', '98'],
-        ['Error mediano de la frecuencia de ciclo', '4,7 %', '0,3 %'],
-        ['Error mediano de la velocidad', '1,3 %', 'no medible de frente'],
-        ['Error mediano de la distancia por ciclo', '4,3 %', 'no medible de frente'],
+        ['Error relativo mediano de la frecuencia de ciclo', '4,7 %', '0,3 %'],
+        ['Error relativo mediano de la velocidad', '1,3 %', 'No observable de frente'],
+        ['Error relativo mediano de la distancia por ciclo', '4,3 %', 'No observable de frente'],
         ['Inicio de la fatiga detectado', 't = 57,3 s (ciclo 42)', 't = 57,8 s (ciclo 45)'],
-        ['Causas principales según SHAP', 'apertura del hombro (173° → 151°), asimetría de brazos (3 % → 24 %), inclinación del tronco (2,7° → 7,9°)',
-         'frecuencia (46,2 → 52,9 ciclos/min), asimetría de brazos (1 % → 23 %), alcance del brazo (−32 %)'],
-        ['Estilo predicho', 'crol (98 %)', 'crol (95 %)'],
-    ], 'Caso ficticio: resultados del sistema frente a la verdad de la simulación.', anchos=[5, 5.5, 5.5])
-    w.p('El sistema detecta la fatiga al empezar la transición programada (aviso temprano, cuando el cambio aún es '
-        'pequeño) y SHAP señala variables que de verdad se alteraron. Velocidad, frecuencia y distancia por ciclo siguen '
-        'a la verdad (Figura 7). De frente no se mide la velocidad ni la inclinación, y los ángulos requieren el 3D.')
-    w.figura(FIG / 'caso_verdad_vs_sistema.png', 'Caso ficticio (lateral): velocidad, frecuencia y distancia por ciclo medidas frente a la verdad.')
-    w.p('**Clasificación del estilo.** Clasificador por ventanas de 4 s (bosque aleatorio) con rasgos que no dependen '
-        'del estilo: brazos a la vez o alternos, posición de la nariz (boca abajo o arriba), piernas juntas o alternas, '
-        'flexión máxima de rodilla, separación de pies, ondulación de la cadera y periodo de las manos. Con 64 vídeos '
-        'simulados (4 estilos × 2 vistas × 8 nadadores) y validación agrupada por vídeo (GroupKFold) clasifica bien el '
-        '100 % de los vídeos; SHAP muestra que la nariz separa crol y espalda, los brazos a la vez la mariposa y las '
-        'piernas juntas la braza (Figura 8). Aplicado a los tres clips reales de Aaron no acierta: en vídeo real el '
-        'modelo de pose copia brazos y piernas y la posición de la cabeza es menos marcada, así que hace falta '
-        'entrenarlo con vídeos reales etiquetados de los cuatro estilos.')
-    w.figura(FIG / 'caso_estilo.png', 'Clasificación del estilo en vídeos simulados: matriz de confusión y SHAP por estilo.')
+        ['Variables con mayor atribución SHAP', 'Apertura del hombro (173° → 151°), asimetría de brazos (3 % → 24 %), inclinación del tronco (2,7° → 7,9°)',
+         'Frecuencia de ciclo (46,2 → 52,9 ciclos/min), asimetría de brazos (1 % → 23 %), alcance del brazo (−32 %)'],
+        ['Estilo predicho (probabilidad)', 'Crol (0,98)', 'Crol (0,95)'],
+    ], 'Datos sintéticos: estimaciones del sistema frente a la referencia programada.', clave='caso', anchos=[5, 5.5, 5.5])
+    w.p('El inicio de la fatiga se detecta al comienzo de la transición programada, cuando el cambio es todavía '
+        'pequeño, lo que equivale a un aviso temprano. Las variables con mayor atribución son variables efectivamente '
+        'alteradas en la simulación. La velocidad, la frecuencia y la distancia por ciclo estimadas siguen a la '
+        'referencia a lo largo de toda la secuencia (Figura {fig:caso}). En vista frontal el error de la frecuencia es '
+        'menor porque la señal sintética está libre de oclusiones; este valor no debe extrapolarse a datos reales.')
+    w.figura(FIG / 'caso_verdad_vs_sistema.png', 'Datos sintéticos (vista lateral): velocidad, frecuencia y distancia por ciclo estimadas frente a la referencia.', clave='caso')
 
-    w.h3('Vídeo real: análisis completo de Aaron en crol')
-    w.p('Se analizaron con `lote.py` los cinco clips de Aaron en crol: tres de GoPro bajo el agua en vista lateral '
-        '(5120 × 2880, 30 fps) y dos de móvil en vista frontal (1080 × 1920, 60 fps). La vista frontal se identificó en '
-        'los datos: en los clips de móvil el tronco aparece casi vertical en la imagen (78-102°) y mide 60-100 píxeles, '
-        'frente a 8-10° en la GoPro, donde Aaron cruza la imagen de lado a lado (Tabla 7 y Figura 9).')
+    w.h3('Clasificación del estilo de nado')
+    w.p('El clasificador se evaluó con 64 vídeos sintéticos (4 estilos × 2 vistas × 8 nadadores con parámetros '
+        'aleatorios), que suman 1216 ventanas, mediante validación cruzada agrupada por vídeo de cinco particiones. La '
+        'exactitud fue del 99,8 % por ventana y del 100 % por vídeo (Figura {fig:estilo}). La atribución SHAP muestra que '
+        'la posición de la nariz distingue el crol de la espalda, la simultaneidad de los brazos caracteriza la mariposa '
+        'y la correlación entre piernas, la braza, lo que coincide con la definición biomecánica de cada estilo.')
+    w.figura(FIG / 'caso_estilo.png', 'Clasificación del estilo en datos sintéticos: matriz de confusión por vídeo y atribución SHAP por estilo.', clave='estilo')
+    w.p('Aplicado a las tres secuencias reales del participante P1, el clasificador no identifica correctamente el '
+        'estilo. En vídeo real, el modelo de pose copia también las piernas (correlación entre piernas de 0,8-0,99) y la '
+        'posición de la cabeza es menos marcada que en la simulación. El resultado pone de manifiesto la distancia entre '
+        'el dominio sintético y el real (*domain gap*) y la necesidad de entrenar con vídeos reales etiquetados.')
+
+    w.h3('Datos reales: participante P1, crol')
+    w.p('Se analizaron con `lote.py` las cinco secuencias disponibles del participante P1 en crol: tres de cámara '
+        'subacuática en vista lateral (5120 × 2880 píxeles, 30 fps) y dos de teléfono móvil en vista frontal '
+        '(1080 × 1920 píxeles, 60 fps). La vista frontal se identificó en los propios datos: en las secuencias de móvil '
+        'el tronco aparece casi vertical en la imagen (78-102°) y mide 60-100 píxeles, frente a 8-10° en la cámara '
+        'subacuática (Tabla {tab:p1} y Figura {fig:p1clips}).')
     w.tabla([
-        ['Clip', 'Vista', 'Duración', 'Analizable', 'Ciclos', 'Ritmo (ciclos/min)'],
-        ['GX011614', 'lateral', '46,2 s', '12,7 s', '9', '50,5'],
-        ['GX011617', 'lateral', '29,0 s', '7,0 s', '0', '—'],
-        ['GX011618', 'lateral', '28,2 s', '8,9 s', '1', '66,6'],
-        ['IMG_7207', 'frontal', '6,0 s', '5,1 s', '3', '73,9'],
-        ['IMG_7215', 'frontal', '9,4 s', '4,8 s', '4', '55,2'],
+        ['Secuencia', 'Vista', 'Duración', 'Analizable', 'Ciclos', 'Frecuencia (ciclos/min)'],
+        ['GX011614', 'Lateral', '46,2 s', '12,7 s', '9', '50,5'],
+        ['GX011617', 'Lateral', '29,0 s', '7,0 s', '0', '—'],
+        ['GX011618', 'Lateral', '28,2 s', '8,9 s', '1', '66,6'],
+        ['IMG_7207', 'Frontal', '6,0 s', '5,1 s', '3', '73,9'],
+        ['IMG_7215', 'Frontal', '9,4 s', '4,8 s', '4', '55,2'],
         ['**Total**', '', '**118,8 s**', '**38,5 s (32 %)**', '**17**', ''],
-    ], 'Clips de Aaron en crol: tiempo analizable y ciclos válidos.', anchos=[2.8, 2.2, 2.4, 3.2, 2, 3.4])
-    w.figura(FIG / 'aaron_clips.png', 'Aaron (crol): tiempo analizable y ciclos válidos por clip.', ancho_cm=14)
-    w.p('El factor limitante es la detección: en GX011617 Aaron está en cuadro unos 19 s, pero el modelo de pose lo '
-        'detecta en unos 5 s, la señal de la mano queda fragmentada y no se forman ciclos. La opción `--imgsz 1280` y '
-        'el programa `probar_deteccion.py` permiten comprobar si una entrada mayor de la red recupera fotogramas; '
-        'su evaluación sistemática queda como trabajo futuro.')
+    ], 'Participante P1 (crol): tiempo analizable y ciclos válidos por secuencia.', clave='p1', anchos=[2.8, 2.2, 2.4, 3.2, 2, 3.4])
+    w.figura(FIG / 'aaron_clips.png', 'Participante P1 (crol): tiempo analizable y ciclos válidos por secuencia.', clave='p1clips', ancho_cm=14)
+    w.p('El factor limitante es la detección: en GX011617 el nadador permanece en el encuadre unos 19 s, pero el modelo '
+        'lo detecta durante unos 5 s, la señal de la mano queda fragmentada y no se forman ciclos. Las opciones '
+        '`--imgsz 1280` y `probar_deteccion.py` permiten evaluar si una entrada de mayor resolución recupera '
+        'fotogramas; su estudio sistemático queda como trabajo futuro.')
 
-    w.h3('Validación del conteo de brazadas frente a la cuenta manual')
+    w.h3('Validación de la frecuencia de ciclo frente al conteo manual')
     w.tabla([
-        ['Clip', 'Vista', 'Cuenta manual', 'Sistema', 'Error', 'Ciclos encontrados'],
-        ['GX011614 (s 30-40)', 'lateral', '54 ciclos/min (9 ciclos en 10 s)', '50,5 ciclos/min', '−6,5 %', '—'],
-        ['IMG_7207 (clip entero)', 'frontal', '80 ciclos/min (8 en 6,0 s)', '73,9 ciclos/min', '−7,6 %', '3 de 8'],
-        ['IMG_7215 (clip entero)', 'frontal', '51 ciclos/min (8 en 9,4 s)', '55,2 ciclos/min', '+8,2 %', '4 de 8'],
-    ], 'Validación frente a la cuenta manual de la autora. En GX011614, versiones previas del método, que distinguían '
-       'brazo izquierdo y derecho, daban 79 y 34 ciclos/min.', anchos=[3.6, 1.9, 4, 2.7, 1.6, 2.2])
-    w.p('El ritmo se mide con un error de entre el 6,5 % y el 8,2 % en las dos vistas, y el sistema distingue ritmos muy '
-        'distintos del mismo nadador (80 y 51 ciclos/min). La cobertura es baja: de frente encuentra entre el 38 % y el '
-        '50 % de los ciclos, por la detección parcial. Las tres comparaciones quedan como pruebas automáticas del código.')
+        ['Secuencia', 'Vista', 'Conteo manual', 'Sistema', 'Error relativo', 'Ciclos detectados'],
+        ['GX011614 (s 30-40)', 'Lateral', '54 ciclos/min (9 ciclos en 10 s)', '50,5 ciclos/min', '6,5 %', '—'],
+        ['IMG_7207 (completa)', 'Frontal', '80 ciclos/min (8 en 6,0 s)', '73,9 ciclos/min', '7,6 %', '3 de 8'],
+        ['IMG_7215 (completa)', 'Frontal', '51 ciclos/min (8 en 9,4 s)', '55,2 ciclos/min', '8,2 %', '4 de 8'],
+    ], 'Frecuencia de ciclo estimada frente al conteo manual. En GX011614, las versiones previas del método, que '
+       'distinguían el brazo izquierdo del derecho, daban 79 y 34 ciclos/min.', clave='validacion', anchos=[3.6, 1.9, 4, 2.7, 2, 2.2])
+    w.p('El error relativo de la frecuencia de ciclo (Ecuación {eq:error}) se sitúa entre el 6,5 % y el 8,2 % en las dos '
+        'vistas, y el sistema distingue ritmos muy distintos de un mismo nadador (80 y 51 ciclos/min). La cobertura es '
+        'baja: de frente se detecta entre el 38 % y el 50 % de los ciclos, a causa de la detección parcial. Las tres '
+        'comparaciones forman parte de las pruebas automáticas del código.')
 
-    w.h3('Medidas de la técnica de Aaron')
-    w.p('Las medidas se resumen solo con los clips laterales, porque los ángulos 2D de vistas distintas no son '
-        'comparables (Tabla 9 y Figura 10). Izquierda y derecha se promedian, porque en vista lateral el modelo copia el '
-        'brazo visible en el oculto.')
+    w.h3('Medidas de la técnica del participante P1')
+    w.p('Las medidas se resumen solo con las secuencias laterales, porque los ángulos 2D de vistas distintas no son '
+        'comparables (Tabla {tab:medidas} y Figura {fig:p1var}). Los valores izquierdo y derecho se promedian, porque en '
+        'vista lateral el modelo copia el brazo visible en el oculto.')
     w.tabla([
-        ['Medida', 'Media', 'Desviación', 'Variación (CV)'],
-        ['Frecuencia de ciclo', '52,1 ciclos/min', '11,6', '22 %'],
+        ['Medida', 'Media', 'Desviación típica', 'CV'],
+        ['Frecuencia de ciclo', '52,1 ciclos/min', '11,6 ciclos/min', '22 %'],
         ['Flexión del codo en el agarre', '125°', '16,6°', '13 %'],
         ['Apertura del hombro', '134°', '39,7°', '30 %'],
         ['Ángulo de cadera', '166°', '14,6°', '9 %'],
         ['Flexión de rodilla', '149°', '31,5°', '21 %'],
-        ['Alcance del brazo', '2,08 troncos', '0,63', '30 %'],
+        ['Alcance del brazo', '2,08 troncos', '0,63 troncos', '30 %'],
         ['Inclinación del tronco', '8,5°', '4,1°', '49 %'],
-        ['Amplitud de patada', '0,49 troncos', '0,29', '59 %'],
-    ], 'Medidas por ciclo de Aaron en crol (10 ciclos laterales de GoPro).', anchos=[5.5, 3.5, 3, 3])
-    w.figura(FIG / 'aaron_variables.png', 'Aaron (crol): valor de cada ciclo y mediana por clip.')
-    w.p('La cadera a 166° y el tronco a 8,5° describen un cuerpo alineado y casi horizontal. Las variables de las '
-        'piernas (rodilla y patada) son las más variables entre ciclos, lo que coincide con que son las peor detectadas '
-        'bajo el agua; no deben leerse como cambios de técnica sin más datos.')
+        ['Amplitud de patada', '0,49 troncos', '0,29 troncos', '59 %'],
+    ], 'Medidas por ciclo del participante P1 en crol (10 ciclos laterales). CV: coeficiente de variación (Ecuación {eq:cv}).',
+        clave='medidas', anchos=[5.5, 3.5, 3.5, 2.5])
+    w.figura(FIG / 'aaron_variables.png', 'Participante P1 (crol): valor de cada ciclo y mediana por secuencia.', clave='p1var')
+    w.p('Un ángulo de cadera de 166° y una inclinación del tronco de 8,5° describen un cuerpo alineado y casi '
+        'horizontal. Las variables de la extremidad inferior presentan la mayor variación entre ciclos (CV del 21 % al '
+        '59 %), lo que coincide con que son las peor detectadas bajo el agua; sin más datos no deben interpretarse como '
+        'cambios técnicos.')
 
-    w.h3('Fatiga en vídeo real')
-    w.p('La sesión de GoPro reúne 10 ciclos y **no se detecta fatiga sostenida**; la del móvil reúne 7, por debajo del '
-        'mínimo de 8 que exige el método. Es el resultado esperado: son pasadas de 10-20 s y el sistema no da una falsa '
-        'alarma. En GX011614, sin fatiga, los valores SHAP son pequeños (≤ 0,1, frente a 0,4-0,6 en el nadador '
-        'sintético) y se concentran en las piernas: explican la variabilidad de la detección, no un cambio técnico. '
-        'Para localizar la fatiga en vídeo real hacen falta al menos unos 20 ciclos seguidos (25-30 s de nado continuo); '
-        'el caso simulado muestra lo que el sistema entrega en esa situación.')
+    w.h3('Fatiga en datos reales')
+    w.p('La sesión de cámara subacuática reúne 10 ciclos y **no se detecta fatiga sostenida**; la de móvil reúne 7, '
+        'por debajo del mínimo de 8 que exige el método. Es el resultado esperado en pasadas de 10-20 s, y el sistema no '
+        'genera falsas alarmas. En GX011614, sin fatiga, los valores SHAP son pequeños (≤ 0,1, frente a 0,4-0,6 en los '
+        'datos sintéticos) y se concentran en la extremidad inferior: describen la variabilidad de la detección, no un '
+        'cambio técnico. La localización de la fatiga en vídeo real requiere al menos unos 20 ciclos consecutivos '
+        '(25-30 s de nado continuo); los datos sintéticos muestran el resultado que el sistema entrega en esa situación.')
 
-    w.h3('Validación del 3D frente al 2D')
+    w.h3('Evaluación de la reconstrucción 3D frente a la 2D')
     w.tabla([
         ['Ángulo', 'Mediana 2D', 'Mediana 3D', 'Correlación'],
         ['Codo izq. / dcho.', '156° / 144°', '158° / 143°', '0,51 / −0,08'],
         ['Hombro izq. / dcho.', '90° / 81°', '89° / 92°', '0,69 / 0,71'],
         ['Cadera izq. / dcha.', '171° / 172°', '160° / 164°', '0,58 / 0,69'],
         ['Rodilla izq. / dcha.', '173° / 173°', '107° / 106°', '0,01 / −0,04'],
-    ], 'Ángulos 2D frente a 3D (MotionBERT) en la vista lateral de Aaron (85 fotogramas).', anchos=[4.5, 3.8, 3.8, 3.9])
-    w.p('MotionBERT reconstruye mal las piernas de un nadador horizontal: coloca la rodilla a 107°, como si estuviera '
-        'sentado, cuando la imagen la muestra casi extendida (173°), y comprime el rango del hombro. Por eso, en vista '
-        'lateral los ángulos se calculan en 2D y el 3D se guarda aparte; en las vistas frontal y oblicua se usa el 3D.')
+    ], 'Ángulos 2D frente a 3D en la vista lateral de la secuencia GX011614 (85 fotogramas).', clave='tresd', anchos=[4.5, 3.8, 3.8, 3.9])
+    w.p('La reconstrucción 3D es coherente con la 2D en codo y cadera, pero no en la rodilla: sitúa la articulación en '
+        '107°, como en una postura sentada, cuando la imagen la muestra casi extendida (173°), y comprime el rango del '
+        'hombro. Por ello, en vista lateral los ángulos se calculan en 2D y el 3D se conserva por separado; en las '
+        'vistas frontal y oblicua se emplea el 3D.')
 
+
+# ---------------------------------------------------------------- capítulo 5
 
 def cap5_discusion(w):
-    w.p('Este capítulo compara el planteamiento inicial con el final y discute las decisiones y sus limitaciones.')
+    w.p('Este capítulo analiza el grado de cumplimiento de las indicaciones recibidas, los cambios respecto al '
+        'planteamiento inicial, las decisiones metodológicas y las limitaciones del trabajo.')
     w.h2('Respuesta a las indicaciones del director')
     w.tabla([
-        ['Indicación', 'Cómo se ha incorporado'],
-        ['La explicabilidad (SHAP) es lo más importante', 'SHAP es la salida principal: global, local y texto para el entrenador'],
-        ['Dos verticales de IA: visión y tabular', 'Visión (pose 2D y 3D) y tabular (variables, fatiga y SHAP) con un formato intermedio común'],
-        ['Modos diferenciados', 'Vídeo y tabular implementados; audio como trabajo futuro'],
-        ['Modelo hidrodinámico como conocimiento previo', 'En el Capítulo 2; la potencia no es variable de los modelos'],
-        ['Optimizar YOLO (MoveNet, ViTPose)', 'Comparativa en CPU; elegido YOLOv8n; MoveNet y MediaPipe como opción; ViTPose, trabajo futuro'],
-    ], 'Indicaciones del director y su implementación.', anchos=[6, 10])
+        ['Indicación', 'Implementación'],
+        ['La explicabilidad (SHAP) es el eje del producto', 'Atribución global, local y textual de la fatiga y del estilo'],
+        ['Dos verticales de IA: visión y datos tabulares', 'Visión (pose 2D y 3D) y tabular (variables, fatiga, estilo y SHAP) con un formato intermedio común'],
+        ['Modos diferenciados', 'Modos vídeo y tabular implementados; audio como trabajo futuro'],
+        ['Modelo hidrodinámico como conocimiento previo', 'Presentado en el Capítulo 2; la potencia no es variable de los modelos'],
+        ['Optimizar el modelo de visión (MoveNet, ViTPose)', 'Comparativa en CPU; elegido YOLOv8n; MoveNet y MediaPipe como opciones; ViTPose como trabajo futuro'],
+    ], 'Indicaciones del director y su implementación.', clave='indicaciones', anchos=[6, 10])
     w.h2('Cambios respecto al planteamiento inicial')
     w.vinetas([
-        '**Solo vista lateral → lateral y frontal.** Parte de los vídeos se grabó de frente, donde la profundidad de la mano no se ve; se añadió una señal propia para esa vista.',
-        '**MoveNet → YOLOv8n.** MoveNet se eligió por fluidez, pero la comparativa sobre vídeo subacuático mostró el doble de confianza con YOLO y cinco veces más ciclos válidos.',
-        '**Sensores inerciales (IMU) → solo vídeo.** No se dispuso de sensores; la fusión con IMU queda como trabajo futuro.',
-        '**LSTM supervisado → Isolation Forest no supervisado.** No hay etiquetas de fatiga; comparar al nadador con su propio estado fresco no las necesita y permite una explicación SHAP exacta.',
-        '**Potencia en vatios → indicadores cinemáticos.** La potencia depende de C_D y A, no medibles desde vídeo.',
-        '**Validación por fotograma → validación por vídeo.** El 99,99 % de precisión anterior era fuga de datos.',
-        '**Colab con GPU → portátil en CPU.** Para un uso real en un club, sin coste y sin subir los vídeos.',
+        '**Solo vista lateral → vistas lateral y frontal.** Parte de los vídeos se registró de frente, donde la profundidad de la mano no es observable; se añadió una señal específica para esa vista.',
+        '**MoveNet → YOLOv8n.** MoveNet se eligió por su fluidez, pero sobre vídeo subacuático YOLO detectó con el doble de confianza y produjo cinco veces más ciclos válidos.',
+        '**Sensores inerciales → solo vídeo.** No se dispuso de sensores; la fusión con unidades inerciales queda como trabajo futuro.',
+        '**Red recurrente supervisada → Isolation Forest no supervisado.** Sin etiquetas de fatiga, la comparación con el estado inicial del propio nadador no las requiere y admite una atribución SHAP exacta.',
+        '**Potencia en vatios → indicadores cinemáticos.** La potencia depende de *C*_{D} y *A*, no medibles desde vídeo.',
+        '**Validación por fotograma → validación por vídeo.** La exactitud del 99,99 % de una versión anterior era fuga de datos.',
+        '**XGBoost → bosque aleatorio.** Para la clasificación del estilo, el bosque aleatorio evita una dependencia adicional y ofrece atribución SHAP exacta con un rendimiento suficiente.',
+        '**Ejecución en Colab con GPU → ordenador personal en CPU.** Para un uso real en un club, sin coste y sin transferir los vídeos.',
     ])
+    w.h2('Decisiones metodológicas')
+    w.p('La comparación del nadador consigo mismo evita la necesidad de etiquetas y respeta la variabilidad individual '
+        'descrita en la literatura. El análisis por ciclo reduce el ruido y la autocorrelación y produce unidades con '
+        'significado para el entrenador. La exclusión de variables redundantes evita que SHAP reparta la importancia '
+        'entre magnitudes dependientes. Por último, se ha priorizado lo observado sobre lo estimado: las brazadas se '
+        'cuentan sobre la imagen 2D y los ángulos laterales son 2D, porque la evaluación mostró que el 3D falla en la '
+        'extremidad inferior.')
+    w.p('Respecto a la evaluación de la pose, la ausencia de anotaciones impide calcular OKS, PCK o mAP sobre los '
+        'datos propios. La estrategia adoptada combina el rendimiento publicado en COCO, las métricas operativas en CPU '
+        'y una validación orientada a la tarea (error de la frecuencia de ciclo). Esta última es la más relevante para '
+        'el objetivo del sistema, aunque no sustituye una evaluación directa de la precisión de cada articulación.')
     w.h2('Limitaciones')
     w.vinetas([
-        'Una sola cámara: los ángulos 2D son proyecciones; la refracción y la rotación del cuerpo los distorsionan.',
-        'En vista lateral el modelo no distingue el brazo izquierdo del derecho: la asimetría y el codo de cada lado son poco fiables en esta vista.',
-        'Detección parcial: con YOLOv8n en CPU, el nadador es analizable en torno a un tercio del vídeo y, de frente, se encuentran entre el 38 % y el 50 % de los ciclos.',
-        'La vista (lateral o frontal) la indica el usuario en la lista de vídeos; si se equivoca, el conteo empeora (con la señal frontal en un clip lateral el error pasó del 6,5 % al 14 %).',
-        'Los clips disponibles son pasadas cortas: no permiten observar la fatiga en vídeo real.',
-        'La clasificación del estilo solo está validada con vídeos simulados; con vídeo real falla y necesita vídeos etiquetados.',
-        'La fase base supone que el nadador empieza fresco; si llega fatigado, el inicio se subestima.',
-        'Falta contrastar el momento de fatiga con una referencia independiente (lactato, esfuerzo percibido o entrenador).',
-        'Los resultados reales corresponden a un nadador; la extensión a los 8 nadadores queda como trabajo futuro.',
+        '**Escasez de datos reales.** Los resultados reales corresponden a un participante y a cinco secuencias cortas; no existe todavía una validación experimental de la fatiga en nadadores reales.',
+        '**Referencia de la fatiga.** No se ha contrastado el inicio detectado con una medida independiente (lactato, esfuerzo percibido o valoración experta).',
+        '**Una sola cámara.** Los ángulos 2D son proyecciones; la refracción y la rotación del cuerpo los distorsionan.',
+        '**Brazos y piernas indistinguibles en vista lateral.** La asimetría y los ángulos de cada lado son poco fiables en esa vista.',
+        '**Detección parcial.** El nadador es analizable en torno a un tercio del vídeo y, de frente, se detecta entre el 38 % y el 50 % de los ciclos.',
+        '**Vista indicada por el usuario.** Un error en la vista empeora el conteo (con la señal frontal en una secuencia lateral el error pasó del 6,5 % al 14 %).',
+        '**Fase base.** Se supone que el nadador comienza descansado; si no es así, el inicio de la fatiga se subestima.',
+        '**Datos sintéticos.** Validan el método, pero son más regulares que los reales; el clasificador de estilo no se transfiere todavía a vídeo real.',
     ])
 
 
+# ---------------------------------------------------------------- capítulos 6 y 7
+
 def cap6_trabajo(w):
-    w.p('Se ha desarrollado un sistema completo que funciona en la CPU de un portátil y que convierte un vídeo de nado '
-        'en eficiencia, momento de fatiga y explicación por variable. Con datos sintéticos, de lado y de frente, la '
-        'detección de fatiga y la explicación SHAP recuperan la transición y las variables introducidas. Con vídeo '
-        'real, el conteo de brazadas se aleja entre un 6,5 % y un 8,2 % de la cuenta manual en tres clips y dos vistas, '
-        'y las medidas de Aaron describen un crol con el cuerpo alineado. La comparativa sobre el propio vídeo '
-        'subacuático resultó más útil que las métricas de COCO para elegir el modelo de pose, y la validación del 3D '
-        'mostró dónde se puede confiar en él. En los clips reales disponibles no se detecta fatiga, lo que es coherente '
-        'con pasadas cortas; el factor limitante es la detección del nadador y la duración del nado continuo, no el '
-        'método de fatiga, que en el caso simulado localiza el inicio de la fatiga y explica sus causas.')
+    w.p('Se ha desarrollado un sistema completo de análisis biomecánico explicable que funciona en la CPU de un '
+        'ordenador personal y que transforma un vídeo de nado en indicadores de eficiencia, inicio de la fatiga técnica '
+        'y atribución por variable. La Tabla {tab:objetivos} resume el grado de cumplimiento de los objetivos.')
+    w.tabla([
+        ['Objetivo', 'Resultado', 'Grado'],
+        ['OE1. Selección del modelo de pose', 'Comparativa en CPU; YOLOv8n-Pose elegido y justificado', 'Cumplido'],
+        ['OE2. Elevación a 3D', 'Implementada y evaluada; válida en codo y cadera, no en rodilla', 'Cumplido con limitaciones'],
+        ['OE3. Ciclos de brazada', 'Error de la frecuencia del 6,5-8,2 % frente al conteo manual', 'Cumplido'],
+        ['OE4. Variables por ciclo', 'Eficiencia y ángulos de codo, hombro, cadera, rodilla y pies', 'Cumplido'],
+        ['OE5. Inicio de la fatiga', 'Validado con datos sintéticos; no observable en las secuencias reales cortas', 'Parcial'],
+        ['OE6. Atribución con SHAP', 'Global, local y textual; coincide con las variables alteradas', 'Cumplido'],
+        ['OE7. Clasificación del estilo', '100 % por vídeo en datos sintéticos; no transferido a vídeo real', 'Parcial'],
+        ['OE8. Vídeo anotado', 'Panel de fatiga por ciclo', 'Cumplido'],
+        ['OE9. Evaluación con datos sintéticos', 'Generador con referencia conocida y pruebas automáticas', 'Cumplido'],
+    ], 'Grado de cumplimiento de los objetivos específicos.', clave='objetivos', anchos=[5, 7.5, 3.5])
+    w.p('Con datos sintéticos de referencia conocida, el sistema estima la frecuencia de ciclo, la velocidad y la '
+        'distancia por ciclo con errores medianos inferiores al 5 %, detecta el inicio de la fatiga al comienzo de la '
+        'transición programada y atribuye la fatiga a las variables alteradas. Con vídeo real, la frecuencia de ciclo '
+        'se aproxima al conteo manual con un error del 6,5 % al 8,2 % en dos vistas, y las medidas del participante P1 '
+        'describen un crol con el cuerpo alineado. En las secuencias reales disponibles no se detecta fatiga, lo que es '
+        'coherente con su duración.')
+    w.p('La principal debilidad del trabajo no reside en el modelo ni en la arquitectura, sino en la escasez de datos '
+        'reales y en la ausencia de una validación experimental de la fatiga en nadadores reales. El sistema está '
+        'preparado para esa validación en cuanto se disponga de grabaciones de nado continuo y de una referencia '
+        'fisiológica.')
 
 
 def cap6_personales(w):
-    w.p('Este trabajo me ha enseñado que, en un proyecto de IA aplicada, la calidad de los datos pesa más que la '
-        'elección del modelo. Descubrir que el 99,99 % de precisión de una versión anterior era fuga de datos fue la '
-        'lección más importante: desde entonces he validado cada resultado frente a una referencia, ya fuera una cuenta '
-        'manual o un caso simulado con verdad conocida.')
-    w.p('También he aprendido a adaptar herramientas pensadas para personas de pie a un entorno tan distinto como el '
-        'agua, y a explicar los resultados de forma que un entrenador pueda usarlos. Trabajar con un portátil sin GPU '
-        'me obligó a priorizar soluciones ligeras y a medir su coste real. Me llevo, sobre todo, la importancia de ser '
-        'honesta con lo que el sistema puede y no puede afirmar.')
+    w.p('Este trabajo me ha enseñado que, en un proyecto de inteligencia artificial aplicada, la calidad de los datos '
+        'pesa más que la elección del modelo. Descubrir que la exactitud del 99,99 % de una versión anterior era fuga '
+        'de datos fue la lección más importante: desde entonces he contrastado cada resultado con una referencia, ya '
+        'fuera un conteo manual o un conjunto de datos sintéticos con valores conocidos.')
+    w.p('También he aprendido a adaptar herramientas concebidas para personas de pie a un entorno tan distinto como el '
+        'agua, y a presentar los resultados de forma que un entrenador pueda utilizarlos. Trabajar con un ordenador '
+        'sin GPU me obligó a priorizar soluciones ligeras y a medir su coste real. Me llevo, sobre todo, la importancia '
+        'de ser rigurosa con lo que un sistema puede y no puede afirmar.')
 
 
 def cap7_futuro(w):
-    w.vinetas([
-        'Analizar los 8 nadadores y comparar sus patrones de fatiga.',
-        'Entrenar el clasificador de estilo con vídeos reales etiquetados de los cuatro estilos.',
-        'Detectar la vista (lateral o frontal) automáticamente a partir de la orientación del tronco.',
-        'Ajustar el modelo de pose con imágenes subacuáticas etiquetadas (SwimXYZ y fotogramas propios) para distinguir los dos brazos y detectar más fotogramas.',
-        'Adaptar MotionBERT a natación para obtener ángulos 3D fiables en las piernas.',
-        'Evaluar ViTPose cuando se disponga de GPU.',
-        'Modo audio: frecuencia de brazada y respiración a partir del sonido.',
-        'Fusión con sensores inerciales (IMU) para medir la velocidad sin calibrar la cámara.',
-        'Validar el inicio de la fatiga frente a lactato, esfuerzo percibido y valoración del entrenador.',
-        'Grabar sesiones con una cámara que siga al nadador para analizar nado continuo.',
-    ])
+    w.p('Las líneas de trabajo futuras se derivan directamente de las limitaciones identificadas y se agrupan en cuatro '
+        'ámbitos: los datos y la validación experimental, los modelos de visión, la extensión del sistema y su '
+        'aplicación práctica.')
+    w.h2('Datos y validación experimental')
+    w.p('La prioridad es la validación experimental de la fatiga en nadadores reales. Para ello se propone un protocolo '
+        'de grabación de series largas de nado continuo (por ejemplo, 400 m o series hasta el agotamiento) con cámara '
+        'lateral fija y calibrada, acompañado de referencias independientes del estado de fatiga: concentración de '
+        'lactato en sangre, escala de esfuerzo percibido y valoración experta del entrenador. Con esos datos podría '
+        'medirse la concordancia entre el ciclo de inicio detectado y la referencia, y estimarse la sensibilidad y la '
+        'especificidad del método.')
+    w.p('En paralelo, la anotación manual de un conjunto de fotogramas subacuáticos permitiría calcular las métricas '
+        'estándar de estimación de pose (OKS, PCK y mAP) sobre los datos propios y comparar los modelos con el mismo '
+        'criterio que la literatura. La ampliación del estudio a los ocho nadadores disponibles y a los cuatro estilos '
+        'permitiría, además, comparar patrones individuales de fatiga.')
+    w.h2('Modelos de visión')
+    w.p('El ajuste fino de los modelos de pose con imágenes de natación, procedentes de SwimXYZ y de fotogramas propios '
+        'anotados, debería mejorar la detección bajo el agua y la distinción entre el brazo izquierdo y el derecho. Con '
+        'un conjunto anotado suficiente cabría desarrollar un modelo propio especializado en natación. Del mismo modo, '
+        'la adaptación de MotionBERT a nadadores, con datos de captura de movimiento acuático o sintéticos, permitiría '
+        'obtener ángulos 3D fiables en la extremidad inferior. Cuando se disponga de GPU, ViTPose y otros modelos de '
+        'mayor precisión podrán evaluarse con el mismo protocolo.')
+    w.h2('Extensión del sistema')
+    w.p('El modo audio, que estimaría la frecuencia de brazada y el patrón respiratorio a partir del sonido, '
+        'completaría los modos de entrada previstos. La fusión con sensores inerciales permitiría medir la velocidad sin '
+        'calibrar la cámara. La detección automática de la vista a partir de la orientación del tronco eliminaría la '
+        'dependencia de la indicación del usuario, y el entrenamiento del clasificador de estilo con vídeos reales '
+        'etiquetados reduciría la distancia entre el dominio sintético y el real.')
+    w.h2('Aplicación práctica')
+    w.p('Por último, una versión con procesamiento en tiempo casi real y una interfaz para el entrenador facilitarían '
+        'su uso diario en el club. Un sistema de grabación con cámara que acompañe al nadador permitiría analizar series '
+        'completas de nado continuo, condición necesaria para observar la fatiga en entrenamientos reales.')
 
 
 def anexos(w):
     w.h2('Anexo A. Guía de ejecución')
     for t in ['pip install -r requirements.txt',
               'python diagnostico.py',
-              'python analizar.py "videos/GX011614.MP4" --nadador "Aaron"',
+              'python analizar.py "videos/GX011614.MP4" --nadador "P1" --estilo crol --vista lateral',
               'python analizar.py "videos/GX011614.MP4" --comparativa',
-              'python sesion.py resultados/GX011614 resultados/GX011617 resultados/GX011618 --nadador "Aaron"',
               'python lote.py --carpeta videos --crear-lista      (y después sin --crear-lista)',
-              'python informe_nadador.py resultados --nadador Aaron --estilo crol',
-              'python probar_deteccion.py "videos/GX011617.MP4" --desde 9 --hasta 29']:
-        w.p(t, alinear='izq', size=9)
-    w.p('Salidas en la carpeta de resultados: keypoints_raw.npz, keypoints_3d.npy, medidas_por_fotograma.csv, '
-        'variables_por_ciclo.csv, shap_por_ciclo.csv, resumen.json, figuras fig_*.png y video_anotado.mp4.')
+              'python sesion.py resultados/GX011614 resultados/GX011617 resultados/GX011618 --nadador "P1"',
+              'python informe_nadador.py resultados --nadador P1 --estilo crol',
+              'python caso_ficticio.py      (datos sintéticos de referencia conocida)']:
+        w.p(f'`{t}`', alinear='izq', size=9)
+    w.p('Salidas en la carpeta de resultados: puntos 2D y 3D, medidas por fotograma, variables por ciclo, valores SHAP '
+        'por ciclo, resumen en formato JSON, figuras y vídeo anotado.')
     w.h2('Anexo B. Estructura del código')
     w.tabla([
         ['Archivo', 'Función'],
@@ -729,46 +1298,58 @@ def anexos(w):
         ['strokelab/pose.py', 'Modelos de pose (YOLO, MoveNet, MediaPipe), giro y comparativa'],
         ['strokelab/lift3d.py', 'Elevación a 3D con MotionBERT adaptada a nadadores'],
         ['strokelab/medidas.py', 'Limpieza, filtros anatómicos, ángulos, ciclos y variables'],
-        ['strokelab/fatiga.py', 'Isolation Forest, PELT, SHAP y explicación en texto'],
+        ['strokelab/fatiga.py', 'Isolation Forest, PELT, SHAP y explicación textual'],
+        ['strokelab/estilo.py', 'Clasificación del estilo con bosque aleatorio y SHAP'],
+        ['strokelab/simulador.py', 'Generación de datos sintéticos con referencia conocida'],
         ['strokelab/video.py', 'Vídeo anotado con el panel de fatiga'],
-        ['sesion.py', 'Fatiga a lo largo de varias pasadas'],
-        ['lote.py', 'Análisis de todos los vídeos de una carpeta y de sus sesiones'],
+        ['sesion.py, lote.py', 'Análisis por sesión y de conjuntos de vídeos'],
         ['informe_nadador.py', 'Informe de un nadador y un estilo'],
-        ['probar_deteccion.py', 'Comparación de ajustes de YOLO en el tramo con nadador'],
-        ['validar_3d.py', 'Comparación de ángulos 2D y 3D'],
-    ], 'Módulos del código de StrokeLab.', anchos=[5, 11])
+        ['caso_ficticio.py', 'Caso de evaluación completo con datos sintéticos'],
+        ['probar_deteccion.py, validar_3d.py', 'Ajustes de detección y comparación 2D-3D'],
+    ], 'Módulos del código de StrokeLab.', clave='codigo', anchos=[5, 11])
     w.h2('Anexo C. Pruebas automáticas')
     w.vinetas([
-        'tests/test_local.py: nadador sintético con errores típicos; exige detectar la fatiga entre 40 y 60 s y medidas plausibles.',
-        'tests/test_sesion.py: el nadador sintético partido en pasadas, con una pasada vacía.',
-        'tests/test_aaron.py: datos reales de Aaron; exige una frecuencia a menos de un 15 % de la cuenta manual.',
-        'tests/test_movenet_recorte.py: conversión de coordenadas del recorte de MoveNet.',
-        'tests/test_estilos.py: ciclos de mariposa (1 brazada) y crol (2 brazadas).',
-        'tests/test_frontal.py: nadador sintético visto de frente, con fatiga.',
-        'tests/test_aaron_frontal.py: clips de móvil de Aaron; exige una frecuencia a menos de un 15 % de la cuenta manual.',
-        'tests/test_lote.py: lista de vídeos, análisis por lotes y sesión.',
+        '`tests/test_local.py`: datos sintéticos con errores típicos; exige detectar la fatiga entre 40 y 60 s y medidas plausibles.',
+        '`tests/test_sesion.py`: datos sintéticos divididos en pasadas, con una pasada vacía.',
+        '`tests/test_aaron.py`: secuencia real GX011614; exige una frecuencia a menos de un 15 % del conteo manual.',
+        '`tests/test_aaron_frontal.py`: secuencias reales frontales; mismo criterio.',
+        '`tests/test_frontal.py`: datos sintéticos en vista frontal con fatiga.',
+        '`tests/test_estilos.py`: ciclos de mariposa (1 brazada) y de crol (2 brazadas).',
+        '`tests/test_simulador_estilo.py`: errores de frecuencia y velocidad frente a la referencia y exactitud del clasificador de estilo.',
+        '`tests/test_lote.py` y `tests/test_movenet_recorte.py`: análisis por lotes y conversión de coordenadas.',
     ])
 
 
 # ---------------------------------------------------------------- montaje
 
-def main():
+def construir():
+    EST['cont'] = {}
+    EST['citas_pasada'] = []
     doc = docx.Document(str(PLANTILLA))
     if 'Caption' not in [s.name for s in doc.styles]:
         st = doc.styles.add_style('Caption', 1)
         st.base_style = doc.styles['Normal']
         st.font.size = Pt(9); st.font.italic = True
         st.paragraph_format.space_after = Pt(8)
+    # Índice alineado: «Capítulo n.» seguido de un espacio (no de un tabulador) y tabulador derecho con puntos
+    num = doc.part.numbering_part.element
+    for an in num.findall(qn('w:abstractNum')):
+        if an.get(qn('w:abstractNumId')) == '7':
+            lvl0 = [lv for lv in an.findall(qn('w:lvl')) if lv.get(qn('w:ilvl')) == '0'][0]
+            suff = OxmlElement('w:suff'); suff.set(qn('w:val'), 'space')
+            lvl0.find(qn('w:lvlText')).addprevious(suff)
+    for nombre in ('toc 1', 'toc 2', 'toc 3'):
+        doc.styles[nombre].paragraph_format.tab_stops.add_tab_stop(Cm(15), WD_TAB_ALIGNMENT.RIGHT, WD_TAB_LEADER.DOTS)
+
     b = list(doc.element.body.iterchildren())
     P = lambda i: Paragraph(b[i], doc._body)  # noqa: E731
     ppr_vineta = copy.deepcopy(b[64].find(qn('w:pPr')))
     for e in ppr_vineta.findall(qn('w:rPr')):
         ppr_vineta.remove(e)
-    ppr_h2 = copy.deepcopy(b[177].find(qn('w:pPr')))
 
     # portada
     poner_texto(P(8), 'MÁSTER UNIVERSITARIO EN INTELIGENCIA ARTIFICIAL')
-    poner_texto(P(11), TITULO, size=16)
+    poner_texto(P(11), TITULO, size=12)
     poner_texto(P(13), AUTORA)
     poner_texto(P(14), 'Dirigido por')
     poner_texto(P(15), DIRECTOR)
@@ -778,8 +1359,6 @@ def main():
     poner_texto(P(21), 'TITULACIÓN: Máster Universitario en Inteligencia Artificial')
     poner_texto(P(23), f'DIRECTOR/ES DEL PROYECTO: {DIRECTOR}')
     poner_texto(P(26), 'FECHA: octubre de 2026')
-
-    # encabezados de página
     for s in doc.sections:
         for h in (s.header, s.first_page_header, s.even_page_header):
             for par in h.paragraphs:
@@ -788,27 +1367,29 @@ def main():
                 elif 'Apellido1' in par.text:
                     poner_texto(par, 'Diana Cruz')
 
-    # tabla resumen
     t = Table(b[128], doc._body)
     for fila, txt in zip(range(1, 8), [AUTORA, TITULO, DIRECTOR, 'NO', 'SÍ', 'SÍ',
-                                       'Desarrollar un sistema de IA explicable que, a partir de vídeo, cuantifique la '
-                                       'eficiencia de la brazada, localice el inicio de la fatiga y explique sus causas con SHAP.']):
+                                       'Desarrollar un sistema de inteligencia artificial explicable que, a partir de '
+                                       'vídeo, cuantifique la eficiencia de la técnica de nado, detecte el inicio de la '
+                                       'fatiga técnica y atribuya sus causas a variables biomecánicas.']):
         poner_texto(t.cell(fila, 1).paragraphs[0], txt)
-
-    # presupuesto
     t = Table(b[246], doc._body)
     for fila, (valor, com) in zip(range(1, 6), [
             ('300 h · 6.000 €', 'Estimación: 12 ECTS × 25 h, valoradas a 20 €/h'),
-            ('1.200 €', 'Valor aproximado de mercado del portátil (800 €) y de la cámara GoPro (400 €)'),
-            ('0 €', 'Software libre: Python, PyTorch, Ultralytics, OpenCV, scikit-learn, shap, XGBoost, Git; Google Colab gratuito'),
-            ('0 €', 'Artículos de acceso abierto o a través de la biblioteca de la UEM'),
+            ('1.200 €', 'Valor aproximado de mercado del ordenador personal (800 €) y de la cámara GoPro (400 €)'),
+            ('0 €', 'Software libre: Python, PyTorch, Ultralytics, OpenCV, scikit-learn, shap, Git; Google Colab gratuito'),
+            ('0 €', 'Artículos de acceso abierto o a través de la biblioteca de la universidad'),
             ('0 €', 'Sin sensores ni material adicional')]):
         poner_texto(t.cell(fila, 1).paragraphs[0], valor)
         poner_texto(t.cell(fila, 2).paragraphs[0], com)
         for extra in t.cell(fila, 2).paragraphs[1:]:
             borrar(extra._p)
+    for i, fila in enumerate(t.rows):                     # la tabla de presupuesto tampoco se parte
+        fila._tr.get_or_add_trPr().append(OxmlElement('w:cantSplit'))
+        for celda in fila.cells:
+            for par in celda.paragraphs:
+                par.paragraph_format.keep_with_next = i < len(t.rows) - 1
 
-    # secciones: (índice del título, índices de la guía a borrar, función que escribe el contenido)
     secciones = [
         (177, [178], cap1_contexto), (179, [180, 181], cap1_problema), (182, [183], cap1_objetivos),
         (184, [185], cap1_resultados), (186, [187], cap1_estructura),
@@ -820,32 +1401,43 @@ def main():
         (268, [269], cap7_futuro), (288, [289], anexos),
     ]
     for h, guia, fn in secciones:
-        fn(Escritor(doc, b[h], ppr_vineta, ppr_h2))
-    # El presupuesto: el texto va antes de la tabla (ya queda así porque se inserta tras el título)
+        fn(Escritor(doc, b[h], ppr_vineta))
 
-    # resumen y abstract
-    w = Escritor(doc, b[99], ppr_vineta, ppr_h2)
+    w = Escritor(doc, b[99], ppr_vineta)
     w.p(RESUMEN)
     w.p(f'**Palabras clave:** {PALABRAS_CLAVE}', alinear='izq')
-    w = Escritor(doc, b[112], ppr_vineta, ppr_h2)
+    w = Escritor(doc, b[112], ppr_vineta)
     w.p(ABSTRACT)
     w.p(f'**Keywords:** {KEYWORDS}', alinear='izq')
-    poner_texto(P(118), 'Gracias a mi director/a por su orientación, al club y a los nadadores que se dejaron grabar, y a mi familia por su apoyo durante el máster.')
+    poner_texto(P(118), 'Agradezco a mi director/a su orientación durante el proyecto, al club y a los nadadores su '
+                        'colaboración en las grabaciones, y a mi familia su apoyo durante el máster.')
 
-    # índices de figuras y tablas
-    for h, guia, tipo in [(165, [166], 'Figura'), (170, [171], 'Tabla')]:
-        par = Escritor(doc, b[h], ppr_vineta, ppr_h2).p('', alinear='izq')
+    # índices de figuras, tablas y ecuaciones
+    for h, tipo in [(165, 'Figura'), (170, 'Tabla')]:
+        par = Escritor(doc, b[h], ppr_vineta).p('', alinear='izq')
         campo(par, f'TOC \\h \\z \\c "{tipo}"', 'Actualizar campos (F9) para generar el índice.')
+        if tipo == 'Tabla':
+            salto = copy.deepcopy(b[169]); par._p.addnext(salto)
+            titulo = copy.deepcopy(b[170]); salto.addnext(titulo)
+            poner_texto(Paragraph(titulo, doc._body), 'Índice de Ecuaciones')
+            pe = Escritor(doc, titulo, ppr_vineta).p('', alinear='izq')
+            campo(pe, 'TOC \\h \\z \\c "Ecuación"', 'Actualizar campos (F9) para generar el índice.')
 
-    # referencias
-    w = Escritor(doc, b[270], ppr_vineta, ppr_h2)
-    for ref in REFERENCIAS:
-        par = w.p(ref, estilo='Bibliography', alinear='izq')
+    # referencias numeradas (orden de primera cita), con marcador para el enlace desde cada cita
+    w = Escritor(doc, b[270], ppr_vineta)
+    orden = EST['citas'] or EST['citas_pasada']
+    for n, k in enumerate(orden, 1):
+        par = w.p('', estilo='Bibliography', alinear='izq')
         par.paragraph_format.left_indent = Cm(1)
         par.paragraph_format.first_line_indent = Cm(-1)
         par.paragraph_format.space_after = Pt(4)
+        EST['marcador'] += 1
+        bs = OxmlElement('w:bookmarkStart'); bs.set(qn('w:id'), str(EST['marcador'])); bs.set(qn('w:name'), f'ref_{k}')
+        be = OxmlElement('w:bookmarkEnd'); be.set(qn('w:id'), str(EST['marcador']))
+        par._p.append(bs); par._p.append(_run_xml(f'[{n}]')); par._p.append(be)
+        par._p.append(_run_xml('\t'))
+        runs_con_formato(par, REFS[k])
 
-    # borrar instrucciones y textos guía (índices de la plantilla original)
     a_borrar = set(range(29, 97)) | set(range(100, 111)) | {113, 115} | set(range(119, 125)) | {127, 132} \
         | {24, 28, 97, 98} | set(range(290, 301)) | {166, 171} | {175, 176} | {192} | {207, 208} | set(range(271, 287)) | {287} | {301}
     for h, guia, fn in secciones:
@@ -853,15 +1445,24 @@ def main():
     for i in sorted(a_borrar, reverse=True):
         borrar(b[i])
 
-    # pedir a Word que actualice índices y números al abrir
     ajustes = doc.settings.element
     uf = ajustes.find(qn('w:updateFields'))
     if uf is None:
         uf = OxmlElement('w:updateFields'); ajustes.append(uf)
     uf.set(qn('w:val'), 'true')
+    return doc
 
+
+def main():
+    construir()
+    EST['citas'] = list(EST['citas_pasada'])
+    doc = construir()
     doc.save(str(SALIDA))
-    print(f'Generado: {SALIDA}')
+    print(f'Generado: {SALIDA} ({len(EST["citas"])} referencias, {EST["cont"]})')
+    if shutil.which('soffice'):
+        r = subprocess.run([sys.executable, str(AQUI / 'actualizar_indices.py'), str(SALIDA), str(FINAL)],
+                           capture_output=True, text=True)
+        print(f'Índices calculados: {FINAL}' if FINAL.exists() and r.returncode == 0 else f'No se pudieron calcular los índices: {r.stderr[-500:]}')
 
 
 if __name__ == '__main__':
