@@ -107,6 +107,11 @@ aparece la fatiga y por qué** (SHAP), y medidas de codos, hombros, caderas, rod
   modelo propio y de no calcular mAP/PCK/OKS (sin anotaciones); 19 ecuaciones OMML numeradas con índice; citas IEEE
   numeradas con enlace; Gantt; tablas sin partir; Cap. 7 en prosa. `generar_memoria.py` hace 2 pasadas y llama a
   `actualizar_indices.py` (LibreOffice + libreoffice-math) -> `TFM_StrokeLab_final.docx`. Pruebas: + test_simulador_estilo.
+- **Versión ampliada (8 oct, 71 págs.)**: conjunto real completo (17 secuencias, P1-P4, 4 estilos, 394 s, 146 s analizables,
+  100 ciclos), perfiles por participante, fatiga en 3 sesiones (sin fatiga, sin falsas alarmas), estilo con vídeos reales
+  (45,5 % por vídeo dejando un vídeo fuera; 9,1 % dejando un participante fuera; base 36,4 %), sensibilidad y robustez
+  (datos sintéticos, presentados como tales), ética, arquitectura, Anexos D-F. Los datos sintéticos NUNCA se presentan como reales.
+  Pendiente: validar a mano la frecuencia de braza de P4 (79,5 parece sobrestimada) y el consentimiento de los nadadores.
 - Datos de la portada pendientes: apellidos de Diana, director/a, horas y presupuesto, equipo, agradecimientos,
   conclusiones personales, fechas de la fase 1, comparativa MoveNet/MediaPipe en CPU y resultado de fatiga real.
 

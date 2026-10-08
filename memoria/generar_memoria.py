@@ -292,10 +292,10 @@ class Escritor:
             par.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
 
     def h2(self, texto):
-        self.p(texto, estilo='Heading 2', alinear='izq')
+        self.p(texto, estilo='Heading 2', alinear='izq').paragraph_format.keep_with_next = True
 
     def h3(self, texto):
-        self.p(texto, estilo='Heading 3', alinear='izq')
+        self.p(texto, estilo='Heading 3', alinear='izq').paragraph_format.keep_with_next = True
 
     def leyenda(self, tipo, texto, clave=None):
         """Leyenda con número automático (campo SEQ), para los índices de figuras, tablas y ecuaciones."""
@@ -344,6 +344,9 @@ class Escritor:
                     celda._tc.get_or_add_tcPr().append(sombra)
                 if anchos:
                     celda.width = Cm(anchos[j])
+        if anchos:                                  # rejilla con los mismos anchos (LibreOffice la usa)
+            for gc, a in zip(t._tbl.tblGrid.findall(qn('w:gridCol')), anchos):
+                gc.set(qn('w:w'), str(int(Cm(a).twips)))
         self._poner(t._tbl)
         self.p('', size=4)
 
@@ -389,13 +392,18 @@ RESUMEN = (
     'dimensiones, con una vertical de datos tabulares que segmenta el nado en ciclos de brazada, calcula indicadores '
     'cinemáticos por ciclo y modela mediante aprendizaje no supervisado el patrón técnico de referencia de cada '
     'nadador. La desviación sostenida respecto a ese patrón define el inicio de la fatiga y su atribución a cada '
-    'variable se obtiene con valores de Shapley. Con vídeo real de un participante de crol, la frecuencia de ciclo '
-    'estimada presenta un error relativo del 6,5 % al 8,2 % frente al conteo manual en vista lateral y frontal. Con '
+    'variable se obtiene con valores de Shapley. El sistema se aplicó a 17 secuencias reales de cuatro participantes '
+    'en los cuatro estilos (394 s grabados), de las que obtuvo 146 s analizables y 100 ciclos válidos. La frecuencia '
+    'de ciclo estimada presenta un error relativo del 6,5 % al 8,2 % frente al conteo manual en vista lateral y '
+    'frontal. Con '
     'datos sintéticos de referencia conocida, el error mediano es del 4,7 % en la frecuencia de ciclo, del 1,3 % en '
     'la velocidad y del 4,3 % en la distancia por ciclo; el inicio de la fatiga se detecta al comienzo de la '
     'transición programada, las variables con mayor atribución coinciden con las alteradas y el estilo de nado se '
-    'clasifica con una exactitud del 100 % por vídeo bajo validación agrupada. En las secuencias reales disponibles, '
-    'de corta duración, no se detecta fatiga sostenida. El sistema se ejecuta en un ordenador personal sin GPU. La '
+    'clasifica con una exactitud del 100 % por vídeo bajo validación agrupada. Con vídeos reales, el clasificador de '
+    'estilo alcanza el 45,5 % por vídeo frente al 36,4 % de la clase mayoritaria y no generaliza a participantes no '
+    'vistos. En las tres sesiones reales con datos suficientes (10 a 27 ciclos) no se detecta fatiga sostenida. El '
+    'análisis de sensibilidad sobre datos sintéticos muestra una tasa de detección del 100 % con un 10 % de falsas '
+    'alarmas en la configuración elegida. El sistema se ejecuta en un ordenador personal sin GPU. La '
     'principal limitación es la escasez de datos reales anotados y la ausencia de una validación experimental de la '
     'fatiga en nadadores reales.')
 PALABRAS_CLAVE = ('visión por computador; estimación de pose humana; aprendizaje no supervisado; detección de '
@@ -408,12 +416,16 @@ ABSTRACT = (
     'vertical, which estimates two- and three-dimensional human pose, with a tabular vertical that segments swimming '
     'into stroke cycles, computes per-cycle kinematic indicators and models each swimmer’s reference technique '
     'through unsupervised learning. A sustained deviation from that reference defines fatigue onset, and its '
-    'attribution to each variable is obtained with Shapley values. On real video of a front-crawl participant, the '
+    'attribution to each variable is obtained with Shapley values. The system was applied to 17 real sequences of four '
+    'participants in the four strokes (394 s recorded), yielding 146 s of analysable video and 100 valid cycles. The '
     'estimated stroke rate shows a relative error of 6.5 % to 8.2 % against manual counts in side and front views. On '
     'synthetic data with known ground truth, the median error is 4.7 % for stroke rate, 1.3 % for velocity and 4.3 % '
     'for distance per stroke; fatigue onset is detected at the start of the programmed transition, the variables with '
     'the highest attribution match the altered ones, and swimming style is classified with 100 % per-video accuracy '
-    'under grouped validation. No sustained fatigue is detected in the available real sequences, which are short. '
+    'under grouped validation. On real videos, the style classifier reaches 45.5 % per-video accuracy against a 36.4 % '
+    'majority baseline and does not generalise to unseen participants. No sustained fatigue is detected in the three '
+    'real sessions with enough data (10 to 27 cycles). A sensitivity analysis on synthetic data shows a 100 % '
+    'detection rate with 10 % false alarms for the chosen configuration. '
     'The system runs on a personal computer without a GPU. The main limitation is the scarcity of annotated real data '
     'and the lack of an experimental validation of fatigue in real swimmers.')
 KEYWORDS = ('computer vision; human pose estimation; unsupervised learning; anomaly detection; explainable '
@@ -467,6 +479,9 @@ def cap1_resultados(w):
         'Detección del inicio de la fatiga y atribución por variable validadas con datos sintéticos de referencia conocida: errores medianos del 4,7 % (frecuencia de ciclo), 1,3 % (velocidad) y 4,3 % (distancia por ciclo).',
         'Clasificación del estilo de nado con una exactitud del 100 % por vídeo en datos sintéticos, bajo validación agrupada.',
         'Análisis biomecánico completo de un participante real (P1, crol, cinco secuencias) y ausencia de falsos positivos de fatiga en secuencias cortas.',
+        'Aplicación del sistema a un conjunto real de 17 secuencias de cuatro participantes y cuatro estilos (394 s grabados, 146 s analizables, 100 ciclos válidos), con perfiles de frecuencia y técnica por participante.',
+        'Evaluación del clasificador de estilo con vídeos reales (45,5 % por vídeo frente al 36,4 % de la clase mayoritaria) y cuantificación de la distancia entre el dominio sintético y el real.',
+        'Análisis de sensibilidad del detector de fatiga y de robustez del conteo de ciclos frente al ruido, con datos sintéticos.',
         'Evaluación de la reconstrucción 3D frente a la 2D, con identificación de sus límites en la extremidad inferior.',
     ])
 
@@ -990,6 +1005,77 @@ def cap4_solucion(w):
         'FRESCO o FATIGA, el ciclo, la frecuencia y una barra temporal con la puntuación de cada ciclo, el umbral y el '
         'inicio de la fatiga.')
     w.figura(FIG / 'panel_video.png', 'Panel del vídeo anotado sobre datos sintéticos (t = 70 s; inicio de la fatiga en t = 51,9 s).', clave='panel', ancho_cm=13)
+    w.h3('Conjunto de datos real')
+    w.p('Los datos proceden de grabaciones de entrenamiento de un club de natación. De los '
+        'vídeos disponibles, se seleccionaron para el análisis las secuencias en que el nadador aparece nadando un '
+        'estilo identificable; se descartaron los vídeos de salida, viraje o reposo y los vídeos generados por el '
+        'propio sistema (vídeos anotados), que no son datos de entrada. El conjunto final contiene **17 secuencias de '
+        'cuatro participantes (P1 a P4) en los cuatro estilos**, con una duración total de 394,2 s (Tabla {tab:datos}).')
+    w.tabla([
+        ['Participante', 'Estilos', 'Secuencias (cámara subacuática / móvil)', 'Duración grabada', 'Vistas'],
+        ['P1', 'Crol, mariposa', '4 / 3', '159,0 s', 'Lateral y frontal'],
+        ['P2', 'Crol, espalda', '1 / 1', '62,5 s', 'Lateral y frontal'],
+        ['P3', 'Crol, mariposa', '3 / 1', '97,6 s', 'Lateral y frontal'],
+        ['P4', 'Braza', '2 / 2', '75,1 s', 'Lateral y frontal'],
+        ['**Total**', '**4 estilos**', '**10 / 7**', '**394,2 s**', ''],
+    ], 'Composición del conjunto de datos real.', clave='datos', anchos=[2.6, 3, 4.4, 2.8, 3.2])
+    w.p('Se emplearon dos dispositivos. La cámara subacuática GoPro registra vídeo de 5120 × 2880 píxeles a 30 fps '
+        'desde el lateral de la calle, con el nadador cruzando el encuadre; cada secuencia contiene una pasada de unos '
+        '10-20 s en la que el nadador es visible. El teléfono móvil registra vídeo vertical de 1080 × 1920 píxeles a '
+        '60 fps desde el borde de la piscina, con el nadador acercándose o alejándose de la cámara. Ninguna de las '
+        'secuencias dispone de anotaciones de puntos articulares, por lo que la validación se apoya en el conteo manual '
+        'de ciclos y en datos sintéticos de referencia conocida.')
+
+    w.h3('Preparación de los datos y determinación de la vista')
+    w.p('Antes del análisis, cada secuencia se describe en una lista editable (`lista_videos.csv`) con el código del '
+        'participante, el estilo, la vista y la sesión. La vista no se fía solo a la indicación manual: durante la '
+        'revisión del conjunto se comprobó que algunas secuencias de móvil estaban marcadas como laterales cuando el '
+        'nadador se desplazaba hacia la cámara. Por ello, la vista se contrastó con un criterio objetivo, la mediana '
+        'de la orientación del tronco en la imagen: con cámara lateral el eje hombros-cadera es casi horizontal '
+        '(8-40°), mientras que de frente aparece casi vertical (más de 60°) y escorzado. Con este criterio, cinco '
+        'secuencias de móvil se clasificaron como frontales y dos como laterales.')
+    w.p('La preparación incluye, además: la anonimización de los participantes mediante códigos; la exclusión de los '
+        'archivos de salida; la agrupación en sesiones por participante, estilo y dispositivo, ya que mezclar cámaras '
+        'distintas alteraría la referencia de cada nadador; y el registro de la versión del análisis en cada '
+        'resultado, de modo que el análisis por lotes rehace automáticamente los vídeos procesados con una versión '
+        'anterior del código.')
+
+    w.h3('Consideraciones éticas y protección de datos')
+    w.p('Los vídeos contienen imágenes de personas identificables y constituyen datos personales. Su tratamiento se '
+        'ha limitado a la finalidad académica del trabajo y requiere el consentimiento de los nadadores y, en el caso de '
+        'menores, de sus tutores [PENDIENTE: indicar el consentimiento obtenido]. Se han aplicado las siguientes '
+        'medidas:')
+    w.vinetas([
+        '**Minimización y anonimización.** En la memoria y en los resultados los participantes se identifican con un código (P1 a P4); no se publican nombres ni fotogramas en los que se reconozca a un nadador.',
+        '**Procesamiento local.** El análisis se ejecuta en el ordenador personal de la autora; los vídeos no se envían a servicios externos de inferencia.',
+        '**Datos derivados.** Los resultados que se comparten son series de puntos articulares y variables por ciclo, que no contienen la imagen del nadador.',
+        '**Ausencia de decisiones automáticas.** El sistema ofrece información al entrenador, que conserva la decisión; los resultados no se emplean para evaluar ni seleccionar a los nadadores.',
+    ])
+    w.p('Con independencia del uso actual, una ampliación del estudio con menores de edad o con medidas fisiológicas '
+        'requeriría la aprobación de un comité de ética y un consentimiento informado específico.')
+
+    w.h3('Arquitectura del software y flujo de datos')
+    w.p('El código se organiza en un paquete de Python (`strokelab`) con un módulo por etapa y varios programas de '
+        'línea de órdenes que las combinan (Anexo B). Cada etapa lee y escribe archivos en una carpeta de resultados '
+        'por vídeo, lo que permite repetir una etapa sin rehacer las anteriores: por ejemplo, recalcular los ciclos y '
+        'la fatiga sin volver a estimar la pose, que es la etapa más costosa. La Tabla {tab:archivos} resume los '
+        'archivos intermedios y su contenido.')
+    w.tabla([
+        ['Archivo', 'Etapa', 'Contenido'],
+        ['keypoints_raw.npz', 'Pose 2D', 'Coordenadas y confianza de los 17 puntos por fotograma, resolución, fps y ajustes de detección'],
+        ['keypoints_3d.npy', 'Elevación 3D', 'Coordenadas 3D normalizadas de los 17 puntos por fotograma'],
+        ['medidas_por_fotograma.csv', 'Tabular', 'Ángulos, profundidad de la mano y señales de ciclo por fotograma'],
+        ['variables_por_ciclo.csv', 'Tabular', 'Variables de cada ciclo válido, puntuación de anomalía y estado'],
+        ['shap_por_ciclo.csv', 'Explicación', 'Valores SHAP de cada variable en cada ciclo'],
+        ['resumen.json', 'Resumen', 'Versión, ajustes, detección, tiempo analizable, ciclos, inicio de la fatiga y explicación'],
+        ['fig_*.png, *_ANOTADO.mp4', 'Presentación', 'Figuras de fatiga y SHAP y vídeo anotado'],
+    ], 'Archivos generados por el análisis de un vídeo.', clave='archivos', anchos=[4.4, 2.6, 9])
+    w.p('El análisis por lotes añade tres tablas agregadas: `resumen_lote.csv` (una fila por vídeo), '
+        '`resumen_sesiones.csv` (una fila por sesión) y `ciclos_todos.csv` (todos los ciclos válidos con el '
+        'participante, el estilo y la vista), así como un archivo comprimido con los resultados ligeros para su '
+        'revisión. Esta separación entre la vertical de visión, que produce los puntos, y la vertical tabular, que los '
+        'consume, materializa los modos de funcionamiento: el modo tabular acepta directamente los puntos o las '
+        'variables por ciclo, sin vídeo.')
     w.p('Herramientas: Python 3, Ultralytics (YOLO), PyTorch (MotionBERT), OpenCV, NumPy, pandas, scikit-learn, shap, '
         'Matplotlib y Git. El código incluye pruebas automáticas que se ejecutan antes de cada cambio (Anexo C).')
 
@@ -1074,7 +1160,8 @@ def cap4_resultados(w):
     w.p('Aplicado a las tres secuencias reales del participante P1, el clasificador no identifica correctamente el '
         'estilo. En vídeo real, el modelo de pose copia también las piernas (correlación entre piernas de 0,8-0,99) y la '
         'posición de la cabeza es menos marcada que en la simulación. El resultado pone de manifiesto la distancia entre '
-        'el dominio sintético y el real (*domain gap*) y la necesidad de entrenar con vídeos reales etiquetados.')
+        'el dominio sintético y el real (*domain gap*) y la necesidad de entrenar con vídeos reales etiquetados. Esta '
+        'cuestión se evalúa con el conjunto real completo más adelante en esta sección.')
 
     w.h3('Datos reales: participante P1, crol')
     w.p('Se analizaron con `lote.py` las cinco secuencias disponibles del participante P1 en crol: tres de cámara '
@@ -1140,6 +1227,164 @@ def cap4_resultados(w):
         'cambio técnico. La localización de la fatiga en vídeo real requiere al menos unos 20 ciclos consecutivos '
         '(25-30 s de nado continuo); los datos sintéticos muestran el resultado que el sistema entrega en esa situación.')
 
+    w.h3('Conjunto real completo: cobertura del análisis')
+    w.p('El análisis por lotes se aplicó a las 17 secuencias del conjunto real con la misma configuración (YOLOv8n-Pose, '
+        'un fotograma de cada dos, filtros anatómicos y de tronco girado). De los 394,2 s grabados, el sistema obtuvo '
+        '**146,4 s analizables (37 %) y 100 ciclos válidos** (Figura {fig:conjunto}; detalle por secuencia en el '
+        'Anexo D). La Tabla {tab:cobertura} agrega los resultados por participante y estilo.')
+    w.figura(FIG / 'real_conjunto.png', 'Conjunto real: duración grabada, tiempo analizable y ciclos válidos por secuencia.', clave='conjunto')
+    w.tabla([
+        ['Participante y estilo', 'Secuencias', 'Grabado', 'Analizable', 'Ciclos válidos'],
+        ['P1 · crol', '5', '118,8 s', '38,5 s (32 %)', '17'],
+        ['P1 · mariposa', '2', '40,2 s', '12,6 s (31 %)', '7'],
+        ['P2 · crol', '1', '49,6 s', '12,6 s (25 %)', '9'],
+        ['P2 · espalda', '1', '12,9 s', '2,9 s (22 %)', '2'],
+        ['P3 · crol', '1', '39,4 s', '7,4 s (19 %)', '3'],
+        ['P3 · mariposa', '3', '58,2 s', '40,0 s (69 %)', '31'],
+        ['P4 · braza', '4', '75,1 s', '32,4 s (43 %)', '31'],
+        ['**Total**', '**17**', '**394,2 s**', '**146,4 s (37 %)**', '**100**'],
+    ], 'Conjunto real: tiempo analizable y ciclos válidos por participante y estilo.', clave='cobertura', anchos=[4, 2.4, 2.6, 3.6, 3.4])
+    w.p('La cobertura depende más de las condiciones de grabación que del estilo. Las dos secuencias de mariposa de P3 '
+        '(GX010724 y GX010725) presentan la mayor proporción analizable (70-74 %), porque el nadador ocupa una '
+        'parte grande del encuadre durante casi toda la secuencia. En cambio, en las secuencias largas de crol con cámara subacuática '
+        '(GX011608, GX011609, GX011614) el nadador cruza el encuadre a distancia y solo se analiza entre el 19 % y el '
+        '27 % del vídeo. Dos secuencias no producen ningún ciclo: GX011617, por la fragmentación de la señal ya '
+        'descrita, e IMG_7209, en la que solo 1,6 s son analizables. El estilo espalda, con una única secuencia frontal '
+        'de 2,9 s analizables, no tiene datos suficientes para ninguna conclusión.')
+
+    w.h3('Frecuencia de ciclo y técnica por participante y estilo')
+    w.p('La Tabla {tab:perfil} resume los ciclos laterales por participante y estilo; las secuencias frontales se '
+        'excluyen porque sus ángulos 2D no son comparables. La Figura {fig:perfil} muestra la distribución por ciclo de '
+        'tres variables.')
+    w.tabla([
+        ['Participante y estilo', 'Ciclos', 'Frecuencia (ciclos/min)', 'Codo (°)', 'Cadera (°)', 'Rodilla (°)', 'Inclinación (°)'],
+        ['P1 · crol', '10', '52,1 ± 11,6', '125 ± 17', '166 ± 15', '149 ± 32', '8,5 ± 4,1'],
+        ['P1 · mariposa', '7', '77,5 ± 9,9', '53 ± 23', '166 ± 4', '139 ± 10', '83,7 ± 2,5'],
+        ['P2 · crol', '9', '66,7 ± 13,9', '80 ± 18', '147 ± 14', '130 ± 38', '18,2 ± 5,8'],
+        ['P3 · crol', '3', '65,8 ± 11,0', '86 ± 31', '118 ± 30', '85 ± 56', '40,3 ± 11,2'],
+        ['P3 · mariposa', '26', '57,5 ± 16,6', '103 ± 32', '163 ± 14', '126 ± 36', '15,2 ± 6,3'],
+        ['P4 · braza', '29', '79,5 ± 17,1', '104 ± 43', '157 ± 14', '145 ± 28', '12,1 ± 5,8'],
+    ], 'Variables por ciclo (media ± desviación típica) de los ciclos laterales por participante y estilo. Los ángulos '
+       'son la media de los lados izquierdo y derecho.', clave='perfil', anchos=[3.0, 1.3, 2.8, 2.2, 2.2, 2.2, 2.3], size=8)
+    w.figura(FIG / 'real_participantes.png', 'Distribución por ciclo de la frecuencia de ciclo, la flexión del codo y la inclinación del tronco por participante y estilo (ciclos laterales).', clave='perfil')
+    w.p('Los perfiles deben leerse junto con la calidad de la detección, porque varios valores revelan errores de la '
+        'pose más que rasgos técnicos:')
+    w.vinetas([
+        '**P1 · mariposa**: una inclinación del tronco de 84° es incompatible con el nado; indica que el modelo colocó un esqueleto casi vertical que superó el filtro de tronco girado, de modo que sus ángulos no son válidos.',
+        '**P3 · crol**: con solo 3 ciclos, una cadera de 118° y una inclinación de 40°, los valores reflejan una detección deficiente y no se interpretan.',
+        '**P4 · braza**: la frecuencia media de 79,5 ciclos/min, con ciclos de 95-100 ciclos/min (el límite que impone la duración mínima de 0,6 s), es superior a la habitual en braza. Es probable que la señal de la mano registre dos máximos por ciclo (tracción y recobro) y que la frecuencia esté sobrestimada; queda pendiente de validar con un conteo manual.',
+        '**P1 · crol, P2 · crol y P3 · mariposa**: valores coherentes con la biomecánica del estilo (cuerpo alineado, inclinación de 8-18°, cadera de 147-166°); la frecuencia de P1 en crol está validada frente al conteo manual.',
+    ])
+    w.p('Con la cautela anterior, los dos nadadores de crol con detección suficiente muestran perfiles distintos: P2 '
+        'nada con mayor frecuencia (66,7 frente a 52,1 ciclos/min), con el codo más flexionado en el agarre (80° '
+        'frente a 125°) y con el tronco más inclinado (18,2° frente a 8,5°). La dispersión entre ciclos es elevada en '
+        'todas las variables (coeficiente de variación del 13 % al 29 % en la frecuencia), lo que refuerza la decisión '
+        'de comparar a cada nadador consigo mismo en lugar de con un patrón común.')
+
+    w.h3('Fatiga en las sesiones reales')
+    w.p('El análisis de fatiga se aplicó a todas las sesiones con al menos ocho ciclos, la condición mínima del método '
+        '(Tabla {tab:sesiones}). En las tres sesiones que la cumplen no se detecta fatiga sostenida y PELT no '
+        'encuentra ningún punto de cambio.')
+    w.tabla([
+        ['Sesión', 'Secuencias', 'Ciclos', 'Inicio de la fatiga', 'Cambio PELT', 'Resultado'],
+        ['P1 · crol · cámara subacuática', '3', '10', 'No', 'No', 'Sin fatiga sostenida'],
+        ['P3 · mariposa · cámara subacuática', '2', '26', 'No', 'No', 'Sin fatiga sostenida'],
+        ['P4 · braza · cámara subacuática', '2', '27', 'No', 'No', 'Sin fatiga sostenida'],
+        ['P1 · crol · móvil', '2', '7', '—', '—', 'Insuficiente (< 8 ciclos)'],
+        ['P4 · braza · móvil', '2', '4', '—', '—', 'Insuficiente (< 8 ciclos)'],
+    ], 'Resultado del análisis de fatiga en las sesiones reales con más de una secuencia.', clave='sesiones', anchos=[4.8, 2, 1.5, 2.5, 2.2, 3])
+    w.figura(FIG / 'real_p4_fatiga_timeline.png', 'Participante P4 (braza, cámara subacuática): puntuación de anomalía por ciclo, umbral de la fase base y frecuencia y flexión del codo por ciclo.', clave='p4t')
+    w.p('La sesión de P4 (Figura {fig:p4t}) ilustra el comportamiento del método en ausencia de fatiga: la puntuación '
+        'oscila entre 0,45 y 0,55 alrededor del nivel de la fase base y solo un ciclo aislado supera el umbral, lo que '
+        'no basta para declarar un inicio (se exigen tres ciclos consecutivos de la media móvil). Las variables por '
+        'ciclo varían mucho de un ciclo al siguiente sin tendencia, lo que corresponde a variabilidad de la detección y '
+        'no a una degradación progresiva. La atribución SHAP de la sesión (Figura {fig:p4s}) se concentra en la '
+        'inclinación del tronco, el ángulo de cadera y el número de patadas por ciclo, con valores pequeños.')
+    w.figura(FIG / 'real_p4_shap_summary.png', 'Participante P4 (braza): atribución SHAP de la puntuación de anomalía en la sesión, sin fatiga detectada.', clave='p4s', ancho_cm=12)
+    w.p('El resultado es coherente con la naturaleza de los datos: las secuencias son pasadas cortas a ritmo de '
+        'técnica, separadas por descansos, y no un esfuerzo continuo capaz de producir fatiga. Que el sistema no '
+        'genere falsas alarmas en tres sesiones reales con 10, 26 y 27 ciclos es un resultado relevante, aunque no '
+        'demuestra su capacidad de detectar la fatiga real, que solo podrá establecerse con grabaciones de nado '
+        'continuo hasta el agotamiento.')
+
+    w.h3('Clasificación del estilo con vídeos reales')
+    w.p('Para cuantificar la transferencia del clasificador a datos reales se extrajeron los rasgos por ventana de las '
+        'secuencias reales con suficiente señal: 42 ventanas de 11 vídeos (crol 4, mariposa 4, braza 3; la espalda no '
+        'tiene ninguna ventana válida). Se compararon cinco esquemas de entrenamiento y evaluación frente a la '
+        'referencia de asignar siempre la clase mayoritaria (Tabla {tab:estilo_real} y Figura {fig:estilo_real}).')
+    w.tabla([
+        ['Entrenamiento', 'Evaluación', 'Exactitud por ventana', 'Exactitud por vídeo'],
+        ['— (clase mayoritaria)', '11 vídeos reales', '—', '36,4 %'],
+        ['64 vídeos sintéticos', '11 vídeos reales', '16,7 %', '9,1 %'],
+        ['Vídeos reales', 'Dejando un vídeo fuera', '47,6 %', '45,5 %'],
+        ['Vídeos reales + sintéticos', 'Dejando un vídeo fuera', '42,9 %', '54,5 %'],
+        ['Vídeos reales', 'Dejando un participante fuera', '9,5 %', '9,1 %'],
+        ['Vídeos reales + sintéticos', 'Dejando un participante fuera', '19,0 %', '18,2 %'],
+    ], 'Exactitud del clasificador de estilo sobre vídeos reales según el esquema de entrenamiento y evaluación.', clave='estilo_real', anchos=[4.6, 4.6, 3.4, 3.4])
+    w.figura(FIG / 'real_estilo.png', 'Clasificación del estilo con vídeos reales: exactitud por vídeo según el esquema y atribución SHAP del modelo entrenado con vídeos reales.', clave='estilo_real')
+    w.p('Los resultados muestran tres hechos. Primero, el modelo entrenado solo con datos sintéticos fracasa en vídeo '
+        'real (9,1 %), por debajo de la referencia. La comparación de los rasgos explica el motivo: en la simulación la '
+        'correlación entre piernas distingue con claridad el crol (−0,63) de la mariposa (0,95), mientras que en vídeo '
+        'real vale 0,87-0,91 en todos los estilos, porque el modelo de pose copia la pierna visible en la oculta; lo '
+        'mismo ocurre, en menor grado, con la correlación entre brazos (−0,41 en crol sintético frente a 0,31 en crol '
+        'real). Segundo, con vídeos reales y dejando un vídeo fuera, la exactitud supera la referencia (45,5 %) y '
+        'mejora al añadir los datos sintéticos (54,5 %). Tercero, dejando fuera un participante completo la exactitud '
+        'cae al 9-18 %: en este conjunto el estilo está confundido con el nadador (P4 solo nada braza), de modo que el '
+        'modelo aprende a reconocer al nadador o a la grabación más que el estilo.')
+    w.p('En consecuencia, la clasificación automática del estilo con vídeo real **no está resuelta** con los datos '
+        'disponibles, y el estilo se indica en la lista de vídeos. La atribución SHAP del modelo real apunta a los '
+        'rasgos que sí conservan información (posición de la nariz, separación de los pies y simultaneidad de los '
+        'brazos), lo que orienta la mejora: rasgos menos sensibles a la copia de extremidades y, sobre todo, más '
+        'participantes por estilo.')
+
+    w.h3('Análisis de sensibilidad del detector de fatiga (datos sintéticos)')
+    w.p('Los parámetros del detector (proporción de la fase base, percentil del umbral y número de ciclos consecutivos '
+        'exigidos) se fijaron a priori. Para evaluar su influencia se generaron, con datos sintéticos, 10 secuencias de '
+        'crol de 120 s con fatiga programada (transición del 10 % al 90 % entre t = 59 s y t = 81 s) y 10 secuencias '
+        'sin fatiga, con copia parcial de brazos y variabilidad entre ciclos. Se midió la tasa de detección en las '
+        'secuencias con fatiga, la tasa de falsas alarmas en las secuencias sin fatiga y el instante medio de inicio '
+        '(Tabla {tab:sensib} y Figura {fig:sensib}).')
+    w.tabla([
+        ['Fase base', 'Percentil', 'k = 2', 'k = 3', 'k = 4'],
+        ['20 %', '90', '1,0 / 0,4 / 64,9 s', '1,0 / 0,3 / 67,3 s', '1,0 / 0,1 / 69,1 s'],
+        ['20 %', '95', '1,0 / 0,1 / 71,8 s', '1,0 / 0,1 / 72,1 s', '1,0 / 0,1 / 74,3 s'],
+        ['20 %', '99', '0,6 / 0,0 / 79,2 s', '0,5 / 0,0 / 75,2 s', '0,5 / 0,0 / 79,2 s'],
+        ['30 %', '90', '1,0 / 0,3 / 60,3 s', '1,0 / 0,3 / 64,1 s', '1,0 / 0,1 / 66,4 s'],
+        ['30 %', '95', '1,0 / 0,1 / 70,5 s', '**1,0 / 0,1 / 70,5 s**', '1,0 / 0,1 / 71,2 s'],
+        ['30 %', '99', '0,8 / 0,1 / 84,8 s', '0,6 / 0,0 / 80,5 s', '0,6 / 0,0 / 83,8 s'],
+        ['40 %', '90', '1,0 / 0,2 / 66,1 s', '1,0 / 0,2 / 66,1 s', '1,0 / 0,1 / 67,1 s'],
+        ['40 %', '95', '1,0 / 0,1 / 68,8 s', '1,0 / 0,1 / 69,3 s', '1,0 / 0,1 / 70,4 s'],
+        ['40 %', '99', '0,7 / 0,0 / 86,8 s', '0,6 / 0,0 / 85,9 s', '0,6 / 0,0 / 85,9 s'],
+    ], 'Datos sintéticos: tasa de detección / tasa de falsas alarmas / inicio medio según la fase base, el percentil del '
+       'umbral y los ciclos consecutivos k (10 secuencias con fatiga y 10 sin fatiga por configuración). En negrita, la '
+       'configuración empleada.', clave='sensib', anchos=[2.2, 2.2, 3.85, 3.85, 3.85])
+    w.figura(FIG / 'sint_sensibilidad.png', 'Datos sintéticos: inicio de la fatiga detectado (media ± desviación típica) según los parámetros del detector.', clave='sensib')
+    w.p('El percentil del umbral es el parámetro decisivo. Con el percentil 90 la detección es completa, pero aparecen '
+        'hasta un 40 % de falsas alarmas y el inicio se adelanta al comienzo de la transición. Con el percentil 99 '
+        'desaparecen las falsas alarmas, pero se pierde entre el 20 % y el 50 % de las fatigas y las detectadas llegan '
+        'tarde (75-87 s). El percentil 95 ofrece el mejor equilibrio en todas las combinaciones: detección del 100 %, '
+        'falsas alarmas del 10 % e inicio medio entre 68,8 s y 74,3 s, dentro de la transición programada. La '
+        'configuración elegida (30 %, percentil 95, k = 3) detecta el inicio en 70,5 ± 5,0 s, en el centro de la '
+        'transición. La proporción de la fase base y el valor de k tienen un efecto menor: aumentar k reduce las falsas '
+        'alarmas a costa de retrasar ligeramente el aviso.')
+
+    w.h3('Robustez del conteo de ciclos (datos sintéticos)')
+    w.p('Para separar el efecto de cada fuente de error sobre la frecuencia de ciclo se generaron secuencias '
+        'sintéticas de crol en vista lateral de 60 s sin fatiga, con copia parcial de brazos (probabilidad 0,5) y con '
+        'distintos niveles de ruido en la posición de los puntos y de pérdida de puntos (Tabla {tab:robustez}).')
+    w.tabla([
+        ['Ruido de posición', 'Pérdida 5 %', 'Pérdida 20 %', 'Pérdida 40 %'],
+        ['1 píxel', '13,6 % (45,4)', '11,1 % (44,2)', '11,8 % (41,8)'],
+        ['3 píxeles', '11,8 % (43,0)', '12,2 % (42,6)', '12,5 % (42,6)'],
+        ['6 píxeles', '33,2 % (45,4)', '38,2 % (49,8)', '32,5 % (45,6)'],
+    ], 'Datos sintéticos: error relativo mediano de la frecuencia de ciclo (y número medio de ciclos válidos) según el '
+       'ruido de posición y la proporción de puntos perdidos.', clave='robustez', anchos=[4, 4, 4, 4])
+    w.p('El conteo es robusto a la pérdida de puntos, incluso del 40 %, gracias a la interpolación de huecos cortos y a '
+        'la mediana de los intervalos entre brazadas. El ruido de posición de hasta 3 píxeles apenas lo afecta, pero a '
+        'partir de 6 píxeles aparecen máximos espurios y el error se triplica. La copia de brazos introduce por sí sola '
+        'un error del 11-13 % (frente al 3-5 % sin copia), lo que confirma que la confusión entre brazos es la '
+        'principal fuente de error del conteo en vista lateral y justifica el uso de la mano más profunda en lugar de '
+        'cada brazo por separado. Los errores observados en vídeo real (6,5-8,2 %) son del mismo orden.')
     w.h3('Evaluación de la reconstrucción 3D frente a la 2D')
     w.tabla([
         ['Ángulo', 'Mediana 2D', 'Mediana 3D', 'Correlación'],
@@ -1190,9 +1435,54 @@ def cap5_discusion(w):
         'datos propios. La estrategia adoptada combina el rendimiento publicado en COCO, las métricas operativas en CPU '
         'y una validación orientada a la tarea (error de la frecuencia de ciclo). Esta última es la más relevante para '
         'el objetivo del sistema, aunque no sustituye una evaluación directa de la precisión de cada articulación.')
+    w.h2('Interpretación de los resultados con datos reales')
+    w.p('La aplicación al conjunto real completo permite separar lo que el sistema ya resuelve de lo que depende de '
+        'los datos. La segmentación en ciclos y la frecuencia de ciclo funcionan en vídeo real con un error del 6,5 % '
+        'al 8,2 % en crol, comparable al error que introduce la copia de brazos en los datos sintéticos (11-13 %), lo '
+        'que indica que el conteo por la mano más profunda neutraliza en gran parte esa confusión. Las medidas '
+        'angulares son plausibles cuando la detección es buena (P1 y P2 en crol, P3 en mariposa) y delatan los fallos '
+        'de la pose cuando no lo es: una inclinación del tronco de 84° no es un rasgo técnico sino un esqueleto mal '
+        'colocado. Este comportamiento es deseable, porque los errores se manifiestan en valores anómalos que el '
+        'usuario puede reconocer, en lugar de quedar ocultos.')
+    w.p('La cobertura del análisis (37 % del tiempo grabado) es el principal cuello de botella y depende sobre todo de '
+        'la distancia entre la cámara y el nadador. El caso de P3 en mariposa, con un 70-74 % analizable, muestra que '
+        'un encuadre más cerrado basta para multiplicar la información útil sin cambiar de modelo. Esta observación '
+        'tiene una consecuencia práctica inmediata para el protocolo de grabación del club.')
+    w.p('La ausencia de fatiga en las sesiones reales no permite afirmar que el detector funcione con nadadores '
+        'reales, pero sí que no genera falsas alarmas en 63 ciclos repartidos en tres sesiones con variabilidad real '
+        'de la detección. El análisis de sensibilidad con datos sintéticos, que estima una tasa de falsas alarmas del '
+        '10 % con la configuración elegida, es coherente con ese resultado. Ambos resultados son complementarios: los '
+        'datos sintéticos cuantifican la capacidad de detección y los reales, el comportamiento ante la variabilidad '
+        'de la pose sin fatiga.')
+    w.p('Por último, la clasificación del estilo ilustra la distancia entre dominios: un modelo perfecto en datos '
+        'sintéticos (100 %) falla en vídeo real (9,1 %) porque los rasgos que lo hacen perfecto, la alternancia de '
+        'piernas y brazos, son precisamente los que el modelo de pose no reproduce bajo el agua. La explicabilidad '
+        'resulta aquí útil no solo para el entrenador sino para el desarrollador: comparar los rasgos y su atribución '
+        'SHAP en ambos dominios permite localizar la causa del fallo.')
+
+    w.h2('Comparación con trabajos relacionados')
+    w.p('Los trabajos de estimación de pose en natación se centran en la precisión de los puntos articulares en '
+        'condiciones controladas [@einfalt2018; @fiche2023] y emplean conjuntos anotados o generados por ordenador. '
+        'StrokeLab no compite en esa precisión, que no puede medir sin anotaciones, sino que aborda un problema '
+        'posterior: convertir una pose imperfecta en indicadores por ciclo y en una explicación de la fatiga. La '
+        'literatura biomecánica describe la fatiga como un aumento de la frecuencia de ciclo con descenso de la '
+        'distancia por ciclo y cambios de coordinación [@craig1979; @alberty2005; @chollet2000]; estas son las '
+        'variables que el sistema modela y, en los datos sintéticos, las que la atribución SHAP señala. La diferencia '
+        'principal respecto a los sistemas instrumentados es el coste y la ausencia de sensores; la principal desventaja, '
+        'la menor precisión de la medida y la dependencia de la calidad del vídeo.')
+
+    w.h2('Amenazas a la validez')
+    w.vinetas([
+        '**Validez interna.** Los parámetros del detector se fijaron antes del análisis de sensibilidad, que confirma que la configuración elegida se sitúa en la zona de mejor equilibrio; no se han ajustado a los datos reales, lo que evita un sesgo optimista. El simulador fue diseñado por la autora, de modo que los datos sintéticos pueden favorecer al método; por ello se presentan siempre separados de los reales.',
+        '**Validez de constructo.** El sistema mide la *fatiga técnica*, entendida como el cambio sostenido de la técnica respecto al estado inicial; no mide la fatiga fisiológica. Un cambio técnico voluntario (por ejemplo, un cambio de ritmo) se detectaría igualmente como anomalía.',
+        '**Validez externa.** Cuatro participantes de un mismo club, grabados con dos dispositivos, no representan la variedad de nadadores, piscinas y cámaras; los resultados no deben generalizarse sin nuevos datos.',
+        '**Fiabilidad de la referencia.** El conteo manual de ciclos fue realizado por una sola persona y sin repetición, por lo que su error propio no está cuantificado.',
+    ])
     w.h2('Limitaciones')
     w.vinetas([
-        '**Escasez de datos reales.** Los resultados reales corresponden a un participante y a cinco secuencias cortas; no existe todavía una validación experimental de la fatiga en nadadores reales.',
+        '**Escasez de datos reales.** El conjunto real suma 17 secuencias cortas de cuatro participantes (146 s analizables y 100 ciclos); varios estilos tienen un solo participante y la espalda carece de datos suficientes. No existe todavía una validación experimental de la fatiga en nadadores reales.',
+        '**Estilo confundido con el participante.** Al nadar P4 solo braza, el clasificador de estilo con vídeos reales no puede separar el estilo del nadador; su exactitud con participantes no vistos es inferior a la referencia.',
+        '**Validación manual limitada.** El conteo manual cubre tres secuencias de crol; la frecuencia de los demás estilos, en particular la braza, no se ha validado.',
         '**Referencia de la fatiga.** No se ha contrastado el inicio detectado con una medida independiente (lactato, esfuerzo percibido o valoración experta).',
         '**Una sola cámara.** Los ángulos 2D son proyecciones; la refracción y la rotación del cuerpo los distorsionan.',
         '**Brazos y piernas indistinguibles en vista lateral.** La asimetría y los ángulos de cada lado son poco fiables en esa vista.',
@@ -1215,9 +1505,9 @@ def cap6_trabajo(w):
         ['OE2. Elevación a 3D', 'Implementada y evaluada; válida en codo y cadera, no en rodilla', 'Cumplido con limitaciones'],
         ['OE3. Ciclos de brazada', 'Error de la frecuencia del 6,5-8,2 % frente al conteo manual', 'Cumplido'],
         ['OE4. Variables por ciclo', 'Eficiencia y ángulos de codo, hombro, cadera, rodilla y pies', 'Cumplido'],
-        ['OE5. Inicio de la fatiga', 'Validado con datos sintéticos; no observable en las secuencias reales cortas', 'Parcial'],
+        ['OE5. Inicio de la fatiga', 'Validado con datos sintéticos (detección 100 %, falsas alarmas 10 %); sin falsas alarmas en tres sesiones reales; sin fatiga real que detectar', 'Parcial'],
         ['OE6. Atribución con SHAP', 'Global, local y textual; coincide con las variables alteradas', 'Cumplido'],
-        ['OE7. Clasificación del estilo', '100 % por vídeo en datos sintéticos; no transferido a vídeo real', 'Parcial'],
+        ['OE7. Clasificación del estilo', '100 % por vídeo en datos sintéticos; 45,5 % en vídeo real (referencia 36,4 %); no generaliza a participantes nuevos', 'Parcial'],
         ['OE8. Vídeo anotado', 'Panel de fatiga por ciclo', 'Cumplido'],
         ['OE9. Evaluación con datos sintéticos', 'Generador con referencia conocida y pruebas automáticas', 'Cumplido'],
     ], 'Grado de cumplimiento de los objetivos específicos.', clave='objetivos', anchos=[5, 7.5, 3.5])
@@ -1225,8 +1515,12 @@ def cap6_trabajo(w):
         'distancia por ciclo con errores medianos inferiores al 5 %, detecta el inicio de la fatiga al comienzo de la '
         'transición programada y atribuye la fatiga a las variables alteradas. Con vídeo real, la frecuencia de ciclo '
         'se aproxima al conteo manual con un error del 6,5 % al 8,2 % en dos vistas, y las medidas del participante P1 '
-        'describen un crol con el cuerpo alineado. En las secuencias reales disponibles no se detecta fatiga, lo que es '
-        'coherente con su duración.')
+        'describen un crol con el cuerpo alineado. Aplicado a 17 secuencias reales de cuatro participantes y cuatro '
+        'estilos, el sistema obtuvo 100 ciclos válidos y perfiles técnicos diferenciados por nadador, y no detectó '
+        'fatiga en ninguna de las tres sesiones con datos suficientes, lo que es coherente con su duración. El análisis '
+        'de sensibilidad confirma que la configuración del detector ofrece el mejor equilibrio entre detección y falsas '
+        'alarmas, y la evaluación con vídeos reales muestra que la clasificación del estilo necesita más participantes '
+        'por estilo para generalizar.')
     w.p('La principal debilidad del trabajo no reside en el modelo ni en la arquitectura, sino en la escasez de datos '
         'reales y en la ausencia de una validación experimental de la fatiga en nadadores reales. El sistema está '
         'preparado para esa validación en cuanto se disponga de grabaciones de nado continuo y de una referencia '
@@ -1319,6 +1613,70 @@ def anexos(w):
         '`tests/test_lote.py` y `tests/test_movenet_recorte.py`: análisis por lotes y conversión de coordenadas.',
     ])
 
+    w.h2('Anexo D. Resultados por secuencia del conjunto real')
+    w.tabla([
+        ['Secuencia', 'Part.', 'Estilo', 'Vista', 'Duración', 'Detección bruta', 'Analizable', 'Ciclos', 'Frecuencia (ciclos/min)'],
+        ['GX011614', 'P1', 'Crol', 'Lateral', '46,2 s', '96 %', '12,7 s', '9', '50,5'],
+        ['GX011617', 'P1', 'Crol', 'Lateral', '29,0 s', '95 %', '7,0 s', '0', '—'],
+        ['GX011618', 'P1', 'Crol', 'Lateral', '28,2 s', '100 %', '8,9 s', '1', '66,6'],
+        ['IMG_7207', 'P1', 'Crol', 'Frontal', '6,0 s', '98 %', '5,1 s', '3', '73,9'],
+        ['IMG_7215', 'P1', 'Crol', 'Frontal', '9,4 s', '100 %', '4,8 s', '4', '55,2'],
+        ['GX011610', 'P1', 'Mariposa', 'Lateral', '30,8 s', '98 %', '11,0 s', '7', '77,5'],
+        ['IMG_7209', 'P1', 'Mariposa', 'Lateral', '9,5 s', '83 %', '1,6 s', '0', '—'],
+        ['GX011608', 'P2', 'Crol', 'Lateral', '49,6 s', '93 %', '12,6 s', '9', '66,7'],
+        ['IMG_7205', 'P2', 'Espalda', 'Frontal', '12,9 s', '100 %', '2,9 s', '2', '54,6'],
+        ['GX011609', 'P3', 'Crol', 'Lateral', '39,4 s', '81 %', '7,4 s', '3', '65,8'],
+        ['GX010724', 'P3', 'Mariposa', 'Lateral', '22,6 s', '99 %', '16,5 s', '13', '61,8'],
+        ['GX010725', 'P3', 'Mariposa', 'Lateral', '21,4 s', '100 %', '15,8 s', '13', '53,3'],
+        ['IMG_7204', 'P3', 'Mariposa', 'Frontal', '14,1 s', '96 %', '7,7 s', '5', '47,3'],
+        ['GX011611', 'P4', 'Braza', 'Lateral', '27,0 s', '99 %', '8,7 s', '9', '82,2'],
+        ['GX011616', 'P4', 'Braza', 'Lateral', '31,7 s', '100 %', '15,6 s', '18', '79,7'],
+        ['IMG_7213', 'P4', 'Braza', 'Lateral', '9,1 s', '97 %', '3,0 s', '2', '64,8'],
+        ['IMG_7217', 'P4', 'Braza', 'Frontal', '7,3 s', '97 %', '5,1 s', '2', '39,7'],
+    ], 'Resultados del análisis por secuencia del conjunto real. La detección bruta es la proporción de fotogramas '
+       'analizados con alguna persona detectada, antes de los filtros; el tiempo analizable es el que supera los '
+       'filtros anatómicos y de tronco girado.', clave='anexo_videos', anchos=[2.5, 1.2, 1.8, 1.6, 1.6, 1.8, 1.8, 1.3, 2.4], size=8)
+    w.h2('Anexo E. Parámetros del sistema')
+    w.tabla([
+        ['Etapa', 'Parámetro', 'Valor', 'Justificación'],
+        ['Pose 2D', 'Modelo', 'YOLOv8n-Pose', 'Mejor detección en vídeo subacuático en CPU (Capítulo 4)'],
+        ['Pose 2D', 'Fotogramas analizados', '1 de cada 2', 'Reduce el tiempo a la mitad; 15 fps bastan para ciclos de 1-2 s'],
+        ['Pose 2D', 'Lado máximo de la imagen', '1920 píxeles', 'Evita el coste de procesar el vídeo 5K completo'],
+        ['Pose 2D', 'Giro del fotograma', 'Automático (0°, ±90°)', 'El modelo detecta mejor personas verticales'],
+        ['Limpieza', 'Confianza mínima de un punto', '0,3', 'Descarta puntos inciertos antes de interpolar'],
+        ['Limpieza', 'Tronco girado', '> 45° de la dirección habitual', 'Elimina esqueletos verticales espurios'],
+        ['Limpieza', 'Longitud del tronco', '0,5-2 × mediana', 'Elimina caderas colocadas sobre el hombro'],
+        ['Limpieza', 'Suavizado', 'Savitzky-Golay', 'Conserva máximos y mínimos de la señal'],
+        ['Ciclos', 'Intervalo entre brazadas (crol)', '0,35-1,0 s', 'Rango fisiológico de 30-85 ciclos/min'],
+        ['Ciclos', 'Intervalo entre brazadas (mariposa / braza)', '0,7-2,0 s / 0,7-2,4 s', 'Un ciclo por brazada'],
+        ['Ciclos', 'Duración de un ciclo válido', '0,6-3,0 s, ≤ 30 % de datos ausentes', 'Descarta ciclos partidos o fusionados'],
+        ['Ciclos', 'Mínimo y máximo por ciclo', 'Percentiles 10 y 90', 'Un fotograma erróneo no fija el valor del ciclo'],
+        ['Fatiga', 'Fase base', 'Primer 30 % de los ciclos (mínimo 5)', 'Análisis de sensibilidad (Tabla {tab:sensib})'],
+        ['Fatiga', 'Isolation Forest', '500 árboles', 'Estabilidad de la puntuación'],
+        ['Fatiga', 'Umbral', 'Percentil 95 de la fase base', 'Mejor equilibrio entre detección y falsas alarmas'],
+        ['Fatiga', 'Inicio', 'Media móvil de 3 ciclos sobre el umbral durante 3 ciclos', 'Evita avisos por ciclos aislados'],
+        ['Fatiga', 'Mínimo de ciclos', '8', 'Fase base de al menos 5 ciclos y margen de observación'],
+        ['Fatiga', 'PELT', 'Coste L2, penalización 2 ln n', 'Criterio de información estándar'],
+        ['Estilo', 'Ventanas', '4 s cada 2 s', 'Al menos dos ciclos por ventana'],
+        ['Estilo', 'Bosque aleatorio', '300 árboles, 2 muestras por hoja', 'Rendimiento estable sin ajuste fino'],
+    ], 'Parámetros principales del sistema y su justificación.', clave='parametros', anchos=[1.8, 4.2, 4.4, 5.6], size=8)
+    w.h2('Anexo F. Diccionario de variables por ciclo')
+    w.tabla([
+        ['Variable', 'Unidad', 'Definición'],
+        ['SR_ciclos_min', 'ciclos/min', 'Frecuencia de ciclo: 60 dividido por la duración del ciclo'],
+        ['velocidad_m_s', 'm/s', 'Velocidad media de la cadera en el ciclo (solo vista lateral calibrada)'],
+        ['DPS_m', 'm', 'Distancia por ciclo: velocidad por duración del ciclo'],
+        ['codo_min_I / _D', 'grados', 'Flexión máxima del codo en el ciclo (percentil 10 del ángulo)'],
+        ['hombro_max_I / _D', 'grados', 'Apertura máxima del hombro (percentil 90 del ángulo tronco-brazo)'],
+        ['cadera_media_I / _D', 'grados', 'Ángulo medio de la cadera (alineación tronco-muslo)'],
+        ['rodilla_min_I / _D', 'grados', 'Flexión máxima de la rodilla (percentil 10)'],
+        ['alcance_I / _D', 'troncos', 'Recorrido de la muñeca en el ciclo, relativo a la longitud del tronco'],
+        ['asimetria_brazos_pct', '%', 'Diferencia de alcance entre brazos dividida por su media'],
+        ['inclinacion_tronco', 'grados', 'Ángulo medio del eje hombros-cadera respecto a la horizontal de la imagen (solo vista lateral)'],
+        ['amplitud_patada', 'troncos', 'Separación máxima entre los tobillos en el ciclo, relativa a la longitud del tronco'],
+        ['patadas_por_ciclo', 'patadas', 'Número de máximos de la separación entre tobillos en el ciclo'],
+        ['anomalia, estado', '—, texto', 'Puntuación de Isolation Forest y estado FRESCO o FATIGA'],
+    ], 'Variables por ciclo del archivo variables_por_ciclo.csv.', clave='diccionario', anchos=[4, 2.2, 9.8], size=8)
 
 # ---------------------------------------------------------------- montaje
 
@@ -1335,9 +1693,10 @@ def construir():
     num = doc.part.numbering_part.element
     for an in num.findall(qn('w:abstractNum')):
         if an.get(qn('w:abstractNumId')) == '7':
-            lvl0 = [lv for lv in an.findall(qn('w:lvl')) if lv.get(qn('w:ilvl')) == '0'][0]
-            suff = OxmlElement('w:suff'); suff.set(qn('w:val'), 'space')
-            lvl0.find(qn('w:lvlText')).addprevious(suff)
+            for lv in an.findall(qn('w:lvl')):          # capítulo y apartados: número + espacio
+                if lv.find(qn('w:suff')) is None and lv.find(qn('w:lvlText')) is not None:
+                    suff = OxmlElement('w:suff'); suff.set(qn('w:val'), 'space')
+                    lv.find(qn('w:lvlText')).addprevious(suff)
     for nombre in ('toc 1', 'toc 2', 'toc 3'):
         doc.styles[nombre].paragraph_format.tab_stops.add_tab_stop(Cm(15), WD_TAB_ALIGNMENT.RIGHT, WD_TAB_LEADER.DOTS)
 
