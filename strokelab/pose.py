@@ -33,7 +33,7 @@ MP_MODELO_URL = ('https://storage.googleapis.com/mediapipe-models/pose_landmarke
 # pequeño; 1280 px detecta mejor a cambio de ~4 veces más tiempo. analizar.py los cambia con --imgsz y --conf-det.
 YOLO_IMGSZ = 640
 YOLO_CONF = 0.25
-MAX_LADO = 1920
+MAX_LADO = 1920   # los fotogramas 4K/5K se reducen a este lado mayor antes del modelo (los modelos usan 192-640 px)
 # Dispositivo de YOLO: 'cpu' en el portátil; 'cuda:0' con GPU (analizar.py --dispositivo auto lo elige solo).
 DISPOSITIVO = 'cpu'
 
@@ -46,7 +46,7 @@ def elegir_dispositivo(pedido='auto'):
         import torch
         return 'cuda:0' if torch.cuda.is_available() else 'cpu'
     except ImportError:
-        return 'cpu'   # los fotogramas 4K/5K se reducen a este lado mayor antes del modelo (los modelos usan 192-640 px)
+        return 'cpu'
 
 
 def reducir(frame, max_lado=MAX_LADO):
