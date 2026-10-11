@@ -1,0 +1,82 @@
+{
+  "version": "2026-10-11",
+  "video": "GX011611.MP4",
+  "nadador": "P4",
+  "estilo": "braza",
+  "estilo_indicado": "braza",
+  "estilo_estimado": "braza",
+  "familia_estimada": "simultaneos",
+  "seguridad_estilo": "media",
+  "razones_estilo": [
+    "Correlación entre las manos +0.18 respecto al umbral de la vista (lateral): brazos simultáneos (mariposa o braza).",
+    "Nariz -0.26 troncos respecto a los hombros: cabeza alta (braza)."
+  ],
+  "aviso_estilo": false,
+  "imgsz": 640,
+  "conf_det": 0.25,
+  "modelo_pose": "yolov8n-pose",
+  "cada": 2,
+  "giro": 0,
+  "angulos_3d": false,
+  "vista": "lateral",
+  "vista_pedida": "lateral",
+  "tramos_vista": [
+    {
+      "inicio_s": 0.0,
+      "fin_s": 27.0,
+      "vista": "lateral"
+    }
+  ],
+  "fps": 29.97002997002997,
+  "resolucion": "5120x2880",
+  "duracion_s": 27.03,
+  "ciclos_validos": 9,
+  "pct_deteccion": 99.3,
+  "s_analizable": 8.7,
+  "SR_media": 82.2,
+  "pct_tronco_descartado": 28.0,
+  "pct_tronco_girado": 23.3,
+  "inicio_fatiga_ciclo": null,
+  "inicio_fatiga_s": null,
+  "cambio_pelt": [],
+  "variables_modelo": [
+    "SR_ciclos_min",
+    "codo_min_I",
+    "codo_min_D",
+    "hombro_max_I",
+    "hombro_max_D",
+    "cadera_media_I",
+    "cadera_media_D",
+    "rodilla_min_I",
+    "rodilla_min_D",
+    "alcance_I",
+    "alcance_D",
+    "asimetria_brazos_pct",
+    "inclinacion_tronco",
+    "amplitud_patada",
+    "patadas_por_ciclo"
+  ],
+  "medias": {
+    "duracion_s": 0.764,
+    "SR_ciclos_min": 82.155,
+    "codo_min_I": 111.003,
+    "codo_min_D": 97.446,
+    "hombro_max_I": 103.714,
+    "hombro_max_D": 102.059,
+    "cadera_media_I": 162.536,
+    "cadera_media_D": 159.959,
+    "rodilla_min_I": 145.008,
+    "rodilla_min_D": 148.609,
+    "alcance_I": 1.995,
+    "alcance_D": 2.241,
+    "asimetria_brazos_pct": 59.922,
+    "inclinacion_tronco": 9.466,
+    "amplitud_patada": 0.689,
+    "patadas_por_ciclo": 1.333,
+    "brazadas_min": 82.155,
+    "anomalia": 0.475
+  },
+  "explicacion": [
+    "P4: no se detecta fatiga sostenida en los 9 ciclos analizados."
+  ]
+}

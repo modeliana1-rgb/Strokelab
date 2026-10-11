@@ -137,6 +137,10 @@ aparece la fatiga y por qué** (SHAP), y medidas de codos, hombros, caderas, rod
   (45,5 % por vídeo dejando un vídeo fuera; 9,1 % dejando un participante fuera; base 36,4 %), sensibilidad y robustez
   (datos sintéticos, presentados como tales), ética, arquitectura, Anexos D-F. Los datos sintéticos NUNCA se presentan como reales.
   Pendiente: validar a mano la frecuencia de braza de P4 (79,5 parece sobrestimada) y el consentimiento de los nadadores.
+- **Memoria automática (11 oct)**: los resultados reales (tablas, cifras del resumen/abstract, cap. 1, 4.6, 5, 6 y Anexo D,
+  figuras real_*) salen de `memoria/datos_reales` vía `memoria/resultados_reales.py`. Para actualizar con un análisis nuevo:
+  `python memoria/importar_resultados.py <para_claude.zip>` y `python memoria/generar_memoria.py`. Base actual: 17 vídeos
+  reanalizados en local con el código 2026-10-11 (imgsz 640); pendiente el zip del clúster (imgsz 1280, + P5 y vídeo de 36 min).
 - Datos de la portada pendientes: apellidos de Diana, director/a, horas y presupuesto, equipo, agradecimientos,
   conclusiones personales, fechas de la fase 1, comparativa MoveNet/MediaPipe en CPU y resultado de fatiga real.
 

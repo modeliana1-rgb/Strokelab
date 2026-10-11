@@ -1,0 +1,82 @@
+{
+  "version": "2026-10-11",
+  "video": "GX010724.MP4",
+  "nadador": "P3",
+  "estilo": "mariposa",
+  "estilo_indicado": "mariposa",
+  "estilo_estimado": "mariposa",
+  "familia_estimada": "simultaneos",
+  "seguridad_estilo": "media",
+  "razones_estilo": [
+    "Correlación entre las manos +0.18 respecto al umbral de la vista (lateral): brazos simultáneos (mariposa o braza).",
+    "Nariz -0.00 troncos respecto a los hombros: cabeza en la línea del cuerpo (mariposa)."
+  ],
+  "aviso_estilo": false,
+  "imgsz": 640,
+  "conf_det": 0.25,
+  "modelo_pose": "yolov8n-pose",
+  "cada": 2,
+  "giro": 0,
+  "angulos_3d": false,
+  "vista": "lateral",
+  "vista_pedida": "lateral",
+  "tramos_vista": [
+    {
+      "inicio_s": 0.0,
+      "fin_s": 22.6,
+      "vista": "lateral"
+    }
+  ],
+  "fps": 29.97002997002997,
+  "resolucion": "1920x1080",
+  "duracion_s": 22.62,
+  "ciclos_validos": 13,
+  "pct_deteccion": 98.7,
+  "s_analizable": 16.2,
+  "SR_media": 65.6,
+  "pct_tronco_descartado": 41.3,
+  "pct_tronco_girado": 26.0,
+  "inicio_fatiga_ciclo": null,
+  "inicio_fatiga_s": null,
+  "cambio_pelt": [],
+  "variables_modelo": [
+    "SR_ciclos_min",
+    "codo_min_I",
+    "codo_min_D",
+    "hombro_max_I",
+    "hombro_max_D",
+    "cadera_media_I",
+    "cadera_media_D",
+    "rodilla_min_I",
+    "rodilla_min_D",
+    "alcance_I",
+    "alcance_D",
+    "asimetria_brazos_pct",
+    "inclinacion_tronco",
+    "amplitud_patada",
+    "patadas_por_ciclo"
+  ],
+  "medias": {
+    "duracion_s": 1.006,
+    "SR_ciclos_min": 65.6,
+    "codo_min_I": 93.044,
+    "codo_min_D": 103.512,
+    "hombro_max_I": 137.1,
+    "hombro_max_D": 153.373,
+    "cadera_media_I": 159.206,
+    "cadera_media_D": 156.763,
+    "rodilla_min_I": 122.419,
+    "rodilla_min_D": 124.29,
+    "alcance_I": 2.493,
+    "alcance_D": 2.485,
+    "asimetria_brazos_pct": 26.86,
+    "inclinacion_tronco": 14.005,
+    "amplitud_patada": 0.605,
+    "patadas_por_ciclo": 1.769,
+    "brazadas_min": 65.6,
+    "anomalia": 0.462
+  },
+  "explicacion": [
+    "P3: no se detecta fatiga sostenida en los 13 ciclos analizados."
+  ]
+}

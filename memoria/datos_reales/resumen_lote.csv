@@ -1,0 +1,26 @@
+﻿archivo;nadador;estilo;estilo_estimado;aviso_estilo;vista;vista_pedida;tramos_vista;sesion;estado;duracion_s;pct_deteccion;s_analizable;ciclos_validos;SR_media;inicio_fatiga_s
+Aaron/libre/GX011614.MP4;P1;crol;crol;False;lateral;lateral;lateral 0-46 s;P1_crol_gopro;ok;46.21;95.7;12.7;9;50.5;
+Aaron/libre/GX011617.MP4;P1;crol;braza;True;lateral;lateral;lateral 0-29 s;P1_crol_gopro;ok;28.96;94.9;6.9;0;;
+Aaron/libre/GX011618.MP4;P1;crol;crol;False;lateral;lateral;lateral 0-28 s;P1_crol_gopro;ok;28.23;100.0;6.4;1;66.6;
+Aaron/libre/IMG_7207.MOV;P1;crol;crol;False;frontal;frontal;frontal 0-6 s;P1_crol_movil;ok;5.98;98.1;5.1;3;73.9;
+Aaron/libre/IMG_7215.MOV;P1;crol;crol;False;frontal;frontal;frontal 0-9 s;P1_crol_movil;ok;9.38;100.0;4.8;4;55.2;
+Aaron/mariposa/GX011610.MP4;P1;mariposa;;False;lateral;lateral;lateral 0-31 s;P1_mariposa_gopro;ok;30.76;97.9;1.5;0;;
+Aaron/mariposa/IMG_7209.MOV;P1;mariposa;;False;lateral;lateral;lateral 0-10 s;P1_mariposa_movil;ok;9.49;83.3;1.6;0;;
+Alvaro/dorso/IMG_7205.MOV;P2;espalda;crol;False;frontal;frontal;frontal 0-13 s;P2_espalda_movil;ok;12.88;100.0;2.9;2;54.6;
+Alvaro/libre/GX011608.MP4;P2;crol;crol;False;lateral;lateral;lateral 0-50 s;P2_crol_gopro;ok;49.62;93.0;12.2;9;66.6;
+Alvise/libre/ASCR.MP4;P5;crol;;;auto;auto;;P5_crol_otra;sin resultado;;;;;;
+Alvise/libre/GX010718.MP4;P5;crol;;;auto;auto;;P5_crol_gopro;sin resultado;;;;;;
+Alvise/libre/GX010719.MP4;P5;crol;;;auto;auto;;P5_crol_gopro;sin resultado;;;;;;
+Alvise/libre/GX010731.MP4;P5;crol;;;auto;auto;;P5_crol_gopro;sin resultado;;;;;;
+Alvise/libre/GX011613.MP4;P5;crol;;;auto;auto;;P5_crol_gopro;sin resultado;;;;;;
+Alvise/libre/GX011615.MP4;P5;crol;;;auto;auto;;P5_crol_gopro;sin resultado;;;;;;
+Alvise/libre/IMG_7214.MOV;P5;crol;;;auto;auto;;P5_crol_movil;sin resultado;;;;;;
+Alvise/libre/IMG_7216.MOV;P5;crol;;;auto;auto;;P5_crol_movil;sin resultado;;;;;;
+Angel/pecho/GX011611.MP4;P4;braza;braza;False;lateral;lateral;lateral 0-27 s;P4_braza_gopro;ok;27.03;99.3;8.7;9;82.2;
+Angel/pecho/GX011616.MP4;P4;braza;braza;False;lateral;lateral;lateral 0-32 s;P4_braza_gopro;ok;31.66;100.0;15.6;18;79.7;
+Angel/pecho/IMG_7213.MOV;P4;braza;;False;lateral;lateral;lateral 0-9 s;P4_braza_movil;ok;9.11;96.9;3.0;2;64.8;
+Angel/pecho/IMG_7217.mov;P4;braza;simultaneos;False;frontal;frontal;frontal 0-7 s;P4_braza_movil;ok;7.3;96.7;5.1;2;39.7;
+Lucia/Libre/GX011609.MP4;P3;crol;;False;lateral;lateral;lateral 0-39 s;P3_crol_gopro;ok;39.36;80.7;6.1;5;75.3;
+Lucia/Mariposa/GX010724.MP4;P3;mariposa;mariposa;False;lateral;lateral;lateral 0-23 s;P3_mariposa_gopro;ok;22.62;98.7;16.2;13;65.6;
+Lucia/Mariposa/GX010725.MP4;P3;mariposa;mariposa;False;lateral;lateral;lateral 0-22 s;P3_mariposa_gopro;ok;21.45;99.5;15.8;13;53.4;
+Lucia/Mariposa/IMG_7204.MOV;P3;mariposa;simultaneos;False;frontal;frontal;frontal 0-14 s;P3_mariposa_movil;ok;14.14;96.4;7.7;5;47.3;

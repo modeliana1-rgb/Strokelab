@@ -1,0 +1,48 @@
+{
+  "version": "2026-10-11",
+  "video": "GX011617.MP4",
+  "nadador": "P1",
+  "estilo": "crol",
+  "estilo_indicado": "crol",
+  "estilo_estimado": "braza",
+  "familia_estimada": "simultaneos",
+  "seguridad_estilo": "alta",
+  "razones_estilo": [
+    "Correlación entre las manos +0.21 respecto al umbral de la vista (lateral): brazos simultáneos (mariposa o braza).",
+    "Nariz -0.19 troncos respecto a los hombros: cabeza alta (braza)."
+  ],
+  "aviso_estilo": true,
+  "imgsz": 640,
+  "conf_det": 0.25,
+  "modelo_pose": "yolov8n-pose",
+  "cada": 2,
+  "giro": 0,
+  "angulos_3d": false,
+  "vista": "lateral",
+  "vista_pedida": "lateral",
+  "tramos_vista": [
+    {
+      "inicio_s": 0.0,
+      "fin_s": 29.0,
+      "vista": "lateral"
+    }
+  ],
+  "fps": 29.97002997002997,
+  "resolucion": "5120x2880",
+  "duracion_s": 28.96,
+  "ciclos_validos": 0,
+  "pct_deteccion": 94.9,
+  "s_analizable": 6.9,
+  "SR_media": null,
+  "pct_tronco_descartado": 27.5,
+  "pct_tronco_girado": 20.0,
+  "inicio_fatiga_ciclo": null,
+  "inicio_fatiga_s": null,
+  "cambio_pelt": [],
+  "variables_modelo": [],
+  "medias": {},
+  "explicacion": [
+    "P1: no hay ciclos válidos",
+    "AVISO: el estilo indicado (crol) no coincide con lo observado en el vídeo (brazos simultaneos)."
+  ]
+}

@@ -1,0 +1,72 @@
+{
+  "version": "2026-10-11",
+  "video": "IMG_7204.MOV",
+  "nadador": "P3",
+  "estilo": "mariposa",
+  "estilo_indicado": "mariposa",
+  "estilo_estimado": null,
+  "familia_estimada": "simultaneos",
+  "seguridad_estilo": "media",
+  "razones_estilo": [
+    "Correlación entre las manos +0.20 respecto al umbral de la vista (frontal): brazos simultáneos (mariposa o braza).",
+    "De frente no se distingue la mariposa de la braza: indicar el estilo."
+  ],
+  "aviso_estilo": false,
+  "imgsz": 640,
+  "conf_det": 0.25,
+  "modelo_pose": "yolov8n-pose",
+  "cada": 2,
+  "giro": 0,
+  "angulos_3d": false,
+  "vista": "frontal",
+  "vista_pedida": "frontal",
+  "tramos_vista": [
+    {
+      "inicio_s": 0.0,
+      "fin_s": 14.1,
+      "vista": "frontal"
+    }
+  ],
+  "fps": 60.04243281471004,
+  "resolucion": "1080x1920",
+  "duracion_s": 14.14,
+  "ciclos_validos": 5,
+  "pct_deteccion": 96.4,
+  "s_analizable": 7.7,
+  "SR_media": 47.3,
+  "pct_tronco_descartado": 22.6,
+  "pct_tronco_girado": 1.4,
+  "inicio_fatiga_ciclo": null,
+  "inicio_fatiga_s": null,
+  "cambio_pelt": [],
+  "variables_modelo": [
+    "SR_ciclos_min",
+    "alcance_I",
+    "alcance_D",
+    "asimetria_brazos_pct",
+    "amplitud_patada",
+    "patadas_por_ciclo"
+  ],
+  "medias": {
+    "duracion_s": 1.282,
+    "SR_ciclos_min": 47.327,
+    "codo_min_I": NaN,
+    "codo_min_D": NaN,
+    "hombro_max_I": NaN,
+    "hombro_max_D": NaN,
+    "cadera_media_I": NaN,
+    "cadera_media_D": NaN,
+    "rodilla_min_I": NaN,
+    "rodilla_min_D": NaN,
+    "alcance_I": 3.752,
+    "alcance_D": 5.028,
+    "asimetria_brazos_pct": 41.838,
+    "inclinacion_tronco": NaN,
+    "amplitud_patada": 1.601,
+    "patadas_por_ciclo": 2.5,
+    "brazadas_min": 47.327
+  },
+  "explicacion": [
+    "P3: Solo 5 ciclos: hacen falta al menos 8 (mejor >= 12) para analizar fatiga."
+  ]
+}

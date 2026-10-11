@@ -1,0 +1,22 @@
+{
+  "nadador": "P1",
+  "pasadas": [
+    "/tmp/claude-0/-home-user/adafa5bb-57f4-54b3-9c22-958569508f76/scratchpad/arbol/resultados/IMG_7207",
+    "/tmp/claude-0/-home-user/adafa5bb-57f4-54b3-9c22-958569508f76/scratchpad/arbol/resultados/IMG_7215"
+  ],
+  "ciclos": 7,
+  "inicio_fatiga_ciclo": null,
+  "inicio_fatiga_pasada": null,
+  "cambio_pelt": [],
+  "variables_modelo": [
+    "SR_ciclos_min",
+    "alcance_I",
+    "alcance_D",
+    "asimetria_brazos_pct",
+    "amplitud_patada",
+    "patadas_por_ciclo"
+  ],
+  "explicacion": [
+    "P1: Solo 7 ciclos: hacen falta al menos 8 (mejor >= 12) para analizar fatiga."
+  ]
+}

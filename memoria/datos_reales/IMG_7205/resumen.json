@@ -1,0 +1,72 @@
+{
+  "version": "2026-10-11",
+  "video": "IMG_7205.MOV",
+  "nadador": "P2",
+  "estilo": "espalda",
+  "estilo_indicado": "espalda",
+  "estilo_estimado": "crol",
+  "familia_estimada": "alternos",
+  "seguridad_estilo": "alta",
+  "razones_estilo": [
+    "Correlación entre las manos -0.26 respecto al umbral de la vista (frontal): brazos alternos (crol o espalda).",
+    "Nariz -0.01 troncos: cara hacia el fondo o de lado (crol)."
+  ],
+  "aviso_estilo": false,
+  "imgsz": 640,
+  "conf_det": 0.25,
+  "modelo_pose": "yolov8n-pose",
+  "cada": 2,
+  "giro": 0,
+  "angulos_3d": false,
+  "vista": "frontal",
+  "vista_pedida": "frontal",
+  "tramos_vista": [
+    {
+      "inicio_s": 0.0,
+      "fin_s": 12.9,
+      "vista": "frontal"
+    }
+  ],
+  "fps": 60.03106393994305,
+  "resolucion": "1080x1920",
+  "duracion_s": 12.88,
+  "ciclos_validos": 2,
+  "pct_deteccion": 100.0,
+  "s_analizable": 2.9,
+  "SR_media": 54.6,
+  "pct_tronco_descartado": 5.4,
+  "pct_tronco_girado": 0.0,
+  "inicio_fatiga_ciclo": null,
+  "inicio_fatiga_s": null,
+  "cambio_pelt": [],
+  "variables_modelo": [
+    "SR_ciclos_min",
+    "alcance_I",
+    "alcance_D",
+    "asimetria_brazos_pct",
+    "amplitud_patada",
+    "patadas_por_ciclo"
+  ],
+  "medias": {
+    "duracion_s": 1.099,
+    "SR_ciclos_min": 54.586,
+    "codo_min_I": NaN,
+    "codo_min_D": NaN,
+    "hombro_max_I": NaN,
+    "hombro_max_D": NaN,
+    "cadera_media_I": NaN,
+    "cadera_media_D": NaN,
+    "rodilla_min_I": NaN,
+    "rodilla_min_D": NaN,
+    "alcance_I": 2.401,
+    "alcance_D": 3.666,
+    "asimetria_brazos_pct": 43.158,
+    "inclinacion_tronco": NaN,
+    "amplitud_patada": 1.919,
+    "patadas_por_ciclo": 1.0,
+    "brazadas_min": 109.172
+  },
+  "explicacion": [
+    "P2: Solo 2 ciclos: hacen falta al menos 8 (mejor >= 12) para analizar fatiga."
+  ]
+}

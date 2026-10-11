@@ -1,0 +1,3 @@
+ciclo,t_inicio_s,duracion_s,SR_ciclos_min,codo_min_I,codo_min_D,hombro_max_I,hombro_max_D,cadera_media_I,cadera_media_D,rodilla_min_I,rodilla_min_D,alcance_I,alcance_D,asimetria_brazos_pct,inclinacion_tronco,amplitud_patada,patadas_por_ciclo,brazadas_min,vista
+1,1.21,1.2474373576309796,48.09860762383017,,,,,,,,,1.6519258047041192,1.1026680705237568,39.87939849281227,,2.178797598964128,1,48.09860762383017,frontal
+2,4.14,1.9127372817008352,31.3686571459762,,,,,,,,,5.128336447395577,3.056895921720463,50.61409211767601,,1.4886495492854381,2,31.3686571459762,frontal

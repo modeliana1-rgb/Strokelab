@@ -1,0 +1,46 @@
+{
+  "version": "2026-10-11",
+  "video": "IMG_7209.MOV",
+  "nadador": "P1",
+  "estilo": "mariposa",
+  "estilo_indicado": "mariposa",
+  "estilo_estimado": null,
+  "familia_estimada": null,
+  "seguridad_estilo": "baja",
+  "razones_estilo": [
+    "No hay suficiente señal de los dos brazos para estimar el estilo."
+  ],
+  "aviso_estilo": false,
+  "imgsz": 640,
+  "conf_det": 0.25,
+  "modelo_pose": "yolov8n-pose",
+  "cada": 2,
+  "giro": -90,
+  "angulos_3d": false,
+  "vista": "lateral",
+  "vista_pedida": "lateral",
+  "tramos_vista": [
+    {
+      "inicio_s": 0.0,
+      "fin_s": 9.5,
+      "vista": "lateral"
+    }
+  ],
+  "fps": 60.136914165350184,
+  "resolucion": "1080x1920",
+  "duracion_s": 9.49,
+  "ciclos_validos": 0,
+  "pct_deteccion": 83.3,
+  "s_analizable": 1.6,
+  "SR_media": null,
+  "pct_tronco_descartado": 3.0,
+  "pct_tronco_girado": 3.0,
+  "inicio_fatiga_ciclo": null,
+  "inicio_fatiga_s": null,
+  "cambio_pelt": [],
+  "variables_modelo": [],
+  "medias": {},
+  "explicacion": [
+    "P1: no hay ciclos válidos"
+  ]
+}

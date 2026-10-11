@@ -1,0 +1,32 @@
+{
+  "nadador": "P1",
+  "pasadas": [
+    "/tmp/claude-0/-home-user/adafa5bb-57f4-54b3-9c22-958569508f76/scratchpad/arbol/resultados/GX011614",
+    "/tmp/claude-0/-home-user/adafa5bb-57f4-54b3-9c22-958569508f76/scratchpad/arbol/resultados/GX011617",
+    "/tmp/claude-0/-home-user/adafa5bb-57f4-54b3-9c22-958569508f76/scratchpad/arbol/resultados/GX011618"
+  ],
+  "ciclos": 10,
+  "inicio_fatiga_ciclo": null,
+  "inicio_fatiga_pasada": null,
+  "cambio_pelt": [],
+  "variables_modelo": [
+    "SR_ciclos_min",
+    "codo_min_I",
+    "codo_min_D",
+    "hombro_max_I",
+    "hombro_max_D",
+    "cadera_media_I",
+    "cadera_media_D",
+    "rodilla_min_I",
+    "rodilla_min_D",
+    "alcance_I",
+    "alcance_D",
+    "asimetria_brazos_pct",
+    "inclinacion_tronco",
+    "amplitud_patada",
+    "patadas_por_ciclo"
+  ],
+  "explicacion": [
+    "P1: no se detecta fatiga sostenida en los 10 ciclos analizados."
+  ]
+}
