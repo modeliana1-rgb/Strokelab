@@ -1,5 +1,8 @@
 """StrokeLab · análisis por lotes: todos los vídeos de una carpeta, y después la fatiga por sesión.
 
+Los vídeos pueden estar sueltos o en una subcarpeta por nadador (videos\Aaron\GX011614.MP4): la columna "archivo"
+guarda la ruta relativa y el código del participante (P1, P2...) sale del nombre de la carpeta.
+
 Pasos (PowerShell, desde la carpeta del proyecto):
   1) python lote.py --carpeta C:\\Users\\user\\StrokeLab\\videos --crear-lista
      Crea videos\\lista_videos.csv con nadador, estilo, vista y sesión de cada vídeo. Revísala en Excel:
@@ -41,31 +44,62 @@ CONOCIDOS = {
     'IMG_7217': ('Angel', 'braza'),
     'GX011615': ('Nadador A', 'crol'),
 }
+# Códigos anónimos de los participantes (memoria: P1-P4); una carpeta nueva recibe el siguiente código libre.
+CODIGOS = {'aaron': 'P1', 'alvaro': 'P2', 'lucia': 'P3', 'angel': 'P4', 'alvise': 'P5'}
+
+
+def _sin_tildes(t):
+    import unicodedata
+    return ''.join(c for c in unicodedata.normalize('NFD', t.lower()) if unicodedata.category(c) != 'Mn')
+
+
+def codigo_participante(nombre):
+    n = _sin_tildes(nombre).strip()
+    if n in CODIGOS:
+        return CODIGOS[n]
+    if n.upper().startswith('P') and n[1:].isdigit():
+        return n.upper()
+    return nombre
 
 
 def videos_de(carpeta):
-    return sorted(p for p in carpeta.iterdir() if p.suffix.lower() in EXTENSIONES)
+    """Vídeos de la carpeta y de sus subcarpetas (una por nadador), sin los vídeos anotados que genera el sistema."""
+    return sorted(p for p in carpeta.rglob('*') if p.is_file() and p.suffix.lower() in EXTENSIONES
+                  and '_anotado' not in p.stem.lower() and not p.stem.lower().startswith('video_anotado')
+                  and not any(parte.lower() == 'resultados' for parte in p.relative_to(carpeta).parts))
 
 
 def crear_lista(carpeta, lista):
-    previas = {f['archivo']: f for f in leer_lista(lista)} if lista.exists() else {}
-    filas = []
+    previas = {}
+    for f in (leer_lista(lista) if lista.exists() else []):
+        previas[f['archivo']] = f
+        previas.setdefault(Path(f['archivo']).name, f)      # una lista antigua (sin carpetas) sigue valiendo
+    filas, vistos = [], set()
     for v in videos_de(carpeta):
-        if v.name in previas:                    # no se pisa lo que Diana ya haya corregido
-            filas.append(previas[v.name])
+        rel = v.relative_to(carpeta).as_posix()
+        if v.name in vistos:
+            print(f'AVISO: hay dos vídeos llamados {v.name}; solo se usa el primero ({rel} se salta).')
             continue
-        nadador, estilo = CONOCIDOS.get(v.stem.upper(), ('?', 'crol'))
+        vistos.add(v.name)
+        previa = previas.get(rel) or previas.get(v.name)
+        if previa:                               # no se pisa lo que Diana ya haya corregido
+            filas.append({**previa, 'archivo': rel})
+            continue
+        sub = v.relative_to(carpeta).parts
+        nadador_c, estilo = CONOCIDOS.get(v.stem.upper(), (sub[0] if len(sub) > 1 else '?', '?'))
+        nadador = codigo_participante(nadador_c)
         camara = 'gopro' if v.stem.upper().startswith('GX') else 'movil'
-        filas.append(dict(archivo=v.name, nadador=nadador, estilo=estilo, vista='auto',
+        falta = [x for x, val in (('nadador', nadador), ('estilo', estilo)) if val == '?']
+        filas.append(dict(archivo=rel, nadador=nadador, estilo=estilo, vista='auto',
                           sesion=f'{nadador}_{estilo}_{camara}', incluir='si',
-                          notas='' if nadador != '?' else 'completar nadador y estilo'))
+                          notas=f'completar {" y ".join(falta)}' if falta else ''))
     with open(lista, 'w', newline='', encoding='utf-8-sig') as f:   # utf-8-sig: Excel lee bien las tildes
         w = csv.DictWriter(f, fieldnames=COLUMNAS, delimiter=';')
         w.writeheader()
         w.writerows(filas)
     print(f'Lista creada: {lista} ({len(filas)} vídeos). Revisa sobre todo "vista" y los "?".')
     for f in filas:
-        print(f"  {f['archivo']:<16} {f['nadador']:<10} {f['estilo']:<9} {f['vista']:<8} {f['sesion']}")
+        print(f"  {f['archivo']:<28} {f['nadador']:<6} {f['estilo']:<9} {f['vista']:<8} {f['sesion']}")
 
 
 def leer_lista(lista):
@@ -148,6 +182,8 @@ def main(argv=None):
         log.write(f'\n===== lote {time.strftime("%Y-%m-%d %H:%M")} =====\n')
         for n, f in enumerate(pendientes, 1):
             video, out = carpeta / f['archivo'], res_dir / Path(f['archivo']).stem
+            if not video.exists():                              # lista antigua sin carpetas: se busca por nombre
+                video = next((v for v in videos_de(carpeta) if v.name == Path(f['archivo']).name), video)
             if not video.exists():
                 print(f'NO EXISTE: {video}')
                 continue

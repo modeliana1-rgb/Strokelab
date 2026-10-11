@@ -4,7 +4,7 @@ No se pierde información para el análisis: analizar.py ya reduce cada fotogram
 Sirve para que los vídeos quepan en la cuota del clúster y se lean más rápido. Usa el ffmpeg de imageio-ffmpeg
 (pip install imageio-ffmpeg), así que funciona igual en Windows y en Linux.
 
-Uso:  python reducir_video.py <vídeo o carpeta> --salida <carpeta>      (sin audio, H.264, calidad alta: crf 18)
+Uso:  python reducir_video.py <vídeo o carpeta (con subcarpetas por nadador)> --salida <carpeta>      (sin audio, H.264, calidad alta: crf 18)
 """
 import argparse
 import subprocess
@@ -29,18 +29,20 @@ def main(argv=None):
     a = ap.parse_args(argv)
     origen, salida = Path(a.origen), Path(a.salida)
     salida.mkdir(parents=True, exist_ok=True)
-    videos = sorted(p for p in origen.iterdir() if p.suffix.lower() in EXT) if origen.is_dir() else [origen]
+    videos = sorted(p for p in origen.rglob('*') if p.is_file() and p.suffix.lower() in EXT) if origen.is_dir() else [origen]
     if origen.is_dir() and (origen / 'lista_videos.csv').exists() and not (salida / 'lista_videos.csv').exists():
         import shutil
         shutil.copy(origen / 'lista_videos.csv', salida / 'lista_videos.csv')     # la lista ya revisada viaja con los vídeos
     for v in videos:
-        if '_ANOTADO' in v.stem or v.stem.startswith('video_anotado'):
+        if '_anotado' in v.stem.lower() or v.stem.lower().startswith('video_anotado'):
             continue
-        dest = salida / v.name              # mismo nombre: la lista de vídeos sigue valiendo
+        rel = v.relative_to(origen) if origen.is_dir() else Path(v.name)
+        dest = salida / rel                 # mismas carpetas y nombres: la lista de vídeos sigue valiendo
+        dest.parent.mkdir(parents=True, exist_ok=True)
         if dest.exists():
             print(f'ya existe, se salta: {dest.name}')
             continue
-        print(f'{v.name} -> {dest}')
+        print(f'{rel} -> {dest}')
         reducir(v, dest, a.lado)
         print(f'   {v.stat().st_size / 1e9:.2f} GB -> {dest.stat().st_size / 1e9:.2f} GB')
 
