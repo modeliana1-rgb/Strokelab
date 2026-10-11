@@ -9,7 +9,7 @@ aparece la fatiga y por qué** (SHAP), y medidas de codos, hombros, caderas, rod
 - Todo se ejecuta **en local, en CPU**, en el portátil personal de Diana (Windows). No usar Colab salvo que lo pida.
 - Programa principal: `python analizar.py "<vídeo>" --nadador "<nombre>"` (ver README para opciones).
 - Pruebas antes de cada commit: `python tests/test_local.py`, `tests/test_sesion.py`, `tests/test_aaron.py`, `tests/test_movenet_recorte.py`,
-  `tests/test_estilos.py`, `tests/test_lote.py`, `tests/test_frontal.py`, `tests/test_aaron_frontal.py` y `tests/test_simulador_estilo.py`.
+  `tests/test_estilos.py`, `tests/test_lote.py`, `tests/test_frontal.py`, `tests/test_aaron_frontal.py`, `tests/test_simulador_estilo.py` y `tests/test_vista_auto.py`.
 - **GPU (11 oct, GPU de la escuela)**: `--dispositivo auto` (defecto en analizar y lote) usa CUDA si PyTorch la ve; en el
   portátil sigue siendo CPU. Con GPU conviene `--imgsz 1280` (mejor detección del nadador pequeño). `diagnostico.py` dice si hay GPU.
 - Todos los vídeos: `python lote.py --carpeta <videos> [--crear-lista]` (lista editable `lista_videos.csv`; reanudable).
@@ -83,6 +83,12 @@ aparece la fatiga y por qué** (SHAP), y medidas de codos, hombros, caderas, rod
   **Validación real (cuenta manual de Diana, 8 ciclos en cada clip entero)**: IMG_7207 80 manual vs 73,9 sistema
   (−7,6 %, 3 de 8 ciclos); IMG_7215 51,1 vs 55,2 (+8,2 %, 4 de 8). El ritmo se mide bien y distingue los dos ritmos;
   la cobertura es baja (38-50 % de los ciclos) por la detección. Prueba: `tests/test_aaron_frontal.py`.
+- **Vista automática** (`--vista auto`, 11 oct, petición de Diana: sistema híbrido): `strokelab/vista.py` divide el vídeo en
+  tramos de 60 s; frontal si >= 65 % de fotogramas con tronco a > 55° de la horizontal (reales: laterales <= 46 %,
+  frontales >= 87 %); el cambio se ajusta al mejor fotograma. Cada tramo se analiza con su vista; la fatiga usa los ciclos
+  de la vista con más ciclos (y `sesion.py` igual). 17/17 reales correctos (no independiente: umbral fijado con ellos);
+  sintético 90 s lateral + 90 s frontal: cambio en 89,9 s. `lote.py --crear-lista` pone `auto` en los vídeos nuevos.
+  Prueba: `tests/test_vista_auto.py`.
 - **Versión del análisis** (`strokelab.VERSION_ANALISIS`): lote.py rehace (reutilizando la pose) los vídeos analizados
   con otra versión. Motivo: el 2º zip de Diana (4 oct 23:05) traía resultados del código viejo porque el lote los saltó.
   Subir la fecha cada vez que cambien medidas, ciclos o fatiga.

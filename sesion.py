@@ -45,6 +45,10 @@ def main(argv=None):
         print('Ninguna pasada tiene ciclos válidos.')
         return 1
     ciclos = pd.concat(partes, ignore_index=True)
+    if 'vista' in ciclos and ciclos.vista.nunique() > 1:   # la fatiga se compara dentro de una misma vista
+        principal = ciclos.vista.value_counts().idxmax()
+        print(f'  la sesión mezcla vistas {dict(ciclos.vista.value_counts())}: se usan los ciclos en vista {principal}')
+        ciclos = ciclos[ciclos.vista == principal].reset_index(drop=True)
     ciclos['ciclo'] = range(1, len(ciclos) + 1)
     out = Path(a.salida) if a.salida else Path('resultados') / f'sesion_{a.nadador}'
     out.mkdir(parents=True, exist_ok=True)

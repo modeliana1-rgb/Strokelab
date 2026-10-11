@@ -21,7 +21,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from strokelab import VERSION_ANALISIS, fatiga, medidas, pose, video
+from strokelab import VERSION_ANALISIS, fatiga, medidas, pose, video, vista as vistas
 
 MODELOS_COMPARATIVA = ['yolov8n-pose', 'yolo11n-pose', 'yolov8s-pose', 'movenet_lightning', 'movenet_thunder', 'mediapipe']
 
@@ -55,8 +55,8 @@ def main(argv=None):
     ap.add_argument('--sin-video', action='store_true', help='no generar el vídeo anotado')
     ap.add_argument('--girar', default='auto', choices=['auto', '0', '90', '-90'],
                     help='girar el fotograma para que el nadador quede de pie ante el modelo (auto: elige el mejor)')
-    ap.add_argument('--vista', default='lateral', choices=['lateral', 'frontal', 'otra'],
-                    help='lateral: cámara de lado, ángulos en 2D (validado; el 3D falla en piernas bajo el agua). '
+    ap.add_argument('--vista', default='lateral', choices=['lateral', 'frontal', 'otra', 'auto'],
+                    help='auto: el sistema decide por tramos (lateral o frontal) según la orientación del tronco. lateral: cámara de lado, ángulos en 2D (validado; el 3D falla en piernas bajo el agua). '
                          'frontal: el nadador viene hacia la cámara o se ve desde el borde; brazadas por el recorrido '
                          'de las muñecas y ángulos en 3D. otra (oblicua): brazadas como en lateral y ángulos en 3D')
     ap.add_argument('--dispositivo', default='auto', help="auto (GPU si hay, si no CPU), cpu o cuda:0")
@@ -127,49 +127,62 @@ def main(argv=None):
             print(f'    AVISO: sin 3D, se continúa en 2D. {type(e).__name__}: {e}')
 
     print('\n[4] Medidas por fotograma y ciclos de brazada')
-    usar_3d = k3d is not None and a.vista != 'lateral'
-    fr = medidas.medidas_por_fotograma(k2d, fps, k3d if usar_3d else None, a.vista)
-    if k3d is not None and not usar_3d:        # el 3D se guarda aparte para comparar (columnas *_3d)
-        f3 = medidas.medidas_por_fotograma(k2d, fps, k3d)
-        for c in ['codo_I', 'codo_D', 'hombro_I', 'hombro_D', 'cadera_I', 'cadera_D', 'rodilla_I', 'rodilla_D']:
-            fr[c + '_3d'] = f3[c]
+    if a.vista == 'auto':
+        tramos = vistas.detectar_vista(k2d, fps)
+        print(f'    vista automática por tramos: {vistas.describir(tramos, fps)}')
+    else:
+        tramos = [(0, len(k2d), a.vista, None)]
+    partes = [_analizar_tramo(k2d, k3d, fps, a, W, ini, fin, v) for ini, fin, v, _ in tramos]
+    fr = pd.concat([p['fr'] for p in partes], ignore_index=True)
+    fr['t'] = np.arange(len(fr)) / fps
+    fr.attrs = {k: float(sum(p['fr'].attrs[k] * len(p['fr']) for p in partes) / len(fr))
+                for k in ('pct_tronco_descartado', 'pct_tronco_girado')}
     fr.to_csv(out / 'medidas_por_fotograma.csv', index=False)
-    sig, picos, ciclos_ab, T_br = medidas.detectar_ciclos(fr, fps, a.estilo, a.vista)
-    ciclos = medidas.variables_por_ciclo(fr, fps, ciclos_ab, a.metros_encuadre, W, a.estilo, a.vista)
-    if a.vista == 'frontal' and not usar_3d and len(ciclos):  # de frente, los ángulos 2D son proyecciones sin sentido
-        angulos = [c for c in ciclos if c.split('_')[0] in ('codo', 'hombro', 'cadera', 'rodilla')]
-        ciclos[angulos] = np.nan
-        print('    vista frontal sin 3D: los ángulos articulares no se calculan (hacen falta los de MotionBERT)')
-    print(f'    ángulos en {"3D" if usar_3d else "2D"} (vista {a.vista}) · tronco implausible descartado: '
-          f'{fr.attrs["pct_tronco_descartado"]:.1f}% (con tronco girado: {fr.attrs["pct_tronco_girado"]:.1f}%) · nadador analizable {np.mean(~np.isnan(sig)) * len(sig) / fps:.1f} s '
-          f'de {len(sig) / fps:.1f} s · brazadas {len(picos)} (ritmo típico {T_br or 0:.2f} s) · ciclos válidos {len(ciclos)}')
+    sig = np.concatenate([p['sig'] for p in partes])
+    picos = np.concatenate([np.asarray(p['picos'], int) + ini for p, (ini, *_) in zip(partes, tramos)]).astype(int)
+    ciclos_ab = [(x + ini, y + ini) for p, (ini, *_) in zip(partes, tramos) for x, y in p['ciclos_ab']]
+    ciclos = pd.concat([p['ciclos'] for p in partes if len(p['ciclos'])], ignore_index=True) if any(len(p['ciclos']) for p in partes) else partes[0]['ciclos']
+    if len(ciclos):
+        ciclos['ciclo'] = range(1, len(ciclos) + 1)
+    usar_3d = any(p['usar_3d'] for p in partes)
+    print(f'    tronco implausible descartado: {fr.attrs["pct_tronco_descartado"]:.1f}% (con tronco girado: '
+          f'{fr.attrs["pct_tronco_girado"]:.1f}%) · nadador analizable {np.mean(~np.isnan(sig)) * len(sig) / fps:.1f} s '
+          f'de {len(sig) / fps:.1f} s · brazadas {len(picos)} · ciclos válidos {len(ciclos)}')
     _grafica_ciclos(sig, picos, ciclos_ab, fps, out, medidas.ESTILOS[a.estilo]['brazadas_ciclo'])
 
+    # La fatiga compara al nadador consigo mismo en la MISMA vista: las variables de frente y de lado no son
+    # comparables. Si el vídeo mezcla vistas, el modelo se aplica a la vista con más ciclos.
+    vista_principal = ciclos.vista.value_counts().idxmax() if len(ciclos) else tramos[0][2]
+    ciclos_f = ciclos[ciclos.vista == vista_principal].reset_index(drop=True).copy() if len(ciclos) else ciclos
+    if len(ciclos_f) < len(ciclos):
+        print(f'    fatiga sobre los {len(ciclos_f)} ciclos en vista {vista_principal} (los otros {len(ciclos) - len(ciclos_f)} quedan en las tablas)')
     print('\n[5] Fatiga (Isolation Forest + PELT + SHAP)')
-    res = fatiga.analizar_fatiga(ciclos) if len(ciclos) else {'aviso': 'no hay ciclos válidos', 'inicio': None, 't_inicio': None, 'cambio_pelt': [], 'feats': []}
+    res = fatiga.analizar_fatiga(ciclos_f) if len(ciclos_f) else {'aviso': 'no hay ciclos válidos', 'inicio': None, 't_inicio': None, 'cambio_pelt': [], 'feats': []}
     if 'anom' in res:
-        ciclos['anomalia'] = res['anom']
-        ciclos['estado'] = ['fatigado' if res['inicio'] is not None and i >= res['inicio'] else 'fresco' for i in range(len(ciclos))]
+        ciclos_f['anomalia'] = res['anom']
+        ciclos_f['estado'] = ['fatigado' if res['inicio'] is not None and i >= res['inicio'] else 'fresco' for i in range(len(ciclos_f))]
         pd.DataFrame(res['shap'], columns=res['feats']).to_csv(out / 'shap_por_ciclo.csv', index=False)
-        fatiga.graficas(ciclos, res, a.nadador, out)
-    texto = fatiga.explicar(ciclos, res, a.nadador)
+        fatiga.graficas(ciclos_f, res, a.nadador, out)
+        ciclos = ciclos.merge(ciclos_f[['ciclo', 'anomalia', 'estado']], on='ciclo', how='left')
+    texto = fatiga.explicar(ciclos_f, res, a.nadador)
     print('    ' + '\n    '.join(texto))
     ciclos.to_csv(out / 'variables_por_ciclo.csv', index=False)
     if len(ciclos):
         print('\n    Medias por ciclo:')
-        print(ciclos.drop(columns=['ciclo', 't_inicio_s', 'estado'], errors='ignore').mean().round(2).to_string())
+        print(ciclos.drop(columns=['ciclo', 't_inicio_s', 'estado', 'vista'], errors='ignore').mean().round(2).to_string())
 
-    resumen = dict(version=VERSION_ANALISIS, video=vid.name, nadador=a.nadador, estilo=a.estilo, imgsz=ajustes[0], conf_det=ajustes[1], modelo_pose=a.modelo, cada=a.cada, giro=rot, angulos_3d=bool(usar_3d), vista=a.vista,
+    resumen = dict(version=VERSION_ANALISIS, video=vid.name, nadador=a.nadador, estilo=a.estilo, imgsz=ajustes[0], conf_det=ajustes[1], modelo_pose=a.modelo, cada=a.cada, giro=rot, angulos_3d=bool(usar_3d), vista=vista_principal, vista_pedida=a.vista,
+                   tramos_vista=[dict(inicio_s=round(x / fps, 1), fin_s=round(y / fps, 1), vista=v) for x, y, v, _ in tramos],
                    fps=fps, resolucion=f'{W}x{H}', duracion_s=round(len(kps) / fps, 2), ciclos_validos=len(ciclos),
                    pct_deteccion=round(float(100 * np.mean((conf[analizados] > 0.3).sum(1) >= 5)), 1),
                    s_analizable=round(float(np.mean(~np.isnan(sig)) * len(sig) / fps), 1),
                    SR_media=round(float(ciclos.SR_ciclos_min.mean()), 1) if len(ciclos) else None,
                    pct_tronco_descartado=round(fr.attrs['pct_tronco_descartado'], 1),
                    pct_tronco_girado=round(fr.attrs['pct_tronco_girado'], 1),
-                   inicio_fatiga_ciclo=None if res.get('inicio') is None else int(ciclos.ciclo.iloc[res['inicio']]),
+                   inicio_fatiga_ciclo=None if res.get('inicio') is None else int(ciclos_f.ciclo.iloc[res['inicio']]),
                    inicio_fatiga_s=res.get('t_inicio'), cambio_pelt=res.get('cambio_pelt', []),
                    variables_modelo=res.get('feats', []),
-                   medias=ciclos.drop(columns=['ciclo', 't_inicio_s', 'estado'], errors='ignore').mean().round(3).to_dict() if len(ciclos) else {},
+                   medias=ciclos.drop(columns=['ciclo', 't_inicio_s', 'estado', 'vista'], errors='ignore').mean().round(3).to_dict() if len(ciclos) else {},
                    explicacion=texto)
     (out / 'resumen.json').write_text(json.dumps(resumen, ensure_ascii=False, indent=2, default=float), encoding='utf-8')
 
@@ -177,10 +190,35 @@ def main(argv=None):
         print('\n[6] Vídeo anotado')
         t0 = time.time()
         destino = out / f'video_anotado.{a.formato}'
-        video.anotar(vid, destino, k2d, fr, ciclos, fps, a.nadador, a.formato, res=res, panel=a.panel)
+        video.anotar(vid, destino, k2d, fr, ciclos_f, fps, a.nadador, a.formato, res=res, panel=a.panel)
         print(f'    {destino} ({time.time() - t0:.0f} s)')
 
     print(f'\nListo en {time.time() - t_total:.0f} s. Resultados en: {out.resolve()}')
+
+
+def _analizar_tramo(k2d, k3d, fps, a, W, ini, fin, vista):
+    """Medidas, brazadas y variables por ciclo de un tramo del vídeo con una sola vista."""
+    k2 = k2d[ini:fin]
+    k3 = k3d[ini:fin] if k3d is not None else None
+    usar_3d = k3 is not None and vista != 'lateral'
+    fr = medidas.medidas_por_fotograma(k2, fps, k3 if usar_3d else None, vista)
+    if k3 is not None and not usar_3d:        # el 3D se guarda aparte para comparar (columnas *_3d)
+        f3 = medidas.medidas_por_fotograma(k2, fps, k3)
+        for c in ['codo_I', 'codo_D', 'hombro_I', 'hombro_D', 'cadera_I', 'cadera_D', 'rodilla_I', 'rodilla_D']:
+            fr[c + '_3d'] = f3[c]
+    fr['vista'] = vista
+    sig, picos, ciclos_ab, T_br = medidas.detectar_ciclos(fr, fps, a.estilo, vista)
+    ciclos = medidas.variables_por_ciclo(fr, fps, ciclos_ab, a.metros_encuadre, W, a.estilo, vista)
+    if vista == 'frontal' and not usar_3d and len(ciclos):  # de frente, los ángulos 2D son proyecciones sin sentido
+        angulos = [c for c in ciclos if c.split('_')[0] in ('codo', 'hombro', 'cadera', 'rodilla')]
+        ciclos[angulos] = np.nan
+        print('    vista frontal sin 3D: los ángulos articulares no se calculan (hacen falta los de MotionBERT)')
+    if len(ciclos):
+        ciclos['t_inicio_s'] = (ciclos.t_inicio_s + ini / fps).round(2)
+        ciclos['vista'] = vista
+    print(f'    {vista} {ini / fps:.0f}-{fin / fps:.0f} s: ángulos en {"3D" if usar_3d else "2D"} · brazadas {len(picos)} '
+          f'(ritmo típico {T_br or 0:.2f} s) · ciclos válidos {len(ciclos)}')
+    return dict(fr=fr, sig=np.asarray(sig, float), picos=picos, ciclos_ab=ciclos_ab, ciclos=ciclos, usar_3d=usar_3d, T_br=T_br)
 
 
 def _grafica_ciclos(sig, picos, ciclos_ab, fps, out, brazadas_ciclo=2):

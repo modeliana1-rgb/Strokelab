@@ -1034,6 +1034,20 @@ def cap4_solucion(w):
         'de la orientación del tronco en la imagen: con cámara lateral el eje hombros-cadera es casi horizontal '
         '(8-40°), mientras que de frente aparece casi vertical (más de 60°) y escorzado. Con este criterio, cinco '
         'secuencias de móvil se clasificaron como frontales y dos como laterales.')
+    w.p('Este criterio se incorporó al sistema como modo de vista automática (`--vista auto`), de modo que el análisis '
+        'no queda limitado a una sola vista por vídeo. Un fotograma aislado no basta para decidir, porque en las '
+        'secuencias laterales el modelo de pose coloca a veces un esqueleto vertical; por ello el vídeo se divide en '
+        'tramos de 60 s y cada tramo se clasifica según la proporción de fotogramas con el tronco a más de 55° de la '
+        'horizontal. En las 17 secuencias reales esa proporción es como máximo del 46 % en las laterales y como mínimo '
+        'del 87 % en las frontales, y el umbral se fijó en el 65 %. Cuando dos tramos consecutivos tienen vistas '
+        'distintas, el punto de cambio se sitúa en el fotograma que mejor separa ambas. Cada tramo se analiza con la '
+        'señal de brazada de su vista, y la fatiga se calcula sobre los ciclos de una misma vista, porque las variables '
+        'de frente y de lado no son comparables.')
+    w.p('El modo automático clasificó correctamente las 17 secuencias reales y reprodujo exactamente sus ciclos y su '
+        'frecuencia. Esta comprobación no es independiente, porque el umbral se fijó con las mismas secuencias. Con datos '
+        'sintéticos que combinan 90 s en vista lateral y 90 s en vista frontal, el cambio se detectó en t = 89,9 s y la '
+        'frecuencia de ciclo de ambos tramos coincidió con la referencia. La resolución temporal del cambio depende de '
+        'la duración del tramo, por lo que cambios de vista de pocos segundos no se detectan.')
     w.p('La preparación incluye, además: la anonimización de los participantes mediante códigos; la exclusión de los '
         'archivos de salida; la agrupación en sesiones por participante, estilo y dispositivo, ya que mezclar cámaras '
         'distintas alteraría la referencia de cada nadador; y el registro de la versión del análisis en cada '
@@ -1487,7 +1501,7 @@ def cap5_discusion(w):
         '**Una sola cámara.** Los ángulos 2D son proyecciones; la refracción y la rotación del cuerpo los distorsionan.',
         '**Brazos y piernas indistinguibles en vista lateral.** La asimetría y los ángulos de cada lado son poco fiables en esa vista.',
         '**Detección parcial.** El nadador es analizable en torno a un tercio del vídeo y, de frente, se detecta entre el 38 % y el 50 % de los ciclos.',
-        '**Vista indicada por el usuario.** Un error en la vista empeora el conteo (con la señal frontal en una secuencia lateral el error pasó del 6,5 % al 14 %).',
+        '**Vista automática ajustada con pocos datos.** El umbral de la vista automática se fijó con las mismas 17 secuencias con las que se comprobó, y no detecta cambios de vista de pocos segundos. Un error en la vista empeora el conteo (con la señal frontal en una secuencia lateral el error pasó del 6,5 % al 14 %), por lo que, cuando se conoce la vista, conviene indicarla.',
         '**Fase base.** Se supone que el nadador comienza descansado; si no es así, el inicio de la fatiga se subestima.',
         '**Datos sintéticos.** Validan el método, pero son más regulares que los reales; el clasificador de estilo no se transfiere todavía a vídeo real.',
     ])
@@ -1563,8 +1577,8 @@ def cap7_futuro(w):
     w.h2('Extensión del sistema')
     w.p('El modo audio, que estimaría la frecuencia de brazada y el patrón respiratorio a partir del sonido, '
         'completaría los modos de entrada previstos. La fusión con sensores inerciales permitiría medir la velocidad sin '
-        'calibrar la cámara. La detección automática de la vista a partir de la orientación del tronco eliminaría la '
-        'dependencia de la indicación del usuario, y el entrenamiento del clasificador de estilo con vídeos reales '
+        'calibrar la cámara. La validación de la vista automática con secuencias nuevas, y su extensión a vistas '
+        'oblicuas, reforzaría el modo híbrido, y el entrenamiento del clasificador de estilo con vídeos reales '
         'etiquetados reduciría la distancia entre el dominio sintético y el real.')
     w.h2('Aplicación práctica')
     w.p('Por último, una versión con procesamiento en tiempo casi real y una interfaz para el entrenador facilitarían '

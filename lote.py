@@ -3,7 +3,8 @@
 Pasos (PowerShell, desde la carpeta del proyecto):
   1) python lote.py --carpeta C:\\Users\\user\\StrokeLab\\videos --crear-lista
      Crea videos\\lista_videos.csv con nadador, estilo, vista y sesión de cada vídeo. Revísala en Excel:
-     - vista: lateral (cámara de lado), frontal (viene hacia la cámara o desde el borde) u otra (oblicua).
+     - vista: auto (el sistema decide por tramos, por defecto), lateral (cámara de lado), frontal (viene hacia la
+       cámara o desde el borde) u otra (oblicua). Si se conoce la vista, indicarla evita errores de la detección automática.
      - sesion: los vídeos con el mismo nombre de sesión se unen en orden para analizar la fatiga.
      - incluir: si / no.
   2) python lote.py --carpeta C:\\Users\\user\\StrokeLab\\videos
@@ -55,7 +56,7 @@ def crear_lista(carpeta, lista):
             continue
         nadador, estilo = CONOCIDOS.get(v.stem.upper(), ('?', 'crol'))
         camara = 'gopro' if v.stem.upper().startswith('GX') else 'movil'
-        filas.append(dict(archivo=v.name, nadador=nadador, estilo=estilo, vista='lateral',
+        filas.append(dict(archivo=v.name, nadador=nadador, estilo=estilo, vista='auto',
                           sesion=f'{nadador}_{estilo}_{camara}', incluir='si',
                           notas='' if nadador != '?' else 'completar nadador y estilo'))
     with open(lista, 'w', newline='', encoding='utf-8-sig') as f:   # utf-8-sig: Excel lee bien las tildes
@@ -124,9 +125,9 @@ def main(argv=None):
     filas = [f for f in leer_lista(lista) if f.get('incluir', 'si').lower() in ('si', 'sí', 's', '1', 'x')]
     if a.solo:
         filas = [f for f in filas if f['archivo'] in a.solo]
-    malos = [f['archivo'] for f in filas if f.get('estilo') not in ESTILOS or f.get('vista') not in ('lateral', 'frontal', 'otra')]
+    malos = [f['archivo'] for f in filas if f.get('estilo') not in ESTILOS or f.get('vista') not in ('lateral', 'frontal', 'otra', 'auto')]
     if malos:
-        print(f'Corrige estilo ({"/".join(ESTILOS)}) o vista (lateral/frontal/otra) en: {", ".join(malos)}')
+        print(f'Corrige estilo ({"/".join(ESTILOS)}) o vista (auto/lateral/frontal/otra) en: {", ".join(malos)}')
         return 1
 
     pendientes = []
@@ -134,7 +135,7 @@ def main(argv=None):
         out = res_dir / Path(f['archivo']).stem
         r = out / 'resumen.json'
         previo = json.loads(r.read_text(encoding='utf-8')) if r.exists() else {}
-        hecho = (previo.get('estilo') == f['estilo'] and previo.get('vista') == f['vista']
+        hecho = (previo.get('estilo') == f['estilo'] and previo.get('vista_pedida', previo.get('vista')) == f['vista']
                  and previo.get('version') == VERSION_ANALISIS)     # código nuevo: se rehace (reutiliza la pose)
         if a.rehacer or a.rehacer_pose or not hecho:
             pendientes.append(f)
@@ -168,7 +169,9 @@ def main(argv=None):
         for f in filas:
             r = res_dir / Path(f['archivo']).stem / 'resumen.json'
             d = json.loads(r.read_text(encoding='utf-8')) if r.exists() else {}
-            tabla.append(dict(archivo=f['archivo'], nadador=f['nadador'], estilo=f['estilo'], vista=f['vista'], sesion=f['sesion'],
+            tabla.append(dict(archivo=f['archivo'], nadador=f['nadador'], estilo=f['estilo'], vista=d.get('vista', f['vista']),
+                              vista_pedida=f['vista'], tramos_vista=' | '.join(f"{t['vista']} {t['inicio_s']:.0f}-{t['fin_s']:.0f} s" for t in d.get('tramos_vista', [])),
+                              sesion=f['sesion'],
                               estado='ok' if d else 'sin resultado', duracion_s=d.get('duracion_s'),
                               pct_deteccion=d.get('pct_deteccion'), s_analizable=d.get('s_analizable'),
                               ciclos_validos=d.get('ciclos_validos'), SR_media=d.get('SR_media'),
