@@ -1,4 +1,7 @@
 ﻿sesion;nadador;estilo;videos;ciclos;inicio_fatiga_ciclo;inicio_fatiga_pasada;explicacion
+P5_crol_otra;P5;crol;1;0;;;un solo vídeo: ver su carpeta
+P5_crol_gopro;P5;crol;5;46;;;P5: no se detecta fatiga sostenida en los 46 ciclos analizados.
+P5_crol_movil;P5;crol;2;24;;;P5: no se detecta fatiga sostenida en los 16 ciclos analizados.
 P1_crol_gopro;P1;crol;3;10;;;P1: no se detecta fatiga sostenida en los 10 ciclos analizados.
 P1_crol_movil;P1;crol;2;7;;;P1: Solo 7 ciclos: hacen falta al menos 8 (mejor >= 12) para analizar fatiga.
 P1_mariposa_gopro;P1;mariposa;1;0;;;un solo vídeo: ver su carpeta

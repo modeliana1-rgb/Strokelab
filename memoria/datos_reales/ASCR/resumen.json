@@ -1,0 +1,46 @@
+{
+  "version": "2026-10-11",
+  "video": "ASCR.MP4",
+  "nadador": "P5",
+  "estilo": "crol",
+  "estilo_indicado": "crol",
+  "estilo_estimado": null,
+  "familia_estimada": null,
+  "seguridad_estilo": "baja",
+  "razones_estilo": [
+    "No hay suficiente señal de los dos brazos para estimar el estilo."
+  ],
+  "aviso_estilo": false,
+  "imgsz": 1280,
+  "conf_det": 0.25,
+  "modelo_pose": "yolov8n-pose",
+  "cada": 2,
+  "giro": 0,
+  "angulos_3d": false,
+  "vista": "lateral",
+  "vista_pedida": "auto",
+  "tramos_vista": [
+    {
+      "inicio_s": 0.0,
+      "fin_s": 28.2,
+      "vista": "lateral"
+    }
+  ],
+  "fps": 29.97002997002997,
+  "resolucion": "1920x1080",
+  "duracion_s": 28.23,
+  "ciclos_validos": 0,
+  "pct_deteccion": 96.4,
+  "s_analizable": 2.3,
+  "SR_media": null,
+  "pct_tronco_descartado": 51.7,
+  "pct_tronco_girado": 46.8,
+  "inicio_fatiga_ciclo": null,
+  "inicio_fatiga_s": null,
+  "cambio_pelt": [],
+  "variables_modelo": [],
+  "medias": {},
+  "explicacion": [
+    "P5: no hay ciclos válidos"
+  ]
+}

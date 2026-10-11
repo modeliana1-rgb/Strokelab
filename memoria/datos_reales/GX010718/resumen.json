@@ -1,0 +1,81 @@
+{
+  "version": "2026-10-11",
+  "video": "GX010718.MP4",
+  "nadador": "P5",
+  "estilo": "crol",
+  "estilo_indicado": "crol",
+  "estilo_estimado": "crol",
+  "familia_estimada": "alternos",
+  "seguridad_estilo": "alta",
+  "razones_estilo": [
+    "Correlación entre las manos -0.26 respecto al umbral de la vista (lateral): brazos alternos (crol o espalda).",
+    "Nariz -0.09 troncos: cara hacia el fondo o de lado (crol)."
+  ],
+  "aviso_estilo": false,
+  "imgsz": 1280,
+  "conf_det": 0.25,
+  "modelo_pose": "yolov8n-pose",
+  "cada": 2,
+  "giro": 0,
+  "angulos_3d": false,
+  "vista": "lateral",
+  "vista_pedida": "auto",
+  "tramos_vista": [
+    {
+      "inicio_s": 0.0,
+      "fin_s": 20.7,
+      "vista": "lateral"
+    }
+  ],
+  "fps": 29.97002997002997,
+  "resolucion": "1920x1080",
+  "duracion_s": 20.72,
+  "ciclos_validos": 5,
+  "pct_deteccion": 97.2,
+  "s_analizable": 11.5,
+  "SR_media": 52.0,
+  "pct_tronco_descartado": 49.6,
+  "pct_tronco_girado": 33.7,
+  "inicio_fatiga_ciclo": null,
+  "inicio_fatiga_s": null,
+  "cambio_pelt": [],
+  "variables_modelo": [
+    "SR_ciclos_min",
+    "codo_min_I",
+    "codo_min_D",
+    "hombro_max_I",
+    "hombro_max_D",
+    "cadera_media_I",
+    "cadera_media_D",
+    "rodilla_min_I",
+    "rodilla_min_D",
+    "alcance_I",
+    "alcance_D",
+    "asimetria_brazos_pct",
+    "inclinacion_tronco",
+    "amplitud_patada",
+    "patadas_por_ciclo"
+  ],
+  "medias": {
+    "duracion_s": 1.161,
+    "SR_ciclos_min": 52.044,
+    "codo_min_I": 103.908,
+    "codo_min_D": 81.707,
+    "hombro_max_I": 149.643,
+    "hombro_max_D": 139.989,
+    "cadera_media_I": 150.515,
+    "cadera_media_D": 149.082,
+    "rodilla_min_I": 131.261,
+    "rodilla_min_D": 124.974,
+    "alcance_I": 1.69,
+    "alcance_D": 2.423,
+    "asimetria_brazos_pct": 45.073,
+    "inclinacion_tronco": 18.958,
+    "amplitud_patada": 1.454,
+    "patadas_por_ciclo": 2.2,
+    "brazadas_min": 104.088
+  },
+  "explicacion": [
+    "P5: Solo 5 ciclos: hacen falta al menos 8 (mejor >= 12) para analizar fatiga."
+  ]
+}

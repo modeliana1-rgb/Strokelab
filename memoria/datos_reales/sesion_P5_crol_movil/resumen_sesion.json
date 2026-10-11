@@ -1,0 +1,30 @@
+{
+  "nadador": "P5",
+  "pasadas": [
+    "../resultados/IMG_7214",
+    "../resultados/IMG_7216"
+  ],
+  "ciclos": 16,
+  "inicio_fatiga_ciclo": null,
+  "inicio_fatiga_pasada": null,
+  "cambio_pelt": [],
+  "variables_modelo": [
+    "SR_ciclos_min",
+    "codo_min_I",
+    "codo_min_D",
+    "hombro_max_I",
+    "hombro_max_D",
+    "cadera_media_I",
+    "cadera_media_D",
+    "rodilla_min_I",
+    "rodilla_min_D",
+    "alcance_I",
+    "alcance_D",
+    "asimetria_brazos_pct",
+    "amplitud_patada",
+    "patadas_por_ciclo"
+  ],
+  "explicacion": [
+    "P5: no se detecta fatiga sostenida en los 16 ciclos analizados."
+  ]
+}

@@ -1,0 +1,82 @@
+{
+  "version": "2026-10-11",
+  "video": "GX011615.MP4",
+  "nadador": "P5",
+  "estilo": "crol",
+  "estilo_indicado": "crol",
+  "estilo_estimado": "crol",
+  "familia_estimada": "alternos",
+  "seguridad_estilo": "baja",
+  "razones_estilo": [
+    "Correlación entre las manos -0.02 respecto al umbral de la vista (lateral): brazos alternos (crol o espalda).",
+    "Nariz -0.05 troncos: cara hacia el fondo o de lado (crol)."
+  ],
+  "aviso_estilo": false,
+  "imgsz": 1280,
+  "conf_det": 0.25,
+  "modelo_pose": "yolov8n-pose",
+  "cada": 2,
+  "giro": -90,
+  "angulos_3d": false,
+  "vista": "lateral",
+  "vista_pedida": "auto",
+  "tramos_vista": [
+    {
+      "inicio_s": 0.0,
+      "fin_s": 33.9,
+      "vista": "lateral"
+    }
+  ],
+  "fps": 29.97002997002997,
+  "resolucion": "1920x1080",
+  "duracion_s": 33.93,
+  "ciclos_validos": 11,
+  "pct_deteccion": 96.6,
+  "s_analizable": 20.4,
+  "SR_media": 39.7,
+  "pct_tronco_descartado": 14.1,
+  "pct_tronco_girado": 6.4,
+  "inicio_fatiga_ciclo": null,
+  "inicio_fatiga_s": null,
+  "cambio_pelt": [],
+  "variables_modelo": [
+    "SR_ciclos_min",
+    "codo_min_I",
+    "codo_min_D",
+    "hombro_max_I",
+    "hombro_max_D",
+    "cadera_media_I",
+    "cadera_media_D",
+    "rodilla_min_I",
+    "rodilla_min_D",
+    "alcance_I",
+    "alcance_D",
+    "asimetria_brazos_pct",
+    "inclinacion_tronco",
+    "amplitud_patada",
+    "patadas_por_ciclo"
+  ],
+  "medias": {
+    "duracion_s": 1.547,
+    "SR_ciclos_min": 39.665,
+    "codo_min_I": 126.591,
+    "codo_min_D": 119.985,
+    "hombro_max_I": 159.972,
+    "hombro_max_D": 161.684,
+    "cadera_media_I": 174.124,
+    "cadera_media_D": 173.55,
+    "rodilla_min_I": 160.039,
+    "rodilla_min_D": 157.647,
+    "alcance_I": 1.805,
+    "alcance_D": 2.082,
+    "asimetria_brazos_pct": 26.03,
+    "inclinacion_tronco": 8.587,
+    "amplitud_patada": 0.452,
+    "patadas_por_ciclo": 3.818,
+    "brazadas_min": 79.33,
+    "anomalia": 0.482
+  },
+  "explicacion": [
+    "P5: no se detecta fatiga sostenida en los 11 ciclos analizados."
+  ]
+}

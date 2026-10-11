@@ -415,7 +415,10 @@ def _largo():
     d = dict(L)
     d['min'] = d['dur'] / 60
     d['fatiga'] = d['inicio'] is not None and d['inicio'] == d['inicio']
+    import re as _re
     causas = [x.strip().lstrip('-').strip() for x in d['explicacion'][2:] if x.strip().startswith('-')]
+    causas = [_re.sub(r'(\d)\.(\d)', r'\1,\2', c.split('[')[0].strip()).replace('->', '→') for c in causas]
+    d['aviso_estilo'] = any('AVISO' in x for x in d['explicacion'])
     d['causas'] = causas
     return d
 
@@ -1136,8 +1139,8 @@ def cap4_solucion(w):
         'Slurm y una GPU NVIDIA RTX 4000 Ada (20 GB). El código selecciona la GPU automáticamente cuando PyTorch la '
         'detecta (`--dispositivo auto`) y mantiene la CPU en el ordenador personal. La estimación de pose pasó de unos '
         '6,6 fotogramas por segundo en la CPU del portátil a unos 160 en la GPU, lo que permitió procesar el conjunto '
-        'completo con una entrada de la red de mayor resolución (1280 píxeles), que detecta mejor al nadador cuando ocupa '
-        'una parte pequeña del encuadre. Para respetar el espacio disponible, los vídeos 5K se reducen antes a 1920 '
+        'completo y probar una entrada de la red de mayor resolución (1280 píxeles), pensada para detectar mejor al '
+        'nadador cuando ocupa una parte pequeña del encuadre (su resultado se presenta en la Sección 4.6). Para respetar el espacio disponible, los vídeos 5K se reducen antes a 1920 '
         'píxeles de lado mayor (`reducir_video.py`), resolución a la que el sistema ya reducía cada fotograma, por lo que '
         'no se pierde información para el análisis. Los scripts de instalación y de envío de trabajos se incluyen en la '
         'carpeta `cluster/`.')
@@ -1386,14 +1389,34 @@ def resultados_reales(w):
     """Resultados con datos reales: se generan a partir de memoria/datos_reales (último análisis por lotes)."""
     V, L = R['V'], _largo()
     w.h3('Conjunto real: cobertura del análisis')
-    config = (f'YOLOv8n-Pose con entrada de {R["imgsz"]} píxeles' if R['imgsz'] else 'YOLOv8n-Pose')
-    w.p(f'El análisis por lotes se aplicó a las {R["n_videos"]} secuencias del conjunto real con la misma configuración '
+    tams = sorted(int(x) for x in V.imgsz.dropna().unique())
+    if len(tams) > 1:
+        n640 = int((V.imgsz == 640).sum())
+        config = (f'YOLOv8n-Pose; las {n640} secuencias del conjunto inicial con la entrada validada de 640 píxeles y las '
+                  f'{len(V) - n640} nuevas, procesadas en el clúster, con 1280 píxeles')
+    else:
+        config = (f'YOLOv8n-Pose con entrada de {R["imgsz"]} píxeles' if R['imgsz'] else 'YOLOv8n-Pose')
+    w.p(f'El análisis por lotes se aplicó a las {R["n_videos"]} secuencias del conjunto real con la configuración siguiente '
         f'({config}, un fotograma de cada dos, filtros anatómicos, vista y estilo comprobados automáticamente). De los '
         f'{num(R["dur"] / 60)} min grabados, el sistema obtuvo **{num(R["anal"] / 60)} min analizables '
         f'({R["pct"]:.0f} %) y {R["ciclos"]} ciclos válidos** (Figura {{fig:conjunto}}; detalle por secuencia en el '
         'Anexo D). La Tabla {tab:cobertura} agrega los resultados por participante y estilo.')
     w.figura(FIG / 'real_conjunto.png', 'Conjunto real: duración grabada, tiempo analizable y ciclos válidos por secuencia.', clave='conjunto')
     w.tabla(rr.tabla_cobertura(R), 'Conjunto real: tiempo analizable y ciclos válidos por participante y estilo.', clave='cobertura', anchos=[4, 2.4, 2.6, 3.6, 3.4])
+    if R['imgsz'] == 1280:
+        w.p('En las 17 secuencias del conjunto inicial, la entrada de 1280 píxeles no mejoró la detección respecto a la de '
+            '640 píxeles: produjo 64 ciclos válidos frente a 95 y 114,5 s analizables frente a 132,3 s. Una entrada mayor '
+            'genera más detecciones parciales y esqueletos incompletos que los filtros anatómicos descartan.')
+    elif len(tams) > 1:
+        w.p('La entrada de 1280 píxeles se probó en el clúster con las 17 secuencias del conjunto inicial y no mejoró la '
+            'detección respecto a la de 640 píxeles: produjo 64 ciclos válidos frente a 95, 114,5 s analizables frente a '
+            '132,3 s y un error de la frecuencia frente al conteo manual mucho mayor. Por ello, para esas secuencias se '
+            'mantiene la entrada de 640 píxeles. Las secuencias nuevas de P5 solo se han analizado con 1280 píxeles; su '
+            'repetición con 640 píxeles queda pendiente y podría aumentar sus ciclos válidos.')
+    elif R['imgsz'] == 640:
+        w.p('Se probó también una entrada de 1280 píxeles en el clúster. En las 17 secuencias del conjunto inicial no mejoró '
+            'la detección: produjo 64 ciclos válidos frente a 95 y 114,5 s analizables frente a 132,3 s, por lo que se '
+            'mantuvo la entrada de 640 píxeles.')
     sin = V[V.ciclos.fillna(0) == 0]
     mejor = V.assign(f=V.anal / V.dur).sort_values('f', ascending=False).iloc[0]
     w.p('La cobertura depende sobre todo de las condiciones de grabación: la distancia entre la cámara y el nadador y el '
@@ -1468,9 +1491,17 @@ def resultados_reales(w):
         if (FIG / 'real_largo_shap_waterfall_inicio.png').exists():
             w.figura(FIG / 'real_largo_shap_waterfall_inicio.png', f'Secuencia {L["clip"]} ({L["P"]}): atribución SHAP en '
                      'el ciclo de inicio de la fatiga.', clave='largo_w', ancho_cm=12)
-        w.p('Este resultado no cuenta con una referencia independiente del estado de fatiga (lactato, esfuerzo percibido '
-            'o valoración del entrenador), por lo que indica un cambio técnico sostenido y no una fatiga fisiológica '
-            'confirmada.')
+        cada = L['dur'] / 60 / max(int(L['ciclos']), 1)
+        w.p(f'El resultado debe interpretarse con cautela. Los {int(L["ciclos"])} ciclos válidos están repartidos a lo largo '
+            f'de toda la grabación (uno cada {num(cada)} min de media), porque el nadador solo es analizable cuando nada '
+            'cerca de la cámara; la fase base la forman los primeros ciclos, pocos, y el análisis compara pasadas separadas '
+            'por minutos de entrenamiento, que pueden incluir cambios de ritmo o de ejercicio.'
+            + (f' Además, el estilo observado (brazos {L["familia"]}) no coincide con el indicado ({L["estilo"]}), lo que '
+               'sugiere que la sesión contiene tramos de otros estilos o ejercicios técnicos.' if L.get('aviso_estilo') else '')
+            + ' No se dispone de una referencia independiente del estado de fatiga (lactato, esfuerzo percibido o '
+            'valoración del entrenador). El resultado es, por tanto, un indicio de cambio técnico sostenido compatible '
+            'con la fatiga, no una fatiga fisiológica confirmada; su validación requiere grabar series de nado continuo '
+            'con el nadador siempre en el encuadre.')
 
     w.h3('Fatiga en las sesiones de pasadas cortas')
     w.p('Las secuencias cortas de un mismo participante, estilo y cámara se unen en sesiones. El análisis de fatiga '

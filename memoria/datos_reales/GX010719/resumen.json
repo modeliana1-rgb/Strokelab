@@ -1,0 +1,83 @@
+{
+  "version": "2026-10-11",
+  "video": "GX010719.MP4",
+  "nadador": "P5",
+  "estilo": "crol",
+  "estilo_indicado": "crol",
+  "estilo_estimado": "braza",
+  "familia_estimada": "simultaneos",
+  "seguridad_estilo": "media",
+  "razones_estilo": [
+    "Correlación entre las manos +0.18 respecto al umbral de la vista (lateral): brazos simultáneos (mariposa o braza).",
+    "Nariz -0.08 troncos respecto a los hombros: cabeza alta (braza)."
+  ],
+  "aviso_estilo": true,
+  "imgsz": 1280,
+  "conf_det": 0.25,
+  "modelo_pose": "yolov8n-pose",
+  "cada": 2,
+  "giro": 90,
+  "angulos_3d": false,
+  "vista": "lateral",
+  "vista_pedida": "auto",
+  "tramos_vista": [
+    {
+      "inicio_s": 0.0,
+      "fin_s": 17.0,
+      "vista": "lateral"
+    }
+  ],
+  "fps": 29.97002997002997,
+  "resolucion": "1920x1080",
+  "duracion_s": 16.95,
+  "ciclos_validos": 11,
+  "pct_deteccion": 97.6,
+  "s_analizable": 14.8,
+  "SR_media": 58.4,
+  "pct_tronco_descartado": 15.6,
+  "pct_tronco_girado": 5.9,
+  "inicio_fatiga_ciclo": null,
+  "inicio_fatiga_s": null,
+  "cambio_pelt": [],
+  "variables_modelo": [
+    "SR_ciclos_min",
+    "codo_min_I",
+    "codo_min_D",
+    "hombro_max_I",
+    "hombro_max_D",
+    "cadera_media_I",
+    "cadera_media_D",
+    "rodilla_min_I",
+    "rodilla_min_D",
+    "alcance_I",
+    "alcance_D",
+    "asimetria_brazos_pct",
+    "inclinacion_tronco",
+    "amplitud_patada",
+    "patadas_por_ciclo"
+  ],
+  "medias": {
+    "duracion_s": 1.056,
+    "SR_ciclos_min": 58.39,
+    "codo_min_I": 105.486,
+    "codo_min_D": 91.765,
+    "hombro_max_I": 89.548,
+    "hombro_max_D": 121.924,
+    "cadera_media_I": 169.526,
+    "cadera_media_D": 168.688,
+    "rodilla_min_I": 140.056,
+    "rodilla_min_D": 144.881,
+    "alcance_I": 1.594,
+    "alcance_D": 1.576,
+    "asimetria_brazos_pct": 22.861,
+    "inclinacion_tronco": 19.42,
+    "amplitud_patada": 0.58,
+    "patadas_por_ciclo": 2.182,
+    "brazadas_min": 116.781,
+    "anomalia": 0.473
+  },
+  "explicacion": [
+    "P5: no se detecta fatiga sostenida en los 11 ciclos analizados.",
+    "AVISO: el estilo indicado (crol) no coincide con lo observado en el vídeo (brazos simultaneos)."
+  ]
+}

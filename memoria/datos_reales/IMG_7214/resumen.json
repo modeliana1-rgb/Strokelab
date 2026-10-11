@@ -1,0 +1,82 @@
+{
+  "version": "2026-10-11",
+  "video": "IMG_7214.MOV",
+  "nadador": "P5",
+  "estilo": "crol",
+  "estilo_indicado": "crol",
+  "estilo_estimado": null,
+  "familia_estimada": "simultaneos",
+  "seguridad_estilo": "alta",
+  "razones_estilo": [
+    "Correlación entre las manos +0.49 respecto al umbral de la vista (frontal): brazos simultáneos (mariposa o braza).",
+    "De frente no se distingue la mariposa de la braza: indicar el estilo."
+  ],
+  "aviso_estilo": true,
+  "imgsz": 1280,
+  "conf_det": 0.25,
+  "modelo_pose": "yolov8n-pose",
+  "cada": 2,
+  "giro": 0,
+  "angulos_3d": true,
+  "vista": "frontal",
+  "vista_pedida": "auto",
+  "tramos_vista": [
+    {
+      "inicio_s": 0.0,
+      "fin_s": 65.3,
+      "vista": "frontal"
+    }
+  ],
+  "fps": 59.94005994005994,
+  "resolucion": "1080x1920",
+  "duracion_s": 65.33,
+  "ciclos_validos": 16,
+  "pct_deteccion": 83.7,
+  "s_analizable": 48.3,
+  "SR_media": 47.2,
+  "pct_tronco_descartado": 12.7,
+  "pct_tronco_girado": 4.4,
+  "inicio_fatiga_ciclo": null,
+  "inicio_fatiga_s": null,
+  "cambio_pelt": [],
+  "variables_modelo": [
+    "SR_ciclos_min",
+    "codo_min_I",
+    "codo_min_D",
+    "hombro_max_I",
+    "hombro_max_D",
+    "cadera_media_I",
+    "cadera_media_D",
+    "rodilla_min_I",
+    "rodilla_min_D",
+    "alcance_I",
+    "alcance_D",
+    "asimetria_brazos_pct",
+    "amplitud_patada",
+    "patadas_por_ciclo"
+  ],
+  "medias": {
+    "duracion_s": 1.315,
+    "SR_ciclos_min": 47.151,
+    "codo_min_I": 81.774,
+    "codo_min_D": 94.11,
+    "hombro_max_I": 63.41,
+    "hombro_max_D": 59.18,
+    "cadera_media_I": 117.823,
+    "cadera_media_D": 126.293,
+    "rodilla_min_I": 72.79,
+    "rodilla_min_D": 87.82,
+    "alcance_I": 9.095,
+    "alcance_D": 8.617,
+    "asimetria_brazos_pct": 33.08,
+    "inclinacion_tronco": NaN,
+    "amplitud_patada": 0.864,
+    "patadas_por_ciclo": 1.714,
+    "brazadas_min": 94.302,
+    "anomalia": 0.473
+  },
+  "explicacion": [
+    "P5: no se detecta fatiga sostenida en los 16 ciclos analizados.",
+    "AVISO: el estilo indicado (crol) no coincide con lo observado en el vídeo (brazos simultaneos)."
+  ]
+}

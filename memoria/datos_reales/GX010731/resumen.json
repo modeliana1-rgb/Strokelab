@@ -1,0 +1,90 @@
+{
+  "version": "2026-10-11",
+  "video": "GX010731.MP4",
+  "nadador": "P5",
+  "estilo": "crol",
+  "estilo_indicado": "crol",
+  "estilo_estimado": "mariposa",
+  "familia_estimada": "simultaneos",
+  "seguridad_estilo": "media",
+  "razones_estilo": [
+    "Correlación entre las manos +0.12 respecto al umbral de la vista (lateral): brazos simultáneos (mariposa o braza).",
+    "Nariz -0.03 troncos respecto a los hombros: cabeza en la línea del cuerpo (mariposa)."
+  ],
+  "aviso_estilo": true,
+  "imgsz": 1280,
+  "conf_det": 0.25,
+  "modelo_pose": "yolov8n-pose",
+  "cada": 2,
+  "giro": 90,
+  "angulos_3d": false,
+  "vista": "lateral",
+  "vista_pedida": "auto",
+  "tramos_vista": [
+    {
+      "inicio_s": 0.0,
+      "fin_s": 2068.2,
+      "vista": "lateral"
+    }
+  ],
+  "fps": 29.97002997002997,
+  "resolucion": "1920x1080",
+  "duracion_s": 2068.23,
+  "ciclos_validos": 19,
+  "pct_deteccion": 73.2,
+  "s_analizable": 130.3,
+  "SR_media": 51.6,
+  "pct_tronco_descartado": 9.7,
+  "pct_tronco_girado": 6.3,
+  "inicio_fatiga_ciclo": 7,
+  "inicio_fatiga_s": 748.05,
+  "cambio_pelt": [
+    6
+  ],
+  "variables_modelo": [
+    "SR_ciclos_min",
+    "codo_min_I",
+    "codo_min_D",
+    "hombro_max_I",
+    "hombro_max_D",
+    "cadera_media_I",
+    "cadera_media_D",
+    "rodilla_min_I",
+    "rodilla_min_D",
+    "alcance_I",
+    "alcance_D",
+    "asimetria_brazos_pct",
+    "inclinacion_tronco",
+    "amplitud_patada",
+    "patadas_por_ciclo"
+  ],
+  "medias": {
+    "duracion_s": 1.205,
+    "SR_ciclos_min": 51.65,
+    "codo_min_I": 91.586,
+    "codo_min_D": 93.163,
+    "hombro_max_I": 115.633,
+    "hombro_max_D": 93.24,
+    "cadera_media_I": 126.157,
+    "cadera_media_D": 127.798,
+    "rodilla_min_I": 56.869,
+    "rodilla_min_D": 49.433,
+    "alcance_I": 1.797,
+    "alcance_D": 2.059,
+    "asimetria_brazos_pct": 31.759,
+    "inclinacion_tronco": 23.29,
+    "amplitud_patada": 0.51,
+    "patadas_por_ciclo": 1.611,
+    "brazadas_min": 103.3,
+    "anomalia": 0.488
+  },
+  "explicacion": [
+    "P5: la fatiga aparece en el ciclo 7 (t = 748.0 s, 32% del recorrido).",
+    "Principales causas (contribución SHAP media tras el inicio):",
+    "  - Amplitud de patada (troncos): 0.27 -> 0.62 (+125%)  [SHAP +0.047]",
+    "  - Frecuencia de ciclo (ciclos/min): 44.59 -> 55.27 (+24%)  [SHAP +0.035]",
+    "  - Flexión codo dcho. en agarre (°): 101.96 -> 86.23 (-15%)  [SHAP +0.024]",
+    "  - Apertura hombro dcho. (°): 78.40 -> 98.73 (+26%)  [SHAP +0.022]",
+    "AVISO: el estilo indicado (crol) no coincide con lo observado en el vídeo (brazos simultaneos)."
+  ]
+}
