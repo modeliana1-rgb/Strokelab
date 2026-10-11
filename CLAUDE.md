@@ -92,7 +92,7 @@ aparece la fatiga y por qué** (SHAP), y medidas de codos, hombros, caderas, rod
 - **Carpetas de vídeos (11 oct)**: `outputs\videos\<Nadador>\<estilo>\vídeo` (libre = crol, dorso = espalda, pecho = braza,
   mariposa). `lote.py` recorre subcarpetas, guarda la ruta relativa en "archivo" y saca P1-P5 de la carpeta del nadador
   (Aaron P1, Alvaro P2, Lucia P3, Angel P4, Alvise P5) y el estilo de la subcarpeta. Alvise (nuevo, 8 vídeos) no tiene
-  carpeta de estilo: estilo "?" hasta que Diana lo complete. `reducir_video.py` conserva las carpetas.
+  carpeta de estilo: estilo "?" hasta que Diana lo complete. Después movió todo a Alvise\libre (crol). Las carpetas mandan sobre una lista anterior en nadador y estilo. `reducir_video.py` conserva las carpetas.
 - **Versión del análisis** (`strokelab.VERSION_ANALISIS`): lote.py rehace (reutilizando la pose) los vídeos analizados
   con otra versión. Motivo: el 2º zip de Diana (4 oct 23:05) traía resultados del código viejo porque el lote los saltó.
   Subir la fecha cada vez que cambien medidas, ciclos o fatiga.

@@ -86,9 +86,6 @@ def crear_lista(carpeta, lista):
             continue
         vistos.add(v.name)
         previa = previas.get(rel) or previas.get(v.name)
-        if previa:                               # no se pisa lo que Diana ya haya corregido
-            filas.append({**previa, 'archivo': rel})
-            continue
         sub = v.relative_to(carpeta).parts          # (nadador, estilo, vídeo), (nadador, vídeo) o (vídeo,)
         nadador_c, estilo = CONOCIDOS.get(v.stem.upper(), ('?', '?'))
         if len(sub) > 1:                            # las carpetas mandan sobre lo conocido
@@ -96,7 +93,20 @@ def crear_lista(carpeta, lista):
         if len(sub) > 2:
             estilo = ESTILO_CARPETA.get(_sin_tildes(sub[1]).strip(), estilo)
         nadador = codigo_participante(nadador_c)
-        camara = 'gopro' if v.stem.upper().startswith('GX') else 'movil'
+        camara = ('gopro' if v.stem.upper().startswith(('GX', 'GH', 'GOPR')) else
+                  'movil' if v.stem.upper().startswith('IMG') else 'otra')    # p. ej. ASCR.MP4: cámara sin identificar
+        if previa:          # se conserva lo que Diana corrigió (vista, sesión, incluir, notas)...
+            fila = {**previa, 'archivo': rel}
+            if len(sub) > 1:                        # ...pero nadador y estilo los dicen las carpetas
+                fila['nadador'] = nadador
+            if len(sub) > 2 and estilo != '?':
+                fila['estilo'] = estilo
+            if '?' in fila.get('sesion', '') or not fila.get('sesion'):
+                fila['sesion'] = f"{fila['nadador']}_{fila['estilo']}_{camara}"
+            if fila.get('notas', '').startswith('completar') and '?' not in (fila['nadador'], fila['estilo']):
+                fila['notas'] = ''
+            filas.append(fila)
+            continue
         falta = [x for x, val in (('nadador', nadador), ('estilo', estilo)) if val == '?']
         filas.append(dict(archivo=rel, nadador=nadador, estilo=estilo, vista='auto',
                           sesion=f'{nadador}_{estilo}_{camara}', incluir='si',
