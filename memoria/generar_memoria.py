@@ -429,8 +429,9 @@ def resumen_es():
     if L is None:
         frase_largo = 'La validación de la fatiga en una secuencia continua de larga duración queda pendiente.'
     elif L['fatiga']:
-        frase_largo = (f'En una secuencia continua de {L["min"]:.0f} min, el sistema detecta el inicio de la fatiga técnica '
-                       f'en t = {num(L["inicio"])} s y lo atribuye a variables concretas de la técnica.')
+        frase_largo = (f'En una secuencia de entrenamiento de {L["min"]:.0f} min, el sistema detecta un cambio técnico '
+                       f'sostenido compatible con la fatiga a partir de t = {num(L["inicio"])} s (aumento de la frecuencia de '
+                       'ciclo), aunque con pocos ciclos válidos y sin referencia fisiológica.')
     else:
         frase_largo = f'En una secuencia continua de {L["min"]:.0f} min no se detecta fatiga técnica sostenida.'
     return ('La evaluación de la técnica de nado y de la aparición de la fatiga se basa habitualmente en la observación '
@@ -460,8 +461,9 @@ def abstract_en():
     if L is None:
         frase = 'Validation of fatigue on a long continuous sequence is pending.'
     elif L['fatiga']:
-        frase = (f'On a continuous {L["min"]:.0f}-min sequence, the system detects the onset of technical fatigue at '
-                 f't = {L["inicio"]:.1f} s and attributes it to specific technique variables.')
+        frase = (f'On a {L["min"]:.0f}-min training sequence, the system detects a sustained technical change compatible '
+                 f'with fatigue from t = {L["inicio"]:.1f} s (higher stroke rate), although with few valid cycles and no '
+                 'physiological reference.')
     else:
         frase = f'No sustained technical fatigue is detected on a continuous {L["min"]:.0f}-min sequence.'
     return ('Swimming technique and the onset of fatigue are usually assessed through the coach’s subjective observation or '
@@ -1473,7 +1475,7 @@ def resultados_reales(w):
             f'tramos ({tr}), obtuvo {num(L["anal"] / 60)} min analizables y {int(L["ciclos"])} ciclos válidos, con una '
             f'frecuencia media de {num(L["SR"])} ciclos/min.')
         if L['fatiga']:
-            w.p(f'**El sistema detecta el inicio de la fatiga técnica en el ciclo {int(L["inicio_ciclo"])} '
+            w.p(f'**El sistema detecta un cambio técnico sostenido, compatible con la fatiga, a partir del ciclo {int(L["inicio_ciclo"])} '
                 f'(t = {num(L["inicio"])} s, {num(L["inicio"] / 60)} min)**: a partir de ese ciclo la puntuación de anomalía '
                 'respecto a la fase base del propio nadador supera el umbral de forma sostenida (Figura {fig:largo_t}).'
                 + (' Las variables con mayor atribución SHAP tras el inicio son: ' + '; '.join(L['causas']) + '.' if L['causas'] else ''))
@@ -1644,7 +1646,7 @@ def cap6_trabajo(w):
         ['OE3. Ciclos de brazada', f'Error de la frecuencia del {_rango_err()[0]} frente al conteo manual; vista automática', 'Cumplido'],
         ['OE4. Variables por ciclo', 'Eficiencia y ángulos de codo, hombro, cadera, rodilla y pies', 'Cumplido'],
         ['OE5. Inicio de la fatiga', 'Validado con datos sintéticos (detección 100 %, falsas alarmas 10 %) y en tiempo real (10/10, sin falsas alarmas); '
-         + (('fatiga técnica detectada' if _largo()['fatiga'] else 'sin fatiga sostenida') + f' en la secuencia real de {_largo()["min"]:.0f} min; ' if _largo() else '')
+         + (('cambio técnico sostenido detectado' if _largo()['fatiga'] else 'sin fatiga sostenida') + f' en la secuencia real de {_largo()["min"]:.0f} min; ' if _largo() else '')
          + 'sin referencia fisiológica', 'Parcial'],
         ['OE6. Atribución con SHAP', 'Global, local y textual; coincide con las variables alteradas', 'Cumplido'],
         ['OE7. Clasificación del estilo', f'Modelo supervisado: 100 % en datos sintéticos, no generaliza en vídeo real. Reglas biomecánicas: familia correcta en {R["familia_ok"]} de {R["estilo_n"]} vídeos reales', 'Parcial'],
@@ -1658,8 +1660,8 @@ def cap6_trabajo(w):
         f'la frecuencia de ciclo se aproxima al conteo manual con un error del {_rango_err()[0]}, la vista y la familia '
         f'del estilo se determinan automáticamente, y el análisis de {R["n_videos"]} secuencias de {R["n_part"]} '
         f'participantes produjo {R["ciclos"]} ciclos válidos y perfiles técnicos diferenciados por nadador. '
-        + ((f'En la secuencia continua de {L["min"]:.0f} min, el sistema detectó el inicio de la fatiga técnica en '
-            f't = {num(L["inicio"])} s y explicó sus causas. ' if L['fatiga'] else
+        + ((f'En la secuencia de {L["min"]:.0f} min, el sistema detectó un cambio técnico sostenido compatible con la '
+            f'fatiga a partir de t = {num(L["inicio"])} s y explicó sus causas, con la cautela de los pocos ciclos válidos. ' if L['fatiga'] else
             f'En la secuencia continua de {L["min"]:.0f} min no se detectó fatiga sostenida. ') if L else '')
         + 'Las sesiones de pasadas cortas no presentaron fatiga, como cabía esperar por su duración.')
     w.p('La principal debilidad del trabajo no reside en el modelo ni en la arquitectura, sino en la escasez de datos '
