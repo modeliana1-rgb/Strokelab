@@ -1,4 +1,4 @@
-"""StrokeLab · análisis por lotes: todos los vídeos de una carpeta, y después la fatiga por sesión.
+r"""StrokeLab · análisis por lotes: todos los vídeos de una carpeta, y después la fatiga por sesión.
 
 Los vídeos pueden estar sueltos o en carpetas nadador\estilo (videos\Aaron\libre\GX011614.MP4): la columna
 "archivo" guarda la ruta relativa, el código del participante (P1, P2...) sale de la carpeta del nadador y el estilo
