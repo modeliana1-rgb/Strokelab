@@ -42,6 +42,10 @@ if ok.get('torch'):
     for _ in range(20): a = a @ a / 512
     print(f'\nPyTorch funciona en CPU ({time.time() - t0:.2f} s en la prueba de cálculo; hilos: {torch.get_num_threads()})')
 
+    if torch.cuda.is_available():
+        print(f'GPU disponible: {torch.cuda.get_device_name(0)} (CUDA {torch.version.cuda}) -> se usará automáticamente')
+    else:
+        print('GPU: no disponible para PyTorch (se usará la CPU)')
 print('\nResumen:')
 print('  YOLO (recomendado)  :', 'disponible' if ok.get('torch') and ok.get('ultralytics') else 'NO disponible')
 print('  MotionBERT (3D)     :', 'disponible' if ok.get('torch') else 'NO disponible')

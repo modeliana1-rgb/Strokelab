@@ -10,6 +10,8 @@ aparece la fatiga y por qué** (SHAP), y medidas de codos, hombros, caderas, rod
 - Programa principal: `python analizar.py "<vídeo>" --nadador "<nombre>"` (ver README para opciones).
 - Pruebas antes de cada commit: `python tests/test_local.py`, `tests/test_sesion.py`, `tests/test_aaron.py`, `tests/test_movenet_recorte.py`,
   `tests/test_estilos.py`, `tests/test_lote.py`, `tests/test_frontal.py`, `tests/test_aaron_frontal.py` y `tests/test_simulador_estilo.py`.
+- **GPU (11 oct, GPU de la escuela)**: `--dispositivo auto` (defecto en analizar y lote) usa CUDA si PyTorch la ve; en el
+  portátil sigue siendo CPU. Con GPU conviene `--imgsz 1280` (mejor detección del nadador pequeño). `diagnostico.py` dice si hay GPU.
 - Todos los vídeos: `python lote.py --carpeta <videos> [--crear-lista]` (lista editable `lista_videos.csv`; reanudable).
 - Responder siempre en español. Explicar las decisiones técnicas en lenguaje claro: Diana las defiende ante un tribunal.
 - No inventar resultados: lo que no se haya medido se marca como pendiente.

@@ -59,6 +59,7 @@ def main(argv=None):
                     help='lateral: cámara de lado, ángulos en 2D (validado; el 3D falla en piernas bajo el agua). '
                          'frontal: el nadador viene hacia la cámara o se ve desde el borde; brazadas por el recorrido '
                          'de las muñecas y ángulos en 3D. otra (oblicua): brazadas como en lateral y ángulos en 3D')
+    ap.add_argument('--dispositivo', default='auto', help="auto (GPU si hay, si no CPU), cpu o cuda:0")
     ap.add_argument('--panel', default='fatiga', choices=['fatiga', 'completo'],
                     help='panel del vídeo: solo fatiga (defecto) o también los ángulos articulares')
     a = ap.parse_args(argv)
@@ -67,8 +68,9 @@ def main(argv=None):
     out = Path(a.salida) if a.salida else Path('resultados') / vid.stem
     out.mkdir(parents=True, exist_ok=True)
     pose.YOLO_IMGSZ, pose.YOLO_CONF = a.imgsz, a.conf_det
+    pose.DISPOSITIVO = pose.elegir_dispositivo(a.dispositivo)
     t_total = time.time()
-    print(f'StrokeLab · {vid.name} -> {out}')
+    print(f'StrokeLab · {vid.name} -> {out} · dispositivo {pose.DISPOSITIVO}')
 
     npz = out / 'keypoints_raw.npz'
     origen = Path(a.keypoints) if a.keypoints else (npz if a.desde_keypoints and npz.exists() else None)
@@ -116,7 +118,7 @@ def main(argv=None):
         try:
             from strokelab import lift3d
             ck = lift3d.localizar_checkpoint(a.motionbert)
-            modelo3d = lift3d.cargar_modelo(ck)
+            modelo3d = lift3d.cargar_modelo(ck, pose.DISPOSITIVO)
             t0 = time.time()
             k3d = lift3d.elevar_3d(k2d, conf_para_3d(conf, k2d, fps), modelo3d)
             np.save(out / 'keypoints_3d.npy', k3d)

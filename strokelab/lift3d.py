@@ -119,7 +119,7 @@ def localizar_checkpoint(ruta=None, carpeta_modelos='modelos'):
             f'  (la descarga automática falló: {type(e).__name__}: {str(e)[:150]})')
 
 
-def cargar_modelo(checkpoint):
+def cargar_modelo(checkpoint, dispositivo='cpu'):
     import torch
     modelo = construir_modelo()
     ck = torch.load(str(checkpoint), map_location='cpu')
@@ -127,7 +127,7 @@ def cargar_modelo(checkpoint):
     estado = {k.replace('module.', '', 1): v for k, v in estado.items()}
     modelo.load_state_dict(estado, strict=True)
     modelo.eval()
-    return modelo
+    return modelo.to(dispositivo)
 
 
 def elevar_3d(kps, conf, modelo, voltear=True):
@@ -136,9 +136,10 @@ def elevar_3d(kps, conf, modelo, voltear=True):
     entrada, valido = preparar_entrada(kps, conf)
     T = len(entrada)
     salida = np.zeros((T, 17, 3), np.float32)
+    disp = next(modelo.parameters()).device
     with torch.no_grad():
         for a in range(0, T, CLIP):
-            x = torch.from_numpy(entrada[a:a + CLIP])[None]
+            x = torch.from_numpy(entrada[a:a + CLIP])[None].to(disp)
             y = modelo(x)
             if voltear:      # aumento por volteo horizontal, como en infer_wild.py
                 xf = x.clone()
@@ -148,7 +149,7 @@ def elevar_3d(kps, conf, modelo, voltear=True):
                 yf[..., 0] *= -1
                 yf[..., IZQ_H36M + DER_H36M, :] = yf[..., DER_H36M + IZQ_H36M, :]
                 y = (y + yf) / 2
-            salida[a:a + CLIP] = y[0].numpy()
+            salida[a:a + CLIP] = y[0].cpu().numpy()
     salida[~valido] = np.nan
     salida = salida - salida[:, :1]                       # relativo a la pelvis
     return h36m_a_coco(salida)

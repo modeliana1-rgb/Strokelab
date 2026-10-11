@@ -33,7 +33,20 @@ MP_MODELO_URL = ('https://storage.googleapis.com/mediapipe-models/pose_landmarke
 # pequeño; 1280 px detecta mejor a cambio de ~4 veces más tiempo. analizar.py los cambia con --imgsz y --conf-det.
 YOLO_IMGSZ = 640
 YOLO_CONF = 0.25
-MAX_LADO = 1920   # los fotogramas 4K/5K se reducen a este lado mayor antes del modelo (los modelos usan 192-640 px)
+MAX_LADO = 1920
+# Dispositivo de YOLO: 'cpu' en el portátil; 'cuda:0' con GPU (analizar.py --dispositivo auto lo elige solo).
+DISPOSITIVO = 'cpu'
+
+
+def elegir_dispositivo(pedido='auto'):
+    """'auto' -> 'cuda:0' si PyTorch ve una GPU NVIDIA, si no 'cpu'."""
+    if pedido != 'auto':
+        return pedido
+    try:
+        import torch
+        return 'cuda:0' if torch.cuda.is_available() else 'cpu'
+    except ImportError:
+        return 'cpu'   # los fotogramas 4K/5K se reducen a este lado mayor antes del modelo (los modelos usan 192-640 px)
 
 
 def reducir(frame, max_lado=MAX_LADO):
@@ -192,7 +205,7 @@ class Estimador:
                 lm = r.pose_landmarks.landmark
             xy = np.array([[lm[i].x * w, lm[i].y * h] for i in MP_A_COCO])
             return xy, np.array([lm[i].visibility for i in MP_A_COCO])
-        r = self.yolo(frame, verbose=False, device='cpu', imgsz=YOLO_IMGSZ, conf=YOLO_CONF)[0]
+        r = self.yolo(frame, verbose=False, device=DISPOSITIVO, imgsz=YOLO_IMGSZ, conf=YOLO_CONF)[0]
         if r.keypoints is None or r.keypoints.conf is None or len(r.boxes) == 0:
             return np.full((17, 2), np.nan), np.zeros(17)
         xy = r.keypoints.xy.cpu().numpy()
