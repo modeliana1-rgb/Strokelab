@@ -18,7 +18,8 @@ REF_MANUAL = 54.0      # ciclos/min (9 ciclos en 10 s, segundos 30-40)
 
 
 def main():
-    z = np.load(RAIZ / 'tests' / 'datos' / 'aaron_GX011614_keypoints.npz')
+    with np.load(RAIZ / 'tests' / 'datos' / 'aaron_GX011614_keypoints.npz') as _npz:          # Windows: el archivo se cierra al terminar de leerlo
+        z = dict(_npz)
     kps, conf, fps = z['kps'], z['conf'], float(z['fps'])
     k2d, _ = medidas.limpiar(kps, conf, fps)
     fr = medidas.medidas_por_fotograma(k2d, fps)

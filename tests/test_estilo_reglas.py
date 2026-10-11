@@ -16,7 +16,8 @@ from strokelab import estilo, medidas, simulador, vista  # noqa: E402
 
 def main():
     for clip in ('GX011614', 'IMG_7207', 'IMG_7215'):
-        z = np.load(RAIZ / 'tests' / 'datos' / f'aaron_{clip}_keypoints.npz')
+        with np.load(RAIZ / 'tests' / 'datos' / f'aaron_{clip}_keypoints.npz') as _npz:          # Windows: el archivo se cierra al terminar de leerlo
+            z = dict(_npz)
         fps = float(z['fps'])
         k2d, _ = medidas.limpiar(z['kps'], z['conf'], fps)
         r = estilo.estimar_por_reglas(k2d, fps, vista.detectar_vista(k2d, fps))

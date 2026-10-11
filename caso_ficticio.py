@@ -110,7 +110,8 @@ def clasificacion_estilo(out, A, B):
     imp = estilo.shap_por_estilo(modelo, datos)
     pred = {}
     for nombre, d, vista in (('A', A, 'lateral'), ('B', B, 'frontal')):
-        z = np.load(d / 'keypoints_raw.npz')
+        with np.load(d / 'keypoints_raw.npz') as _npz:          # Windows: el archivo se cierra al terminar de leerlo
+            z = dict(_npz)
         k2d, _ = medidas.limpiar(z['kps'], z['conf'], float(z['fps']))
         pred[nombre] = estilo.predecir(modelo, estilo.rasgos_ventanas(k2d, float(z['fps']), vista))
     ev['confusion'].to_csv(out / 'estilo_confusion.csv')

@@ -175,7 +175,8 @@ def main(argv=None):
     cap = cv2.VideoCapture(int(a.fuente) if camara else a.fuente) if (camara or Path(a.fuente).exists()) else None
     kps_previos = None
     if a.resultados:
-        d = np.load(Path(a.resultados) / 'keypoints_raw.npz')
+        with np.load(Path(a.resultados) / 'keypoints_raw.npz') as _npz:          # Windows: el archivo se cierra al terminar de leerlo
+            d = dict(_npz)
         kps_previos, conf_previos = d['kps'], d['conf']
         fps, W, H = float(d['fps']), int(d['w']), int(d['h'])
     elif cap is None or not cap.isOpened():

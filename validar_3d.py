@@ -18,7 +18,8 @@ COLS = ['codo_I', 'codo_D', 'hombro_I', 'hombro_D', 'cadera_I', 'cadera_D', 'rod
 def main(carpeta):
     warnings.filterwarnings('ignore')
     c = Path(carpeta)
-    z = np.load(c / 'keypoints_raw.npz')
+    with np.load(c / 'keypoints_raw.npz') as _npz:          # Windows: el archivo se cierra al terminar de leerlo
+        z = dict(_npz)
     k3 = np.load(c / 'keypoints_3d.npy')
     fps = float(z['fps'])
     k2, _ = medidas.limpiar(z['kps'], z['conf'], fps)

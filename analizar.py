@@ -91,12 +91,13 @@ def main(argv=None):
         print(tabla.to_string(index=False))
 
     if origen:
-        d = np.load(origen)
+        with np.load(origen) as _npz:          # Windows: el archivo se cierra al terminar de leerlo
+            d = dict(_npz)
         kps, conf, fps, W, H = d['kps'], d['conf'], float(d['fps']), int(d['w']), int(d['h'])
-        rot = int(d['giro']) if 'giro' in d.files else 0
-        ajustes = (int(d['imgsz']) if 'imgsz' in d.files else 640, float(d['conf_det']) if 'conf_det' in d.files else 0.25)
+        rot = int(d['giro']) if 'giro' in d else 0
+        ajustes = (int(d['imgsz']) if 'imgsz' in d else 640, float(d['conf_det']) if 'conf_det' in d else 0.25)
         if origen != npz:
-            np.savez(npz, **{k: d[k] for k in d.files})
+            np.savez(npz, **{k: d[k] for k in d})
         print(f'\n[1] Pose 2D cargada de {origen}')
     else:
         print(f'\n[1] Pose 2D con {a.modelo} (1 de cada {a.cada} fotogramas, giro {rot:+d}°)')

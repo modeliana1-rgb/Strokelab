@@ -22,7 +22,7 @@ from strokelab import simulador  # noqa: E402
 
 def correr(t_fatiga, seed):
     s = simulador.simular('crol', 'lateral', dur=120, seed=seed, t_fatiga=t_fatiga, copia_brazos=0.5)
-    with tempfile.TemporaryDirectory() as d:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as d:
         np.savez(Path(d) / 'keypoints_raw.npz', kps=s['kps'], conf=s['conf'], fps=s['fps'], w=s['W'], h=s['H'])
         with contextlib.redirect_stdout(io.StringIO()):
             en_vivo.main(['sintetico', '--resultados', d, '--sin-ventana', '--salida', d])

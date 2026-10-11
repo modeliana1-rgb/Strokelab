@@ -20,7 +20,8 @@ MANUAL = {'IMG_7207': (8, 6.0), 'IMG_7215': (8, 9.4)}     # (ciclos contados, se
 
 def main():
     for clip, (n_manual, dur) in MANUAL.items():
-        z = np.load(RAIZ / 'tests' / 'datos' / f'aaron_{clip}_keypoints.npz')
+        with np.load(RAIZ / 'tests' / 'datos' / f'aaron_{clip}_keypoints.npz') as _npz:          # Windows: el archivo se cierra al terminar de leerlo
+            z = dict(_npz)
         fps = float(z['fps'])
         k2d, _ = medidas.limpiar(z['kps'], z['conf'], fps)
         fr = medidas.medidas_por_fotograma(k2d, fps, vista='frontal')

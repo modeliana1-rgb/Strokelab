@@ -22,7 +22,7 @@ def main():
     fro = simulador.simular('crol', 'frontal', dur=90, seed=22, t_fatiga=None)
     kps = np.concatenate([lat['kps'], fro['kps']])
     conf = np.concatenate([lat['conf'], fro['conf']])
-    with tempfile.TemporaryDirectory() as d:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as d:
         d = Path(d)
         np.savez(d / 'mixto.npz', kps=kps, conf=conf, fps=lat['fps'], w=lat['W'], h=lat['H'])
         analizar.main(['mixto.mp4', '--keypoints', str(d / 'mixto.npz'), '--salida', str(d / 'res'), '--sin-3d',
