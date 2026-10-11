@@ -45,7 +45,9 @@ def elegir_dispositivo(pedido='auto'):
     try:
         import torch
         return 'cuda:0' if torch.cuda.is_available() else 'cpu'
-    except ImportError:
+    except (ImportError, OSError) as e:      # OSError: Windows puede bloquear las DLL de PyTorch (WinError 4551)
+        print(f'    AVISO: no se puede cargar PyTorch ({type(e).__name__}); se usa la CPU. YOLO y MotionBERT no '
+              'funcionarán en este equipo hasta resolverlo, pero el análisis desde puntos ya extraídos sí.')
         return 'cpu'
 
 
