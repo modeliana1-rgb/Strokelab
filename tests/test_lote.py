@@ -1,5 +1,5 @@
 """Prueba de lote.py: crea la lista, analiza 3 vídeos (pose ya extraída, del nadador sintético) y une la sesión.
-Los vídeos están en una subcarpeta por nadador (Aaron -> P1; una carpeta nueva, Alvise -> P5).
+Los vídeos están en carpetas nadador/estilo (Aaron/libre -> P1, crol) y sin estilo (Alvise -> P5, estilo por completar).
 
 Uso:  python tests/test_lote.py
 """
@@ -21,19 +21,19 @@ from test_local import nadador_sintetico  # noqa: E402
 def main():
     tmp = Path(tempfile.mkdtemp())
     vids, res = tmp / 'videos', tmp / 'resultados'
-    (vids / 'Aaron').mkdir(parents=True)
+    (vids / 'Aaron' / 'libre').mkdir(parents=True)
     (vids / 'Alvise').mkdir()
     kps, conf, fps, W, H = nadador_sintetico()
     for nombre, (a, b) in zip(['GX011614', 'GX011617', 'GX011618'], [(0, 900), (900, 1800), (1800, 2700)]):
-        (vids / 'Aaron' / f'{nombre}.MP4').write_bytes(b'')          # el vídeo no se lee: la pose ya está extraída
+        (vids / 'Aaron' / 'libre' / f'{nombre}.MP4').write_bytes(b'')          # el vídeo no se lee: la pose ya está extraída
         (res / nombre).mkdir(parents=True)
         np.savez(res / nombre / 'keypoints_raw.npz', kps=kps[a:b], conf=conf[a:b], fps=fps, w=W, h=H)
     (vids / 'Alvise' / 'OTRO.mov').write_bytes(b'')
-    (vids / 'Aaron' / 'GX011614_ANOTADO.mp4').write_bytes(b'')   # salida del sistema: no entra en la lista
+    (vids / 'Aaron' / 'libre' / 'GX011614_ANOTADO.mp4').write_bytes(b'')   # salida del sistema: no entra en la lista
     assert lote.main(['--carpeta', str(vids), '--crear-lista']) == 0
     filas = lote.leer_lista(vids / 'lista_videos.csv')
     assert [f['nadador'] for f in filas] == ['P1'] * 3 + ['P5'], filas
-    assert filas[0]['archivo'] == 'Aaron/GX011614.MP4' and filas[3]['estilo'] == '?', filas
+    assert filas[0]['archivo'] == 'Aaron/libre/GX011614.MP4' and filas[0]['estilo'] == 'crol' and filas[3]['estilo'] == '?', filas
     for f in filas:                                         # Diana marca el desconocido como "no incluir"
         if f['archivo'] == 'Alvise/OTRO.mov':
             f['incluir'] = 'no'

@@ -89,6 +89,10 @@ aparece la fatiga y por qué** (SHAP), y medidas de codos, hombros, caderas, rod
   de la vista con más ciclos (y `sesion.py` igual). 17/17 reales correctos (no independiente: umbral fijado con ellos);
   sintético 90 s lateral + 90 s frontal: cambio en 89,9 s. `lote.py --crear-lista` pone `auto` en los vídeos nuevos.
   Prueba: `tests/test_vista_auto.py`.
+- **Carpetas de vídeos (11 oct)**: `outputs\videos\<Nadador>\<estilo>\vídeo` (libre = crol, dorso = espalda, pecho = braza,
+  mariposa). `lote.py` recorre subcarpetas, guarda la ruta relativa en "archivo" y saca P1-P5 de la carpeta del nadador
+  (Aaron P1, Alvaro P2, Lucia P3, Angel P4, Alvise P5) y el estilo de la subcarpeta. Alvise (nuevo, 8 vídeos) no tiene
+  carpeta de estilo: estilo "?" hasta que Diana lo complete. `reducir_video.py` conserva las carpetas.
 - **Versión del análisis** (`strokelab.VERSION_ANALISIS`): lote.py rehace (reutilizando la pose) los vídeos analizados
   con otra versión. Motivo: el 2º zip de Diana (4 oct 23:05) traía resultados del código viejo porque el lote los saltó.
   Subir la fecha cada vez que cambien medidas, ciclos o fatiga.

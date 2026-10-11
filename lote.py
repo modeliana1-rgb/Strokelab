@@ -1,7 +1,8 @@
 """StrokeLab · análisis por lotes: todos los vídeos de una carpeta, y después la fatiga por sesión.
 
-Los vídeos pueden estar sueltos o en una subcarpeta por nadador (videos\Aaron\GX011614.MP4): la columna "archivo"
-guarda la ruta relativa y el código del participante (P1, P2...) sale del nombre de la carpeta.
+Los vídeos pueden estar sueltos o en carpetas nadador\estilo (videos\Aaron\libre\GX011614.MP4): la columna
+"archivo" guarda la ruta relativa, el código del participante (P1, P2...) sale de la carpeta del nadador y el estilo
+de la subcarpeta (libre = crol, dorso = espalda, pecho = braza, mariposa).
 
 Pasos (PowerShell, desde la carpeta del proyecto):
   1) python lote.py --carpeta C:\\Users\\user\\StrokeLab\\videos --crear-lista
@@ -46,6 +47,9 @@ CONOCIDOS = {
 }
 # Códigos anónimos de los participantes (memoria: P1-P4); una carpeta nueva recibe el siguiente código libre.
 CODIGOS = {'aaron': 'P1', 'alvaro': 'P2', 'lucia': 'P3', 'angel': 'P4', 'alvise': 'P5'}
+# Nombres de las carpetas de estilo (vocabulario de natación) -> estilo del sistema
+ESTILO_CARPETA = {'libre': 'crol', 'crol': 'crol', 'dorso': 'espalda', 'espalda': 'espalda',
+                  'pecho': 'braza', 'braza': 'braza', 'mariposa': 'mariposa'}
 
 
 def _sin_tildes(t):
@@ -85,8 +89,12 @@ def crear_lista(carpeta, lista):
         if previa:                               # no se pisa lo que Diana ya haya corregido
             filas.append({**previa, 'archivo': rel})
             continue
-        sub = v.relative_to(carpeta).parts
-        nadador_c, estilo = CONOCIDOS.get(v.stem.upper(), (sub[0] if len(sub) > 1 else '?', '?'))
+        sub = v.relative_to(carpeta).parts          # (nadador, estilo, vídeo), (nadador, vídeo) o (vídeo,)
+        nadador_c, estilo = CONOCIDOS.get(v.stem.upper(), ('?', '?'))
+        if len(sub) > 1:                            # las carpetas mandan sobre lo conocido
+            nadador_c = sub[0]
+        if len(sub) > 2:
+            estilo = ESTILO_CARPETA.get(_sin_tildes(sub[1]).strip(), estilo)
         nadador = codigo_participante(nadador_c)
         camara = 'gopro' if v.stem.upper().startswith('GX') else 'movil'
         falta = [x for x, val in (('nadador', nadador), ('estilo', estilo)) if val == '?']
