@@ -139,3 +139,72 @@ def graficas(ciclos, res, nadador, carpeta):
         plt.figure(); shap.plots.waterfall(e, show=False)
         plt.title(f'Atribución SHAP en el ciclo de inicio de la fatiga (ciclo {int(ciclos.ciclo.iloc[i])})')
         plt.tight_layout(); plt.savefig(carpeta / 'fig_shap_waterfall_inicio.png', dpi=150, bbox_inches='tight'); plt.close()
+
+
+class FatigaEnVivo:
+    """Fatiga ciclo a ciclo, usando solo los ciclos ya nadados (para el modo en tiempo real).
+
+    Diferencia con analizar_fatiga: allí la fase base es el primer 30 % de TODOS los ciclos, que en directo no se
+    conocen. Aquí la base son los n_base primeros ciclos; con ellos se ajustan la escala, el Isolation Forest y el
+    umbral (percentil 95). Cada ciclo nuevo recibe su puntuación, la media móvil de 3 ciclos y su explicación SHAP;
+    la fatiga empieza cuando la media móvil supera el umbral en k ciclos seguidos (la misma regla que en lote).
+    """
+
+    def __init__(self, n_base=10, k=3, percentil=95, arboles=300):
+        self.n_base, self.k, self.percentil, self.arboles = n_base, k, percentil, arboles
+        self.filas, self.anom, self.suav = [], [], []
+        self.modelo = None
+        self.inicio = None            # índice del ciclo de inicio de la fatiga
+        self.seguidos = 0
+
+    @property
+    def estado(self):
+        if self.modelo is None:
+            return 'CALIBRANDO'
+        return 'FATIGA' if self.inicio is not None else 'FRESCO'
+
+    def _ajustar(self):
+        from sklearn.ensemble import IsolationForest
+        from sklearn.preprocessing import StandardScaler
+        import shap
+        base = pd.DataFrame(self.filas)
+        self.feats = [f for f in CANDIDATAS if f in base and base[f].notna().mean() >= 0.6]
+        X = base[self.feats]
+        self.medianas = X.median()
+        X = X.fillna(self.medianas)
+        self.scaler = StandardScaler().fit(X)
+        self.modelo = IsolationForest(n_estimators=self.arboles, random_state=42).fit(self.scaler.transform(X))
+        a = -self.modelo.score_samples(self.scaler.transform(X))
+        self.umbral = float(np.percentile(a, self.percentil))
+        self.explicador = shap.TreeExplainer(self.modelo)
+        self.anom = list(a)
+        self.suav = list(pd.Series(a).rolling(3, min_periods=1).mean())
+
+    def agregar(self, fila):
+        """fila: dict con las variables de un ciclo (salida de medidas.variables_por_ciclo). Devuelve el estado."""
+        self.filas.append(dict(fila))
+        n = len(self.filas)
+        if self.modelo is None:
+            if n >= self.n_base:
+                self._ajustar()
+            return dict(estado=self.estado, ciclo=n, base=self.n_base, causas=[])
+        x = pd.DataFrame([fila])[self.feats].astype(float).fillna(self.medianas)
+        xs = np.nan_to_num(self.scaler.transform(x))
+        a = float(-self.modelo.score_samples(xs)[0])
+        self.anom.append(a)
+        self.suav.append(float(np.mean(self.anom[-3:])))
+        self.seguidos = self.seguidos + 1 if self.suav[-1] > self.umbral else 0
+        if self.inicio is None and self.seguidos >= self.k:
+            self.inicio = n - self.k
+        sv = -np.ravel(self.explicador.shap_values(xs))
+        orden = np.argsort(sv)[::-1]
+        base = pd.DataFrame(self.filas[:self.n_base])
+        causas = []
+        for i in orden[:2]:
+            if sv[i] <= 0:
+                continue
+            f = self.feats[i]
+            causas.append(dict(variable=f, nombre=NOMBRES.get(f, f), shap=float(sv[i]),
+                               base=float(base[f].mean()), ahora=float(x[f].iloc[0])))
+        return dict(estado=self.estado, ciclo=n, anomalia=a, media3=self.suav[-1], umbral=self.umbral,
+                    inicio=self.inicio, causas=causas)

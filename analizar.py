@@ -21,7 +21,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from strokelab import VERSION_ANALISIS, fatiga, medidas, pose, video, vista as vistas
+from strokelab import VERSION_ANALISIS, estilo as estilos, fatiga, medidas, pose, video, vista as vistas
 
 MODELOS_COMPARATIVA = ['yolov8n-pose', 'yolo11n-pose', 'yolov8s-pose', 'movenet_lightning', 'movenet_thunder', 'mediapipe']
 
@@ -38,8 +38,9 @@ def main(argv=None):
     ap.add_argument('video')
     ap.add_argument('--salida', help='carpeta de resultados (por defecto resultados/<vídeo>)')
     ap.add_argument('--nadador', default='Nadador')
-    ap.add_argument('--estilo', default='crol', choices=list(medidas.ESTILOS),
-                    help='estilo de nado: fija cuántas brazadas forman un ciclo y el ritmo plausible')
+    ap.add_argument('--estilo', default='crol', choices=list(medidas.ESTILOS) + ['auto'],
+                    help='estilo de nado: fija cuántas brazadas forman un ciclo y el ritmo plausible. auto: lo estima '
+                         'el sistema con reglas biomecánicas (brazos alternos o simultáneos y posición de la cabeza)')
     ap.add_argument('--modelo', default='yolov8n-pose',
                     help='yolov8n-pose (defecto), yolo11n-pose, yolov8s-pose, movenet_lightning, movenet_thunder, mediapipe')
     ap.add_argument('--imgsz', type=int, default=640, help='YOLO: lado de entrada de la red (1280 detecta mejor nadadores pequeños, ~4x más lento)')
@@ -132,6 +133,22 @@ def main(argv=None):
         print(f'    vista automática por tramos: {vistas.describir(tramos, fps)}')
     else:
         tramos = [(0, len(k2d), a.vista, None)]
+    est = estilos.estimar_por_reglas(k2d, fps, tramos)
+    estilo_indicado = a.estilo
+    if a.estilo == 'auto':
+        a.estilo = est['estilo_para_ciclos'] or 'crol'
+        print(f'    estilo automático: {est["estilo"] or est["familia"] or "sin estimación"} (seguridad {est["seguridad"]}); '
+              f'ciclos como {a.estilo}')
+    else:
+        print(f'    estilo indicado: {a.estilo} · estimado por el sistema: {est["estilo"] or est["familia"] or "sin estimación"} '
+              f'(seguridad {est["seguridad"]})')
+    familia_indicada = 'simultaneos' if a.estilo in ('mariposa', 'braza') else 'alternos'
+    aviso_estilo = (est['familia'] is not None and estilo_indicado != 'auto' and est['familia'] != familia_indicada
+                    and est['seguridad'] != 'baja')
+    for r_ in est['razones']:
+        print('      ' + r_)
+    if aviso_estilo:
+        print(f'    AVISO: el estilo indicado ({a.estilo}) no coincide con lo observado (brazos {est["familia"]}): revisar la lista')
     partes = [_analizar_tramo(k2d, k3d, fps, a, W, ini, fin, v) for ini, fin, v, _ in tramos]
     fr = pd.concat([p['fr'] for p in partes], ignore_index=True)
     fr['t'] = np.arange(len(fr)) / fps
@@ -165,13 +182,17 @@ def main(argv=None):
         fatiga.graficas(ciclos_f, res, a.nadador, out)
         ciclos = ciclos.merge(ciclos_f[['ciclo', 'anomalia', 'estado']], on='ciclo', how='left')
     texto = fatiga.explicar(ciclos_f, res, a.nadador)
+    if aviso_estilo:
+        texto.append(f'AVISO: el estilo indicado ({a.estilo}) no coincide con lo observado en el vídeo (brazos {est["familia"]}).')
     print('    ' + '\n    '.join(texto))
     ciclos.to_csv(out / 'variables_por_ciclo.csv', index=False)
     if len(ciclos):
         print('\n    Medias por ciclo:')
         print(ciclos.drop(columns=['ciclo', 't_inicio_s', 'estado', 'vista'], errors='ignore').mean().round(2).to_string())
 
-    resumen = dict(version=VERSION_ANALISIS, video=vid.name, nadador=a.nadador, estilo=a.estilo, imgsz=ajustes[0], conf_det=ajustes[1], modelo_pose=a.modelo, cada=a.cada, giro=rot, angulos_3d=bool(usar_3d), vista=vista_principal, vista_pedida=a.vista,
+    resumen = dict(version=VERSION_ANALISIS, video=vid.name, nadador=a.nadador, estilo=a.estilo, estilo_indicado=estilo_indicado,
+                   estilo_estimado=est['estilo'], familia_estimada=est['familia'], seguridad_estilo=est['seguridad'],
+                   razones_estilo=est['razones'], aviso_estilo=bool(aviso_estilo), imgsz=ajustes[0], conf_det=ajustes[1], modelo_pose=a.modelo, cada=a.cada, giro=rot, angulos_3d=bool(usar_3d), vista=vista_principal, vista_pedida=a.vista,
                    tramos_vista=[dict(inicio_s=round(x / fps, 1), fin_s=round(y / fps, 1), vista=v) for x, y, v, _ in tramos],
                    fps=fps, resolucion=f'{W}x{H}', duracion_s=round(len(kps) / fps, 2), ciclos_validos=len(ciclos),
                    pct_deteccion=round(float(100 * np.mean((conf[analizados] > 0.3).sum(1) >= 5)), 1),
@@ -190,7 +211,8 @@ def main(argv=None):
         print('\n[6] Vídeo anotado')
         t0 = time.time()
         destino = out / f'video_anotado.{a.formato}'
-        video.anotar(vid, destino, k2d, fr, ciclos_f, fps, a.nadador, a.formato, res=res, panel=a.panel)
+        video.anotar(vid, destino, k2d, fr, ciclos_f, fps, a.nadador, a.formato, res=res, panel=a.panel,
+                     info=f'{a.estilo} · vista {vista_principal}')
         print(f'    {destino} ({time.time() - t0:.0f} s)')
 
     print(f'\nListo en {time.time() - t_total:.0f} s. Resultados en: {out.resolve()}')

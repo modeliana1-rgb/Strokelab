@@ -123,3 +123,79 @@ def shap_por_estilo(modelo, X):
     sv = shap.TreeExplainer(rf).shap_values(Xi)
     sv = np.stack(sv, -1) if isinstance(sv, list) else sv          # (n, rasgos, clases)
     return pd.DataFrame(np.abs(sv).mean(0), index=RASGOS, columns=rf.classes_)[[e for e in ESTILOS if e in rf.classes_]]
+
+
+
+# ---------------------------------------------------------------- estimación por reglas biomecánicas
+# Con 11-14 vídeos reales y cada estilo nadado por 1-2 personas, un modelo entrenado aprende a reconocer a la persona
+# y no el estilo (exactitud 0 % con nadadores nuevos). Las reglas se basan en la definición de cada estilo y no
+# dependen de quién nade:
+#   1) brazos ALTERNOS (crol, espalda) o SIMULTÁNEOS (mariposa, braza): correlación entre la señal de las dos manos.
+#      De lado el modelo de pose copia en parte el brazo visible en el oculto, lo que sube la correlación: el umbral
+#      lateral es más alto que el frontal.
+#   2) entre los simultáneos, en braza la cabeza va más alta (respiración frontal en cada ciclo): la nariz queda por
+#      encima de la línea de los hombros. Entre los alternos, en espalda la cara mira hacia arriba.
+# Valores medidos en los 17 vídeos reales (ver CLAUDE.md); la regla 2 se apoya en muy pocos vídeos: orientativa.
+UMBRAL_CORR = {'lateral': 0.65, 'frontal': 0.20}
+UMBRAL_NARIZ_BRAZA = -0.05      # nariz respecto a los hombros, en troncos (negativo = por encima)
+UMBRAL_NARIZ_ESPALDA = -0.30    # cara claramente hacia arriba
+
+
+def _senales(k2d, fps, vista):
+    fr = medidas.medidas_por_fotograma(k2d, fps, vista=vista)
+    s = 'front' if vista == 'frontal' else 'prof2d'          # de frente: recorrido de cada muñeca (medidas.py)
+    mI, mD = fr[f'munI_{s}'].to_numpy(), fr[f'munD_{s}'].to_numpy()
+    hom = np.nanmean([k2d[:, LSH], k2d[:, RSH]], 0)
+    cad = np.nanmean([k2d[:, LHIP], k2d[:, RHIP]], 0)
+    e = hom - cad
+    L = np.linalg.norm(e, axis=1)
+    u = e / L[:, None]
+    abajo = np.c_[-u[:, 1], u[:, 0]]
+    abajo = abajo * np.where(abajo[:, 1:2] < 0, -1, 1)
+    nariz = ((k2d[:, 0] - hom) * abajo).sum(1) / np.nanmedian(L)
+    valido = ~np.isnan(fr.inclinacion_tronco.to_numpy()) if vista == 'lateral' else ~np.isnan(L)
+    return mI, mD, np.where(valido, nariz, np.nan)
+
+
+def estimar_por_reglas(k2d, fps, tramos):
+    """Estilo estimado con reglas biomecánicas. tramos: [(inicio, fin, vista, ...)] (ver vista.detectar_vista).
+
+    Devuelve dict(estilo (o None), familia 'alternos'|'simultaneos', estilo_para_ciclos, seguridad 'alta'|'media'|'baja',
+    razones [texto], medidas {...}). Para contar ciclos basta la familia (2 o 1 brazadas por ciclo).
+    """
+    corrs, pesos, narices, vistas = [], [], [], []
+    for a, b, v, *_ in tramos:
+        if v not in UMBRAL_CORR or b - a < 2 * fps:
+            continue
+        mI, mD, nz = _senales(k2d[a:b], fps, v)
+        ok = ~(np.isnan(mI) | np.isnan(mD))
+        if ok.sum() < 2 * fps or np.std(mI[ok]) < 1e-9 or np.std(mD[ok]) < 1e-9:
+            continue
+        c = float(np.corrcoef(mI[ok], mD[ok])[0, 1])
+        corrs.append(c - UMBRAL_CORR[v])                     # distancia al umbral de su vista
+        pesos.append(ok.sum())
+        narices.append(np.nanmedian(nz))
+        vistas.append(v)
+    if not corrs:
+        return dict(estilo=None, familia=None, seguridad='baja', medidas={}, estilo_para_ciclos=None,
+                    razones=['No hay suficiente señal de los dos brazos para estimar el estilo.'])
+    margen = float(np.average(corrs, weights=pesos))
+    nariz = float(np.nanmedian(narices)) if np.any(~np.isnan(narices)) else np.nan
+    simult = margen >= 0
+    familia = 'simultaneos' if simult else 'alternos'
+    razones = [f'Correlación entre las manos {margen:+.2f} respecto al umbral de la vista ({", ".join(sorted(set(vistas)))}): '
+               f'brazos {"simultáneos (mariposa o braza)" if simult else "alternos (crol o espalda)"}.']
+    solo_frontal = set(vistas) == {'frontal'}
+    if simult and solo_frontal:                 # de frente la altura de la cabeza no se ve bien
+        estilo_ = None
+        razones.append('De frente no se distingue la mariposa de la braza: indicar el estilo.')
+    elif simult:
+        estilo_ = 'braza' if nariz < UMBRAL_NARIZ_BRAZA else 'mariposa'
+        razones.append(f'Nariz {nariz:+.2f} troncos respecto a los hombros: cabeza {"alta (braza)" if estilo_ == "braza" else "en la línea del cuerpo (mariposa)"}.')
+    else:
+        estilo_ = 'espalda' if nariz < UMBRAL_NARIZ_ESPALDA else 'crol'
+        razones.append(f'Nariz {nariz:+.2f} troncos: cara {"hacia arriba (espalda)" if estilo_ == "espalda" else "hacia el fondo o de lado (crol)"}.')
+    seguridad = 'alta' if abs(margen) >= 0.2 else 'media' if abs(margen) >= 0.08 else 'baja'
+    return dict(estilo=estilo_, familia=familia, seguridad=seguridad, razones=razones,
+                estilo_para_ciclos=estilo_ or ('mariposa' if simult else 'crol'),   # 1 o 2 brazadas por ciclo
+                medidas=dict(margen_correlacion=round(margen, 3), nariz=round(nariz, 3) if not np.isnan(nariz) else None))

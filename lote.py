@@ -177,9 +177,9 @@ def main(argv=None):
     filas = [f for f in leer_lista(lista) if f.get('incluir', 'si').lower() in ('si', 'sí', 's', '1', 'x')]
     if a.solo:
         filas = [f for f in filas if f['archivo'] in a.solo]
-    malos = [f['archivo'] for f in filas if f.get('estilo') not in ESTILOS or f.get('vista') not in ('lateral', 'frontal', 'otra', 'auto')]
+    malos = [f['archivo'] for f in filas if f.get('estilo') not in ESTILOS + ['auto'] or f.get('vista') not in ('lateral', 'frontal', 'otra', 'auto')]
     if malos:
-        print(f'Corrige estilo ({"/".join(ESTILOS)}) o vista (auto/lateral/frontal/otra) en: {", ".join(malos)}')
+        print(f'Corrige estilo ({"/".join(ESTILOS)}/auto) o vista (auto/lateral/frontal/otra) en: {", ".join(malos)}')
         return 1
 
     pendientes = []
@@ -187,7 +187,7 @@ def main(argv=None):
         out = res_dir / Path(f['archivo']).stem
         r = out / 'resumen.json'
         previo = json.loads(r.read_text(encoding='utf-8')) if r.exists() else {}
-        hecho = (previo.get('estilo') == f['estilo'] and previo.get('vista_pedida', previo.get('vista')) == f['vista']
+        hecho = (previo.get('estilo_indicado', previo.get('estilo')) == f['estilo'] and previo.get('vista_pedida', previo.get('vista')) == f['vista']
                  and previo.get('version') == VERSION_ANALISIS)     # código nuevo: se rehace (reutiliza la pose)
         if a.rehacer or a.rehacer_pose or not hecho:
             pendientes.append(f)
@@ -223,7 +223,8 @@ def main(argv=None):
         for f in filas:
             r = res_dir / Path(f['archivo']).stem / 'resumen.json'
             d = json.loads(r.read_text(encoding='utf-8')) if r.exists() else {}
-            tabla.append(dict(archivo=f['archivo'], nadador=f['nadador'], estilo=f['estilo'], vista=d.get('vista', f['vista']),
+            tabla.append(dict(archivo=f['archivo'], nadador=f['nadador'], estilo=d.get('estilo', f['estilo']),
+                              estilo_estimado=d.get('estilo_estimado') or d.get('familia_estimada'), aviso_estilo=d.get('aviso_estilo'), vista=d.get('vista', f['vista']),
                               vista_pedida=f['vista'], tramos_vista=' | '.join(f"{t['vista']} {t['inicio_s']:.0f}-{t['fin_s']:.0f} s" for t in d.get('tramos_vista', [])),
                               sesion=f['sesion'],
                               estado='ok' if d else 'sin resultado', duracion_s=d.get('duracion_s'),

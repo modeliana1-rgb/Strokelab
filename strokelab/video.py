@@ -51,7 +51,7 @@ def _barra_fatiga(f, ciclos, res, t, dur_total):
     cv2.line(f, (xc, y0 - 4), (xc, y1 + 4), BLANCO, 2)
 
 
-def anotar(video, salida, kps, fr, ciclos, fps, nadador, formato='mp4', res=None, panel='fatiga'):
+def anotar(video, salida, kps, fr, ciclos, fps, nadador, formato='mp4', res=None, panel='fatiga', info=None):
     """Escribe el vídeo anotado (máx. 1280 px de ancho). formato: 'mp4' (mp4v) o 'avi' (MJPG, se abre en todo)."""
     res = res or {}
     cap = cv2.VideoCapture(str(video))
@@ -84,6 +84,8 @@ def anotar(video, salida, kps, fr, ciclos, fps, nadador, formato='mp4', res=None
                     cv2.line(f, tuple(kv[t, a].astype(int)), tuple(kv[t, b].astype(int)), col, 3, cv2.LINE_AA)
 
         lineas = [(f'{nadador}   t = {t / fps:5.1f} s', BLANCO, 0.6, 1)]
+        if info:
+            lineas.append((info, BLANCO, 0.55, 1))
         if i >= 0:
             c = ciclos.iloc[i]
             lineas.append((f'Ciclo {int(c.ciclo)} de {len(ciclos)}   {c.SR_ciclos_min:4.1f} ciclos/min', BLANCO, 0.6, 1))

@@ -41,6 +41,9 @@ def angulo(a, b, c):
     return np.degrees(np.arccos(np.clip(cos, -1, 1)))
 
 
+VERTICAL_LATERAL = 55.0   # grados: en vista lateral, tronco más vertical que esto = esqueleto erróneo
+
+
 def medidas_por_fotograma(k2d, fps, k3d=None, vista='lateral'):
     """Medidas por fotograma. k2d (T,17,2) limpio; k3d (T,17,3) opcional (MotionBERT, orden COCO).
 
@@ -73,6 +76,10 @@ def medidas_por_fotograma(k2d, fps, k3d=None, vista='lateral'):
         ang_hab = cand[np.argmin([dif(ang2[ok2], c).sum() for c in cand])]     # mediana axial (robusta)
         desv = np.degrees(dif(ang2, ang_hab))
     girado = desv > 45
+    # En vista lateral un nadador no puede estar vertical en la imagen: si el modelo "lo pone de pie" en la mayoría
+    # de fotogramas (P1, mariposa, GX011610), la dirección habitual sería vertical y el filtro anterior no actuaría.
+    if vista == 'lateral':
+        girado = girado | (np.degrees(np.abs(np.arctan2(np.abs(e2[:, 1]), np.abs(e2[:, 0])))) > VERTICAL_LATERAL)
     malo = malo | girado
     L = np.where(malo, np.nan, L)
     u = eje / np.where(np.isnan(L), np.nan, np.linalg.norm(eje, axis=1))[:, None]     # eje del tronco unitario

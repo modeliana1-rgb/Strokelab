@@ -9,7 +9,8 @@ aparece la fatiga y por qué** (SHAP), y medidas de codos, hombros, caderas, rod
 - Todo se ejecuta **en local, en CPU**, en el portátil personal de Diana (Windows). No usar Colab salvo que lo pida.
 - Programa principal: `python analizar.py "<vídeo>" --nadador "<nombre>"` (ver README para opciones).
 - Pruebas antes de cada commit: `python tests/test_local.py`, `tests/test_sesion.py`, `tests/test_aaron.py`, `tests/test_movenet_recorte.py`,
-  `tests/test_estilos.py`, `tests/test_lote.py`, `tests/test_frontal.py`, `tests/test_aaron_frontal.py`, `tests/test_simulador_estilo.py` y `tests/test_vista_auto.py`.
+  `tests/test_estilos.py`, `tests/test_lote.py`, `tests/test_frontal.py`, `tests/test_aaron_frontal.py`, `tests/test_simulador_estilo.py`, `tests/test_vista_auto.py`,
+  `tests/test_estilo_reglas.py` y `tests/test_en_vivo.py`.
 - **GPU (11 oct, GPU de la escuela)**: `--dispositivo auto` (defecto en analizar y lote) usa CUDA si PyTorch la ve; en el
   portátil sigue siendo CPU. Con GPU conviene `--imgsz 1280` (mejor detección del nadador pequeño). `diagnostico.py` dice si hay GPU.
 - Todos los vídeos: `python lote.py --carpeta <videos> [--crear-lista]` (lista editable `lista_videos.csv`; reanudable).
@@ -93,6 +94,18 @@ aparece la fatiga y por qué** (SHAP), y medidas de codos, hombros, caderas, rod
   mariposa). `lote.py` recorre subcarpetas, guarda la ruta relativa en "archivo" y saca P1-P5 de la carpeta del nadador
   (Aaron P1, Alvaro P2, Lucia P3, Angel P4, Alvise P5) y el estilo de la subcarpeta. Alvise (nuevo, 8 vídeos) no tiene
   carpeta de estilo: estilo "?" hasta que Diana lo complete. Después movió todo a Alvise\libre (crol). Las carpetas mandan sobre una lista anterior en nadador y estilo. `reducir_video.py` conserva las carpetas.
+- **Correcciones (11 oct, versión 2026-10-11)**: en vista lateral se descartan los fotogramas con el tronco a > 55° de la
+  horizontal (`medidas.VERTICAL_LATERAL`). GX011610 (P1 mariposa) pasa de 7 ciclos (inclinación 84°, esqueletos de pie) a 0;
+  GX011614 sin cambios. Braza P4: la frecuencia depende del t_min (0,7 s -> 80-84; 0,85 -> 41-75; 1,0 -> 40-55 ciclos/min):
+  NO se cambia sin el conteo manual de Diana (pendiente: contar 10 s de GX011616).
+- **Estilo por reglas biomecánicas** (`estilo.estimar_por_reglas`, 11 oct): el bosque aleatorio con vídeos reales aprendía
+  al nadador (0 % con nadadores nuevos). Reglas: correlación de las manos (umbral lateral 0,65, frontal 0,20) -> brazos
+  alternos/simultáneos (basta para contar ciclos: 2 o 1 brazadas); nariz respecto a hombros -> braza (< -0,05) / mariposa,
+  espalda (< -0,30) / crol. Reales: familia 12/13, estilo 9/13 (umbrales fijados con ellos); sintéticos: familia 81 %.
+  De frente no distingue mariposa de braza (lo dice). `analizar.py --estilo auto`; con estilo indicado, avisa si no coincide.
+- **Tiempo real** (`en_vivo.py`, 11 oct): reproduce vídeo o cámara con pose en directo (o `--resultados` para reutilizar la
+  pose) y panel CALIBRANDO/FRESCO/FATIGA con causas SHAP, estilo y vista. `fatiga.FatigaEnVivo`: base = primeros 10 ciclos,
+  IF + p95 + 3 seguidos, SHAP por ciclo. Sintético 120 s (10+10 semillas, copia de brazos 0,5): 10/10 detectadas, 0/10 falsas.
 - **Versión del análisis** (`strokelab.VERSION_ANALISIS`): lote.py rehace (reutilizando la pose) los vídeos analizados
   con otra versión. Motivo: el 2º zip de Diana (4 oct 23:05) traía resultados del código viejo porque el lote los saltó.
   Subir la fecha cada vez que cambien medidas, ciclos o fatiga.
