@@ -165,6 +165,10 @@ def main(argv=None):
     a = ap.parse_args(argv)
 
     carpeta = Path(a.carpeta)
+    if not carpeta.is_dir():
+        print(f'No existe la carpeta de vídeos: {carpeta.resolve()}\n'
+              'Comprueba la ruta de --carpeta (en el clúster, los vídeos van en ~/StrokeLab/videos).')
+        return 1
     lista = Path(a.lista) if a.lista else carpeta / 'lista_videos.csv'
     if a.crear_lista or not lista.exists():
         crear_lista(carpeta, lista)
