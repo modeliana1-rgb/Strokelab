@@ -106,6 +106,14 @@ aparece la fatiga y por qué** (SHAP), y medidas de codos, hombros, caderas, rod
 - **Tiempo real** (`en_vivo.py`, 11 oct): reproduce vídeo o cámara con pose en directo (o `--resultados` para reutilizar la
   pose) y panel CALIBRANDO/FRESCO/FATIGA con causas SHAP, estilo y vista. `fatiga.FatigaEnVivo`: base = primeros 10 ciclos,
   IF + p95 + 3 seguidos, SHAP por ciclo. Sintético 120 s (10+10 semillas, copia de brazos 0,5): 10/10 detectadas, 0/10 falsas.
+- **Evaluación de la pose con nadadores anotados (12 oct, tras la entrega)**: Roboflow «Deep Dive Pose Technique» v6
+  (CC BY 4.0): 405 imágenes reales GoPro subacuática lateral, 17 puntos COCO, 640x640 estiradas, 53 sin nadador; su
+  partición aleatoria mezcla fotogramas de los mismos vídeos (fuga) -> `preparar_datos_pose.py` reparte por grabación
+  (12 grabaciones, 4 pliegues equilibrados ~200/100/100). `evaluar_pose.py`: PCK@0,05/0,1/0,2 (escala max lado de la
+  caja), OKS (sigmas COCO, área de la caja), detección y mAP de Ultralytics. YOLOv8n-Pose original en valid/test de
+  Roboflow (conf 0,25): detección 8-16 % sin giro y 43-58 % con giro ±90° (valida el giro), PCK@0,1 12-14 %, OKS 0,12-0,14.
+  `entrenar_pose.py` + `cluster/entrenar_pose.sbatch`: ajuste fino por pliegues y comparación original/ajustado.
+  Pendiente: SwimXYZ (Freestyle_labels + vídeos part2) y fotogramas propios anotados como prueba final.
 - **Versión del análisis** (`strokelab.VERSION_ANALISIS`): lote.py rehace (reutilizando la pose) los vídeos analizados
   con otra versión. Motivo: el 2º zip de Diana (4 oct 23:05) traía resultados del código viejo porque el lote los saltó.
   Subir la fecha cada vez que cambien medidas, ciclos o fatiga.
