@@ -7,7 +7,8 @@ Instalar:  pip install remotezip
 Uso:
   python descargar_swimxyz.py --url "<enlace del .zip en Zenodo>" --listar            (ver qué vídeos hay)
   python descargar_swimxyz.py --url "<enlace>" --filtro Front Water_Quantity_0,75 --max 24 --salida swimxyz_videos
-  --filtro: todas las palabras deben aparecer en la ruta del vídeo (p. ej. la vista y la carpeta de agua).
+  --filtro: todas las palabras deben aparecer en la ruta del vídeo (p. ej. la vista). Los --max vídeos se reparten
+  entre todos los que cumplen el filtro (distintos nadadores, agua, luz y velocidad).
 """
 import argparse
 from pathlib import Path
@@ -34,7 +35,9 @@ def main(argv=None):
                 print(f'  {c}: {len(n)} vídeos, {sum(i.file_size for i in n) / 1e6:.0f} MB')
             print('Ejemplo de ruta:', videos[0].filename if videos else '-')
             return 0
-        elegidos = [i for i in videos if all(f.lower() in i.filename.lower() for f in a.filtro)][:a.max]
+        todos = [i for i in videos if all(f.lower() in i.filename.lower() for f in a.filtro)]
+        paso = max(1, len(todos) // a.max)                 # repartidos: distintos nadadores, agua, luz y velocidad
+        elegidos = todos[::paso][:a.max]
         print(f'Se descargan {len(elegidos)} vídeos ({sum(i.file_size for i in elegidos) / 1e6:.0f} MB) en {a.salida}')
         for n, i in enumerate(elegidos, 1):
             z.extract(i, a.salida)
