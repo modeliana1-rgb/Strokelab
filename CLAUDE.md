@@ -138,6 +138,13 @@ aparece la fatiga y por qué** (SHAP), y medidas de codos, hombros, caderas, rod
   ajustado (0,40 / 37 %): con ~200 imágenes de entrenamiento el modelo grande no aprovecha su tamaño. **YOLOv8s**: original
   sin giro 21 %, OKS 0,07, PCK@0,1 5 %; con giro 58 %, 0,14, 12 %, 20 %; ajustado sin giro 76 %, 0,37, 34 %, 54 % (FP 3,5/13);
   con giro 95 %, 0,35, 31 %, 51 % (FP 12,75/13). Conclusión: tras el ajuste n ≈ s ≈ m (OKS 0,35-0,40); se mantiene YOLOv8n.
+  Con el modelo ajustado las reglas posteriores fallan (calibradas con la pose del original): video2 (YouTube, cámara en el
+  fondo) sale lateral en vez de frontal (48 % de troncos descartados, 3 ciclos frente a 13) y estilo mariposa; Thorpe sale
+  mariposa. Decisión: el sistema del TFM sigue con el modelo original; recalibrar vista/ciclos/estilo es trabajo futuro.
+  **SwimXYZ** (`convertir_swimxyz.py`): etiquetas por secuencia en <vista>/<agua>/<luz>/<velocidad>/<posición>/body25/2D_cam.txt
+  («Nombre.x;Nombre.y;Nombre.z», coma decimal, px); la carpeta COCO trae 18 puntos (OpenPose) con cabecera de BODY25: se usa
+  body25 por nombre. Hacen falta los vídeos (misma ruta relativa). Solo entrenamiento: `preparar_datos_pose.py
+  --solo-entrenamiento`. Pendiente comprobar con --revisar si la y va desde arriba (sin vídeo aún).
 - **Versión del análisis** (`strokelab.VERSION_ANALISIS`): lote.py rehace (reutilizando la pose) los vídeos analizados
   con otra versión. Motivo: el 2º zip de Diana (4 oct 23:05) traía resultados del código viejo porque el lote los saltó.
   Subir la fecha cada vez que cambien medidas, ciclos o fatiga.
