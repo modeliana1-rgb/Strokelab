@@ -114,6 +114,11 @@ aparece la fatiga y por qué** (SHAP), y medidas de codos, hombros, caderas, rod
   Roboflow (conf 0,25): detección 8-16 % sin giro y 43-58 % con giro ±90° (valida el giro), PCK@0,1 12-14 %, OKS 0,12-0,14.
   `entrenar_pose.py` + `cluster/entrenar_pose.sbatch`: ajuste fino por pliegues y comparación original/ajustado.
   Pendiente: SwimXYZ (Freestyle_labels + vídeos part2) y fotogramas propios anotados como prueba final.
+  **Resultado del ajuste fino (18 oct, clúster, 4 pliegues por grabación, ~97 nadadores y 13 imágenes vacías de prueba por
+  pliegue, media)**: original sin giro: detección 15 %, OKS 0,05, PCK@0,1 4 %, PCK@0,2 7 %; original con giro: 47 %, 0,10, 9 %,
+  15 %; ajustado sin giro: 78 %, 0,40, 37 %, 56 % (PCK@0,05 17 %), falsos positivos 3/13; ajustado con giro: 92 %, 0,38, 35 %,
+  54 %, falsos positivos 10/13. El pliegue 0 (60 % PCK@0,1 en CPU) era el más fácil; el 3, el más difícil (26 %).
+  Pendiente: aplicar el modelo ajustado a los vídeos propios (`--modelo .../best.pt`) y medir ciclos y error frente a la cuenta manual.
 - **Versión del análisis** (`strokelab.VERSION_ANALISIS`): lote.py rehace (reutilizando la pose) los vídeos analizados
   con otra versión. Motivo: el 2º zip de Diana (4 oct 23:05) traía resultados del código viejo porque el lote los saltó.
   Subir la fecha cada vez que cambien medidas, ciclos o fatiga.
