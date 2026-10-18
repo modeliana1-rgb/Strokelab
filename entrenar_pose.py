@@ -16,7 +16,7 @@ def entrenar(yaml, nombre, salida, epocas, imgsz, dispositivo, base='yolov8n-pos
     from ultralytics import YOLO
     m = YOLO(base)
     m.train(data=str(yaml), epochs=epocas, imgsz=imgsz, device=dispositivo, project=str(salida), name=nombre,
-            exist_ok=True, patience=20, batch=8, workers=2, fliplr=0.5, degrees=10, mosaic=1.0, plots=False, verbose=False,
+            exist_ok=True, patience=20, batch=8, workers=0, fliplr=0.5, degrees=10, mosaic=1.0, plots=False, verbose=False,
             seed=0, deterministic=True)
     return Path(salida) / nombre / 'weights' / 'best.pt'
 
