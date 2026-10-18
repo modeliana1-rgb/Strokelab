@@ -128,6 +128,11 @@ aparece la fatiga y por qué** (SHAP), y medidas de codos, hombros, caderas, rod
   130 -> 254 s, 19 -> 62 ciclos, pero el inicio de fatiga de 748 s (original, 1280) NO se reproduce: sin fatiga. La sesión P5
   gopro (5 clips de días distintos, orden por nombre) da inicio a 91,5 s de GX010731: probable cambio de condiciones entre
   clips, no fatiga. ASCR y GX011613 son el mismo vídeo (keypoints idénticos).
+  Causa del +35 % en GX011614 con el ajustado: picos dobles en la señal de la mano (T = 0,43 s, intervalos de 0,23-0,4 s;
+  manual 18 brazadas en 30-40 s = 0,55 s). Suavizar la señal 0,15 s: GX011614 48,7 (-10 %), IMG_7215 +5 %, IMG_7207 -26 %
+  (2 ciclos). Con el original el mismo suavizado empeora. NO se cambia: 3 cuentas manuales no bastan para calibrar
+  (pendiente: más cuentas manuales de Diana). `cluster/entrenar_pose_grandes.sbatch`: mismos pliegues con YOLOv8s y v8m
+  (`entrenar_pose.py --base`).
 - **Versión del análisis** (`strokelab.VERSION_ANALISIS`): lote.py rehace (reutilizando la pose) los vídeos analizados
   con otra versión. Motivo: el 2º zip de Diana (4 oct 23:05) traía resultados del código viejo porque el lote los saltó.
   Subir la fecha cada vez que cambien medidas, ciclos o fatiga.

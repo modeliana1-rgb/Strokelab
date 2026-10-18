@@ -36,7 +36,7 @@ def entrenar_final(datos, salida, a):
     yaml = yaml.replace('train: pliegue0_train.txt', 'train: final_train.txt').replace('val: pliegue0_val.txt', 'val: final_train.txt')
     (datos / 'final.yaml').write_text(yaml, encoding='utf-8')
     print(f'Modelo final: {len(todas)} imágenes, {a.epocas} épocas fijas')
-    entrenar(datos / 'final.yaml', 'final', salida, a.epocas, a.imgsz, a.dispositivo, paciencia=a.epocas + 1)
+    entrenar(datos / 'final.yaml', 'final', salida, a.epocas, a.imgsz, a.dispositivo, base=a.base, paciencia=a.epocas + 1)
     pesos = salida / 'final' / 'weights' / 'last.pt'
     print(f'Modelo final guardado en {pesos}')
     return 0
@@ -51,6 +51,7 @@ def main(argv=None):
     ap.add_argument('--imgsz', type=int, default=640)
     ap.add_argument('--dispositivo', default='cpu', help='cpu o 0 (GPU)')
     ap.add_argument('--salida', default='modelos_pose')
+    ap.add_argument('--base', default='yolov8n-pose.pt', help='modelo de partida: yolov8n-pose.pt, yolov8s-pose.pt, yolov8m-pose.pt...')
     ap.add_argument('--final', action='store_true', help='entrenar el modelo definitivo con todas las imágenes')
     a = ap.parse_args(argv)
     datos, salida = Path(a.datos).resolve(), Path(a.salida).resolve()
@@ -58,12 +59,12 @@ def main(argv=None):
         return entrenar_final(datos, salida, a)
     filas = []
     for k in (a.solo if a.solo is not None else range(a.pliegues)):
-        pesos = entrenar(datos / f'pliegue{k}.yaml', f'pliegue{k}', salida, a.epocas, a.imgsz, a.dispositivo)
+        pesos = entrenar(datos / f'pliegue{k}.yaml', f'pliegue{k}', salida, a.epocas, a.imgsz, a.dispositivo, base=a.base)
         prueba = datos / f'pliegue{k}_test.txt'
-        for etiqueta, modelo in (('original', 'yolov8n-pose.pt'), ('ajustado', str(pesos))):
+        for etiqueta, modelo in (('original', a.base), ('ajustado', str(pesos))):
             for giro in (False, True):
                 r = evaluar_pose.evaluar(datos, str(prueba), modelo, a.imgsz, 0.25, a.dispositivo, giro)
-                fila = dict(pliegue=k, modelo=etiqueta, giro=giro, nadadores=r['nadadores'], deteccion=r['deteccion'],
+                fila = dict(pliegue=k, base=Path(a.base).stem, modelo=etiqueta, giro=giro, nadadores=r['nadadores'], deteccion=r['deteccion'],
                             OKS=r['OKS_medio'], **{f'PCK@{x}': r[f'PCK@{x}'] for x in evaluar_pose.ALFAS},
                             falsos_positivos=r['falsos_positivos'], imagenes_sin_nadador=r['imagenes_sin_nadador'],
                             por_articulacion=r['PCK@0.1_por_articulacion'])
