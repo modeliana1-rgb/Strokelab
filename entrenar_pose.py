@@ -3,7 +3,11 @@ del modelo original frente al ajustado en los vídeos de prueba de cada pliegue 
 
 Uso:  python preparar_datos_pose.py <conjuntos...> --salida datos_pose --pliegues 4
       python entrenar_pose.py --datos datos_pose --pliegues 4 --epocas 80 [--dispositivo 0] [--salida modelos_pose]
+      python entrenar_pose.py --datos datos_pose --final --epocas 60 --dispositivo 0      (modelo para usar)
 Salida: modelos_pose/pliegueK/weights/best.pt, comparacion_pose.csv y comparacion_pose.json (media por pliegue).
+Con --final: modelos_pose/final/weights/last.pt, entrenado con TODAS las imágenes y un número fijo de épocas. Los
+pliegues miden cuánto mejora el modelo; el final es el que se usa en los vídeos (práctica habitual: evaluar con
+validación cruzada y entrenar el modelo definitivo con todos los datos).
 """
 import argparse
 import json
@@ -12,13 +16,30 @@ from pathlib import Path
 import evaluar_pose
 
 
-def entrenar(yaml, nombre, salida, epocas, imgsz, dispositivo, base='yolov8n-pose.pt'):
+def entrenar(yaml, nombre, salida, epocas, imgsz, dispositivo, base='yolov8n-pose.pt', paciencia=20):
     from ultralytics import YOLO
     m = YOLO(base)
     m.train(data=str(yaml), epochs=epocas, imgsz=imgsz, device=dispositivo, project=str(salida), name=nombre,
-            exist_ok=True, patience=20, batch=8, workers=0, fliplr=0.5, degrees=10, mosaic=1.0, plots=False, verbose=False,
+            exist_ok=True, patience=paciencia, batch=8, workers=0, fliplr=0.5, degrees=10, mosaic=1.0, plots=False, verbose=False,
             seed=0, deterministic=True)
     return Path(salida) / nombre / 'weights' / 'best.pt'
+
+
+def entrenar_final(datos, salida, a):
+    """Modelo definitivo: entrena con las imágenes de prueba de todos los pliegues (= todas, sin repetir). La validación
+    es un subconjunto del entrenamiento, así que no se usa para parar antes ni para medir: épocas fijas y last.pt."""
+    todas = sorted({l.strip() for t in sorted(datos.glob('pliegue*_test.txt')) for l in t.read_text().split('\n') if l.strip()})
+    if not todas:
+        raise SystemExit(f'No hay pliegues en {datos}: ejecuta antes preparar_datos_pose.py')
+    (datos / 'final_train.txt').write_text('\n'.join(todas) + '\n')
+    yaml = (datos / 'pliegue0.yaml').read_text(encoding='utf-8')
+    yaml = yaml.replace('train: pliegue0_train.txt', 'train: final_train.txt').replace('val: pliegue0_val.txt', 'val: final_train.txt')
+    (datos / 'final.yaml').write_text(yaml, encoding='utf-8')
+    print(f'Modelo final: {len(todas)} imágenes, {a.epocas} épocas fijas')
+    entrenar(datos / 'final.yaml', 'final', salida, a.epocas, a.imgsz, a.dispositivo, paciencia=a.epocas + 1)
+    pesos = salida / 'final' / 'weights' / 'last.pt'
+    print(f'Modelo final guardado en {pesos}')
+    return 0
 
 
 def main(argv=None):
@@ -30,8 +51,11 @@ def main(argv=None):
     ap.add_argument('--imgsz', type=int, default=640)
     ap.add_argument('--dispositivo', default='cpu', help='cpu o 0 (GPU)')
     ap.add_argument('--salida', default='modelos_pose')
+    ap.add_argument('--final', action='store_true', help='entrenar el modelo definitivo con todas las imágenes')
     a = ap.parse_args(argv)
     datos, salida = Path(a.datos).resolve(), Path(a.salida).resolve()
+    if a.final:
+        return entrenar_final(datos, salida, a)
     filas = []
     for k in (a.solo if a.solo is not None else range(a.pliegues)):
         pesos = entrenar(datos / f'pliegue{k}.yaml', f'pliegue{k}', salida, a.epocas, a.imgsz, a.dispositivo)

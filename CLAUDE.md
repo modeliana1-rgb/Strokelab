@@ -118,7 +118,9 @@ aparece la fatiga y por qué** (SHAP), y medidas de codos, hombros, caderas, rod
   pliegue, media)**: original sin giro: detección 15 %, OKS 0,05, PCK@0,1 4 %, PCK@0,2 7 %; original con giro: 47 %, 0,10, 9 %,
   15 %; ajustado sin giro: 78 %, 0,40, 37 %, 56 % (PCK@0,05 17 %), falsos positivos 3/13; ajustado con giro: 92 %, 0,38, 35 %,
   54 %, falsos positivos 10/13. El pliegue 0 (60 % PCK@0,1 en CPU) era el más fácil; el 3, el más difícil (26 %).
-  Pendiente: aplicar el modelo ajustado a los vídeos propios (`--modelo .../best.pt`) y medir ciclos y error frente a la cuenta manual.
+  Modelo para usar: `entrenar_pose.py --final` (405 imágenes, 60 épocas fijas, last.pt; los pliegues solo miden).
+  `cluster/lote_ajustado.sbatch`: entrena el final si falta y pasa la lista con `lote.py --modelo` a ../resultados_ajustado
+  (lote rehace la pose si el modelo_pose del resumen es otro). Pendiente: comparar ciclos y error frente a la cuenta manual.
 - **Versión del análisis** (`strokelab.VERSION_ANALISIS`): lote.py rehace (reutilizando la pose) los vídeos analizados
   con otra versión. Motivo: el 2º zip de Diana (4 oct 23:05) traía resultados del código viejo porque el lote los saltó.
   Subir la fecha cada vez que cambien medidas, ciclos o fatiga.

@@ -161,6 +161,8 @@ def main(argv=None):
     ap.add_argument('--imgsz', type=int, default=640, help='YOLO: 1280 detecta mejor nadadores pequeños (~4x más lento)')
     ap.add_argument('--conf-det', type=float, default=0.25, help='YOLO: confianza mínima de la detección')
     ap.add_argument('--dispositivo', default='auto', help='auto (GPU si hay, si no CPU), cpu o cuda:0')
+    ap.add_argument('--modelo', default='yolov8n-pose', help='modelo de pose (p. ej. ../modelos_pose/final/weights/last.pt, '
+                    'el ajustado con nadadores). Con otro modelo que el de la pose guardada, la pose se vuelve a extraer')
     ap.add_argument('--rehacer-pose', action='store_true', help='volver a extraer la pose aunque ya exista (p. ej. con otro --imgsz)')
     a = ap.parse_args(argv)
 
@@ -191,12 +193,15 @@ def main(argv=None):
         out = res_dir / Path(f['archivo']).stem
         r = out / 'resumen.json'
         previo = json.loads(r.read_text(encoding='utf-8')) if r.exists() else {}
-        hecho = (previo.get('estilo_indicado', previo.get('estilo')) == f['estilo'] and previo.get('vista_pedida', previo.get('vista')) == f['vista']
+        otro_modelo = bool(previo) and previo.get('modelo_pose', 'yolov8n-pose') != a.modelo
+        if otro_modelo:
+            f['_rehacer_pose'] = True
+        hecho = not otro_modelo and (previo.get('estilo_indicado', previo.get('estilo')) == f['estilo'] and previo.get('vista_pedida', previo.get('vista')) == f['vista']
                  and previo.get('version') == VERSION_ANALISIS)     # código nuevo: se rehace (reutiliza la pose)
         if a.rehacer or a.rehacer_pose or not hecho:
             pendientes.append(f)
     total = sum(duracion_s(carpeta / f['archivo']) for f in pendientes
-                if a.rehacer_pose or not (res_dir / Path(f['archivo']).stem / 'keypoints_raw.npz').exists())
+                if a.rehacer_pose or f.get('_rehacer_pose') or not (res_dir / Path(f['archivo']).stem / 'keypoints_raw.npz').exists())
     print(f'{len(filas)} vídeos en la lista; {len(pendientes)} por analizar. Vídeo nuevo por procesar: {total / 60:.1f} min '
           f'-> unas {(7 if a.imgsz <= 640 else 25) * total / 3600 + 0.1 * len(pendientes):.1f} h en CPU{" (+ vídeo anotado)" if a.con_video else ""}; con GPU, bastante menos.')
 
@@ -212,8 +217,8 @@ def main(argv=None):
             print(f'\n######## [{n}/{len(pendientes)}] {f["archivo"]} · {f["nadador"]} · {f["estilo"]} · vista {f["vista"]}')
             cmd = [sys.executable, str(RAIZ / 'analizar.py'), str(video), '--salida', str(out), '--nadador', f['nadador'],
                    '--estilo', f['estilo'], '--vista', f['vista'], '--imgsz', str(a.imgsz), '--conf-det', str(a.conf_det),
-                   '--dispositivo', a.dispositivo]
-            if (out / 'keypoints_raw.npz').exists() and not a.rehacer_pose:
+                   '--dispositivo', a.dispositivo, '--modelo', a.modelo]
+            if (out / 'keypoints_raw.npz').exists() and not (a.rehacer_pose or f.get('_rehacer_pose')):
                 cmd.append('--desde-keypoints')                 # la pose ya está extraída: solo se rehace el análisis
             if not a.con_video:
                 cmd.append('--sin-video')
