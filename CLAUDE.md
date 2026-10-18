@@ -132,7 +132,10 @@ aparece la fatiga y por qué** (SHAP), y medidas de codos, hombros, caderas, rod
   manual 18 brazadas en 30-40 s = 0,55 s). Suavizar la señal 0,15 s: GX011614 48,7 (-10 %), IMG_7215 +5 %, IMG_7207 -26 %
   (2 ciclos). Con el original el mismo suavizado empeora. NO se cambia: 3 cuentas manuales no bastan para calibrar
   (pendiente: más cuentas manuales de Diana). `cluster/entrenar_pose_grandes.sbatch`: mismos pliegues con YOLOv8s y v8m
-  (`entrenar_pose.py --base`).
+  (`entrenar_pose.py --base`). **YOLOv8m (18 oct, media 4 pliegues)**: original sin giro 40 %, OKS 0,17, PCK@0,1 15 %,
+  PCK@0,2 23 %; original con giro 68 %, 0,22, 19 %, 30 %; ajustado sin giro 69 %, 0,35, 33 %, 50 % (FP 2,5/13); ajustado con
+  giro 86 %, 0,34, 33 %, 49 % (FP 7,75/13). El m original es mucho mejor que el n original, pero ajustado NO supera al n
+  ajustado (0,40 / 37 %): con ~200 imágenes de entrenamiento el modelo grande no aprovecha su tamaño. YOLOv8s: pendiente.
 - **Versión del análisis** (`strokelab.VERSION_ANALISIS`): lote.py rehace (reutilizando la pose) los vídeos analizados
   con otra versión. Motivo: el 2º zip de Diana (4 oct 23:05) traía resultados del código viejo porque el lote los saltó.
   Subir la fecha cada vez que cambien medidas, ciclos o fatiga.
