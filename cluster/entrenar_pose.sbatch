@@ -9,6 +9,6 @@
 #SBATCH --time=12:00:00
 #SBATCH --output=entrenar_pose_%j.log
 cd "$SLURM_SUBMIT_DIR"
-source venv/bin/activate
+if [ -f venv/bin/activate ]; then source venv/bin/activate; else source ../venv/bin/activate; fi
 export MPLBACKEND=Agg PYTHONUNBUFFERED=1
 python3 entrenar_pose.py --datos ../datos_pose --pliegues 4 --epocas 80 --dispositivo 0 --salida ../modelos_pose
