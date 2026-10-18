@@ -311,6 +311,9 @@ def _puntuar(est, tramos, conf_min=0.30):
 def elegir_rotacion(video, modelo):
     """Prueba el fotograma sin girar y girado ±90° en 8 tramos del vídeo; elige el que mejor detecta."""
     tramos = leer_tramos(video, n_tramos=8, largo=5)
+    if not tramos:
+        raise SystemExit(f'No se puede leer el vídeo {video}: no existe o su códec (p. ej. AV1/VP9 de YouTube) no lo abre '
+                         'OpenCV. Descárgalo en H.264: yt-dlp -f "bv*[vcodec^=avc1][height<=1080]" ...')
     h, w = tramos[0][0].shape[:2]
     filas = []
     for rot in (0, 90, -90):
