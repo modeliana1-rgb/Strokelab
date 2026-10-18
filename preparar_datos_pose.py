@@ -6,6 +6,10 @@ entero a una sola partición. Se crean k pliegues: en cada uno, un grupo de víd
 el resto el entrenamiento. Las particiones son listas de rutas (.txt), sin copiar imágenes.
 
 Uso:  python preparar_datos_pose.py <carpeta conjunto> [<otra carpeta> ...] --salida datos_pose --pliegues 5
+      [--solo-entrenamiento <carpeta> ...]
+Con --solo-entrenamiento (p. ej. imágenes sintéticas de SwimXYZ u otro conjunto), esas imágenes se añaden al
+entrenamiento de TODOS los pliegues y nunca a validación ni prueba: la evaluación sigue siendo solo con imágenes reales
+y comparable con la anterior.
 """
 import argparse
 import glob
@@ -43,8 +47,10 @@ def main(argv=None):
     ap.add_argument('--salida', default='datos_pose')
     ap.add_argument('--pliegues', type=int, default=5)
     ap.add_argument('--semilla', type=int, default=0)
+    ap.add_argument('--solo-entrenamiento', nargs='*', default=[], help='conjuntos que solo se usan para entrenar')
     a = ap.parse_args(argv)
     grupos = imagenes(a.carpetas)
+    extra = [im for v in imagenes(a.solo_entrenamiento).values() for im in sorted(v)] if a.solo_entrenamiento else []
     videos = sorted(grupos)
     random.Random(a.semilla).shuffle(videos)
     k = a.pliegues
@@ -53,17 +59,19 @@ def main(argv=None):
         min(bloques, key=lambda b: sum(len(grupos[x]) for x in b)).append(v)
     out = Path(a.salida).resolve()
     out.mkdir(parents=True, exist_ok=True)
-    print(f'{len(videos)} vídeos de origen, {sum(len(v) for v in grupos.values())} imágenes')
+    print(f'{len(videos)} vídeos de origen, {sum(len(v) for v in grupos.values())} imágenes'
+          + (f'; + {len(extra)} imágenes solo para entrenar' if extra else ''))
     for i in range(k):
         prueba, val = bloques[i], bloques[(i + 1) % k]
         entr = [v for v in videos if v not in prueba and v not in val]
         for nombre, vs in (('train', entr), ('val', val), ('test', prueba)):
-            (out / f'pliegue{i}_{nombre}.txt').write_text('\n'.join(im for v in vs for im in sorted(grupos[v])) + '\n')
+            lista = [im for v in vs for im in sorted(grupos[v])] + (extra if nombre == 'train' else [])
+            (out / f'pliegue{i}_{nombre}.txt').write_text('\n'.join(lista) + '\n')
         (out / f'pliegue{i}.yaml').write_text(
             f'path: {out}\ntrain: pliegue{i}_train.txt\nval: pliegue{i}_val.txt\ntest: pliegue{i}_test.txt\n'
             f'kpt_shape: [17, 3]\nflip_idx: {FLIP_COCO}\nnames:\n  0: swimmer\n', encoding='utf-8')
         n = lambda vs: sum(len(grupos[v]) for v in vs)
-        print(f'  pliegue {i}: entrenamiento {n(entr)} imágenes ({len(entr)} vídeos) · validación {n(val)} '
+        print(f'  pliegue {i}: entrenamiento {n(entr) + len(extra)} imágenes ({len(entr)} vídeos) · validación {n(val)} '
               f'({len(val)}) · prueba {n(prueba)} ({len(prueba)}): {", ".join(v.split("/")[-1] for v in prueba)}')
     return 0
 

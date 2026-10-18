@@ -26,9 +26,9 @@ def entrenar(yaml, nombre, salida, epocas, imgsz, dispositivo, base='yolov8n-pos
 
 
 def entrenar_final(datos, salida, a):
-    """Modelo definitivo: entrena con las imágenes de prueba de todos los pliegues (= todas, sin repetir). La validación
+    """Modelo definitivo: entrena con todas las imágenes de los pliegues (reales y, si las hay, las de solo entrenamiento). La validación
     es un subconjunto del entrenamiento, así que no se usa para parar antes ni para medir: épocas fijas y last.pt."""
-    todas = sorted({l.strip() for t in sorted(datos.glob('pliegue*_test.txt')) for l in t.read_text().split('\n') if l.strip()})
+    todas = sorted({l.strip() for t in sorted(datos.glob('pliegue*_*.txt')) for l in t.read_text().split('\n') if l.strip()})
     if not todas:
         raise SystemExit(f'No hay pliegues en {datos}: ejecuta antes preparar_datos_pose.py')
     (datos / 'final_train.txt').write_text('\n'.join(todas) + '\n')
