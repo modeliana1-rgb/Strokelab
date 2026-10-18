@@ -135,7 +135,9 @@ aparece la fatiga y por qué** (SHAP), y medidas de codos, hombros, caderas, rod
   (`entrenar_pose.py --base`). **YOLOv8m (18 oct, media 4 pliegues)**: original sin giro 40 %, OKS 0,17, PCK@0,1 15 %,
   PCK@0,2 23 %; original con giro 68 %, 0,22, 19 %, 30 %; ajustado sin giro 69 %, 0,35, 33 %, 50 % (FP 2,5/13); ajustado con
   giro 86 %, 0,34, 33 %, 49 % (FP 7,75/13). El m original es mucho mejor que el n original, pero ajustado NO supera al n
-  ajustado (0,40 / 37 %): con ~200 imágenes de entrenamiento el modelo grande no aprovecha su tamaño. YOLOv8s: pendiente.
+  ajustado (0,40 / 37 %): con ~200 imágenes de entrenamiento el modelo grande no aprovecha su tamaño. **YOLOv8s**: original
+  sin giro 21 %, OKS 0,07, PCK@0,1 5 %; con giro 58 %, 0,14, 12 %, 20 %; ajustado sin giro 76 %, 0,37, 34 %, 54 % (FP 3,5/13);
+  con giro 95 %, 0,35, 31 %, 51 % (FP 12,75/13). Conclusión: tras el ajuste n ≈ s ≈ m (OKS 0,35-0,40); se mantiene YOLOv8n.
 - **Versión del análisis** (`strokelab.VERSION_ANALISIS`): lote.py rehace (reutilizando la pose) los vídeos analizados
   con otra versión. Motivo: el 2º zip de Diana (4 oct 23:05) traía resultados del código viejo porque el lote los saltó.
   Subir la fecha cada vez que cambien medidas, ciclos o fatiga.

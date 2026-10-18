@@ -1,0 +1,13 @@
+modelo,estado,giro,deteccion,OKS,PCK@0.05,PCK@0.1,PCK@0.2,falsos_positivos_de_13
+yolov8n,original,no,0.151,0.050,0.020,0.042,0.073,3.25
+yolov8n,original,si,0.467,0.104,0.040,0.091,0.149,5.75
+yolov8n,ajustado,no,0.782,0.397,0.172,0.370,0.564,3.00
+yolov8n,ajustado,si,0.915,0.378,0.160,0.349,0.540,10.25
+yolov8s,original,no,0.211,0.066,0.025,0.050,0.085,1.75
+yolov8s,original,si,0.575,0.140,0.055,0.116,0.201,8.50
+yolov8s,ajustado,no,0.764,0.367,0.155,0.336,0.537,3.50
+yolov8s,ajustado,si,0.950,0.347,0.146,0.314,0.507,12.75
+yolov8m,original,no,0.402,0.167,0.082,0.152,0.233,1.50
+yolov8m,original,si,0.679,0.215,0.103,0.189,0.297,5.75
+yolov8m,ajustado,no,0.686,0.346,0.157,0.331,0.497,2.50
+yolov8m,ajustado,si,0.859,0.344,0.156,0.326,0.494,7.75
