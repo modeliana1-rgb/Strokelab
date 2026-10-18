@@ -144,7 +144,7 @@ aparece la fatiga y por qué** (SHAP), y medidas de codos, hombros, caderas, rod
   **SwimXYZ** (`convertir_swimxyz.py`): etiquetas por secuencia en <vista>/<agua>/<luz>/<velocidad>/<posición>/body25/2D_cam.txt
   («Nombre.x;Nombre.y;Nombre.z», coma decimal, px); la carpeta COCO trae 18 puntos (OpenPose) con cabecera de BODY25: se usa
   body25 por nombre. Hacen falta los vídeos (misma ruta relativa). Solo entrenamiento: `preparar_datos_pose.py
-  --solo-entrenamiento`. Pendiente comprobar con --revisar si la y va desde arriba (sin vídeo aún).
+  --solo-entrenamiento`. La y de SwimXYZ va desde abajo (comprobado con revisar_*.jpg): usar --y-desde-abajo. Vista Front = cámara fuera del agua al fondo de la piscina, nadador ~100 px de 1920: se recorta un cuadrado de 3x el nadador. Vídeos .webm de Zenodo 8402009 (Front y Aerial, 41,7 GB) bajados en parte con descargar_swimxyz.py (48 Front -> 777 imágenes).
 - **Versión del análisis** (`strokelab.VERSION_ANALISIS`): lote.py rehace (reutilizando la pose) los vídeos analizados
   con otra versión. Motivo: el 2º zip de Diana (4 oct 23:05) traía resultados del código viejo porque el lote los saltó.
   Subir la fecha cada vez que cambien medidas, ciclos o fatiga.

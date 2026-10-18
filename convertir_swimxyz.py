@@ -66,6 +66,8 @@ def main(argv=None):
     ap.add_argument('--max-por-secuencia', type=int, default=20)
     ap.add_argument('--y-desde-abajo', action='store_true', help='si la y de SwimXYZ cuenta desde abajo de la imagen')
     ap.add_argument('--revisar', type=int, default=0, help='guardar N imágenes con el esqueleto dibujado')
+    ap.add_argument('--sin-recorte', action='store_true', help='guardar la imagen entera (por defecto se recorta un '
+                    'cuadrado de 3 veces el tamaño del nadador a su alrededor: en algunas vistas mide ~100 px de 1920)')
     a = ap.parse_args(argv)
     etiquetas = Path(a.etiquetas).resolve()
     out = Path(a.salida).resolve()
@@ -100,6 +102,16 @@ def main(argv=None):
             dentro = (p[:, 0] >= 0) & (p[:, 0] < w) & (p[:, 1] >= 0) & (p[:, 1] < h)
             if dentro.sum() < 8:                                  # nadador casi fuera de la imagen
                 continue
+            if not a.sin_recorte:                                 # cuadrado alrededor del nadador
+                q = p[dentro]
+                cx, cy = (q.min(0) + q.max(0)) / 2
+                lado = int(min(max(3 * (q.max(0) - q.min(0)).max(), 256), w, h))
+                ox = int(np.clip(cx - lado / 2, 0, w - lado))
+                oy = int(np.clip(cy - lado / 2, 0, h - lado))
+                img = img[oy:oy + lado, ox:ox + lado]
+                p = p - [ox, oy]
+                h, w = img.shape[:2]
+                dentro = (p[:, 0] >= 0) & (p[:, 0] < w) & (p[:, 1] >= 0) & (p[:, 1] < h) & dentro
             q = p[dentro]
             x0, y0 = q.min(0)
             x1, y1 = q.max(0)
