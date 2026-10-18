@@ -120,7 +120,14 @@ aparece la fatiga y por qué** (SHAP), y medidas de codos, hombros, caderas, rod
   54 %, falsos positivos 10/13. El pliegue 0 (60 % PCK@0,1 en CPU) era el más fácil; el 3, el más difícil (26 %).
   Modelo para usar: `entrenar_pose.py --final` (405 imágenes, 60 épocas fijas, last.pt; los pliegues solo miden).
   `cluster/lote_ajustado.sbatch`: entrena el final si falta y pasa la lista con `lote.py --modelo` a ../resultados_ajustado
-  (lote rehace la pose si el modelo_pose del resumen es otro). Pendiente: comparar ciclos y error frente a la cuenta manual.
+  (lote rehace la pose si el modelo_pose del resumen es otro). **Resultado en los vídeos propios (18 oct,
+  `resultados_pose/comparacion_videos_original_ajustado.csv`)**: 17 vídeos del TFM (ambos a 640): analizable 132 -> 166 s
+  (+26 %), ciclos 95 -> 109 (+15 %), pero desigual (GX011617 0->9, GX011618 1->11, IMG_7204 5->10; GX011609 5->0, IMG_7205,
+  7213, 7217 -> 0). Frecuencia frente a la cuenta manual NO mejora: GX011614 54 manual: original 50,5 (-6 %), ajustado 73,0
+  (+35 %); IMG_7207 80: 73,9 (-8 %) / 60,5 (-24 %); IMG_7215 51,1: 55,2 (+8 %) / 54,5 (+7 %). Vídeo largo GX010731 (P5):
+  130 -> 254 s, 19 -> 62 ciclos, pero el inicio de fatiga de 748 s (original, 1280) NO se reproduce: sin fatiga. La sesión P5
+  gopro (5 clips de días distintos, orden por nombre) da inicio a 91,5 s de GX010731: probable cambio de condiciones entre
+  clips, no fatiga. ASCR y GX011613 son el mismo vídeo (keypoints idénticos).
 - **Versión del análisis** (`strokelab.VERSION_ANALISIS`): lote.py rehace (reutilizando la pose) los vídeos analizados
   con otra versión. Motivo: el 2º zip de Diana (4 oct 23:05) traía resultados del código viejo porque el lote los saltó.
   Subir la fecha cada vez que cambien medidas, ciclos o fatiga.
