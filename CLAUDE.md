@@ -144,7 +144,12 @@ aparece la fatiga y por qué** (SHAP), y medidas de codos, hombros, caderas, rod
   **SwimXYZ** (`convertir_swimxyz.py`): etiquetas por secuencia en <vista>/<agua>/<luz>/<velocidad>/<posición>/body25/2D_cam.txt
   («Nombre.x;Nombre.y;Nombre.z», coma decimal, px); la carpeta COCO trae 18 puntos (OpenPose) con cabecera de BODY25: se usa
   body25 por nombre. Hacen falta los vídeos (misma ruta relativa). Solo entrenamiento: `preparar_datos_pose.py
-  --solo-entrenamiento`. La y de SwimXYZ va desde abajo (comprobado con revisar_*.jpg): usar --y-desde-abajo. Vista Front = cámara fuera del agua al fondo de la piscina, nadador ~100 px de 1920: se recorta un cuadrado de 3x el nadador. Vídeos .webm de Zenodo 8402009 (Front y Aerial, 41,7 GB) bajados en parte con descargar_swimxyz.py (48 Front -> 777 imágenes).
+  --solo-entrenamiento`. La y de SwimXYZ va desde abajo (comprobado con revisar_*.jpg): usar --y-desde-abajo. Vista Front = cámara fuera del agua al fondo de la piscina, nadador ~100 px de 1920: se recorta un cuadrado de 3x el nadador. Vídeos .webm de Zenodo 8402009 (Front y Aerial, 41,7 GB) bajados en parte con descargar_swimxyz.py (48 Front -> 777 imágenes). **Resultado con SwimXYZ (19 oct, mismos pliegues de prueba
+  reales, 777 sintéticas solo en entrenamiento, YOLOv8n)**: sin giro detección 76 % (antes 78), OKS 0,392 (0,397), PCK@0,05
+  18,6 % (17,2), PCK@0,1 38,3 % (37,0), PCK@0,2 54 % (56), falsos positivos 6,75/13 (3). Sin mejora clara en la prueba
+  (lateral bajo el agua; SwimXYZ Front es fuera del agua) y más falsos positivos (las sintéticas siempre tienen nadador).
+  Pliegue 3 (el difícil): detección 60 -> 84 %, PCK@0,1 26,1 -> 26,9 %. Medir la ventaja en vista frontal exige
+  imágenes frontales reales anotadas (pendiente).
 - **Versión del análisis** (`strokelab.VERSION_ANALISIS`): lote.py rehace (reutilizando la pose) los vídeos analizados
   con otra versión. Motivo: el 2º zip de Diana (4 oct 23:05) traía resultados del código viejo porque el lote los saltó.
   Subir la fecha cada vez que cambien medidas, ciclos o fatiga.

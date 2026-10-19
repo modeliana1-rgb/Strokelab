@@ -11,3 +11,5 @@ yolov8m,original,no,0.402,0.167,0.082,0.152,0.233,1.50
 yolov8m,original,si,0.679,0.215,0.103,0.189,0.297,5.75
 yolov8m,ajustado,no,0.686,0.346,0.157,0.331,0.497,2.50
 yolov8m,ajustado,si,0.859,0.344,0.156,0.326,0.494,7.75
+yolov8n+swimxyz,ajustado,no,0.761,0.392,0.186,0.383,0.544,6.75
+yolov8n+swimxyz,ajustado,si,0.844,0.381,0.180,0.370,0.528,9.25
