@@ -251,7 +251,7 @@ s = nueva('Texto', 'Pose 2D: por qué YOLOv8n', 'Ocho modelos considerados; cuat
           'puntos: son los más precisos en COCO, pero caros en CPU. Los ascendentes, como OpenPose, detectan todos los '
           'puntos y luego los agrupan. Y los de una etapa, como YOLO-Pose, sacan la caja y los 17 puntos en una sola '
           'pasada. La precisión en COCO está medida con personas en tierra, así que no decide sola: medí los candidatos '
-          'en mi vídeo subacuático. YOLOv8n detecta igual que YOLOv8s con 3,5 veces menos parámetros y el doble de '
+          'en mi vídeo subacuático. YOLOv8n detecta igual que YOLOv8s con 3,3 millones de parámetros frente a 11,6 y a 6,6 FPS frente a 3,3, el doble de '
           'velocidad; YOLO11n da resultados equivalentes sin ser más rápido; y frente a MoveNet, que fue mi primera '
           'elección por fluidez, YOLO detecta con el doble de confianza y da 15 ciclos válidos frente a 3. Como el vídeo '
           'anotado se genera después del análisis, la fluidez de MoveNet dejó de importar. [≈ 1 min 15 s]')
@@ -269,7 +269,7 @@ caja(s, 8.9, 3.0, 6.1, 4.0, GRIS_CL)
 texto(s, 9.2, 3.2, 5.5, 0.5, '¿Por qué YOLOv8n? (vídeo real, CPU)', tam=17, color=ROJO, negrita=True)
 texto(s, 9.2, 3.8, 5.5, 3.1, [[('•  ' + t, {'tam': 13, 'esp': 8})] for t in [
     'Una sola pasada: caja y 17 puntos a la vez',
-    'Frente a YOLOv8s: misma detección (35,6 %) con 3,5× menos parámetros y el doble de FPS (6,6 frente a 3,3)',
+    'Frente a YOLOv8s: misma detección (35,6 %) con 3,3 M parámetros frente a 11,6 M y 6,6 FPS frente a 3,3',
     'Frente a YOLO11n: resultados equivalentes (37,6 %, confianza 0,78) sin ser más rápido (6,2 FPS)',
     'Frente a MoveNet: el doble de confianza (0,73-0,77 frente a 0,34-0,37) y 15 ciclos válidos frente a 3',
     'HRNet y ViTPose: mejor AP, pero coste elevado en CPU']])
@@ -712,7 +712,7 @@ s = nueva('Texto', 'Algoritmos: qué y por qué', 'Vertical de visión (pose) �
           '[≈ 1 min 15 s]')
 tabla(s, 0.99, 3.0, 14.0, [
     ['Etapa', 'Algoritmo elegido', 'Alternativa comparada', 'Por qué'],
-    ['Pose 2D', 'YOLOv8n-Pose (CNN, una etapa)', 'YOLO11n, YOLOv8s, MoveNet, HRNet, ViTPose', 'Detecta como v8s con 3,5× menos parámetros; doble de confianza que MoveNet'],
+    ['Pose 2D', 'YOLOv8n-Pose (CNN, una etapa)', 'YOLO11n, YOLOv8s, MoveNet, HRNet, ViTPose', 'Detecta como v8s (35,6 %) con 3,3 M parámetros frente a 11,6 M; doble de confianza que MoveNet'],
     ['Pose 3D', 'MotionBERT-Lite (transformer)', 'Ángulos 2D', 'Solo de frente: en lateral falla la rodilla (107° frente a 173°)'],
     ['Vista', 'Orientación del tronco, tramos de 60 s', 'Vista indicada a mano', 'Hay vídeos laterales y frontales, incluso en el mismo vídeo'],
     ['Ciclos', 'Picos de la mano (lateral) · PCA (frontal)', 'Cada muñeca por separado', 'YOLO copia el brazo visible en el oculto'],
@@ -725,7 +725,7 @@ limpiar(s)
 # ------------------------------------------------------------------ D4 · Visión
 s = nueva('Texto', 'Visión: pose bajo el agua', 'Modelos medidos en el vídeo real (GX011614, CPU de 4 hilos)',
           notas='Comparé los modelos en mi propio vídeo subacuático, porque la precisión publicada en COCO es con personas '
-          'en tierra. YOLOv8n detecta lo mismo que YOLOv8s con 3,5 veces menos parámetros y el doble de velocidad; '
+          'en tierra. YOLOv8n detecta lo mismo que YOLOv8s con 3,3 millones de parámetros frente a 11,6 y a 6,6 FPS frente a 3,3; '
           'YOLO11n queda equivalente sin ser más rápido. MoveNet fue mi primera elección por fluidez, pero YOLO detecta con '
           'el doble de confianza y da 15 ciclos válidos frente a 3; HRNet y ViTPose son más precisos en COCO pero caros en '
           'CPU. Como YOLO se entrenó con personas de pie, lo adapté: giro el fotograma 90 grados si detecta mejor, descarto '
@@ -737,7 +737,7 @@ tabla(s, 0.99, 3.0, 7.9, [['Modelo', 'Parám. (M)', 'FPS', 'Detección', 'Confia
                          ['YOLOv8s', '11,6', '3,3', '35,6 %', '0,74'],
                          ['MoveNet Lightning', '—', '—', '35-48 %*', '0,34-0,37*']], [2.6, 1.3, 0.9, 1.5, 1.6], tam=13, alto_fila=0.5, resaltar=(1,))
 texto(s, 0.99, 5.6, 7.9, 1.8, [[('•  ' + t, {'tam': 13, 'esp': 5})] for t in [
-    'Frente a MoveNet: 15 ciclos válidos frente a 3 en el mismo vídeo',
+    'Frente a MoveNet (vídeo subacuático): doble de confianza y 15 ciclos válidos frente a 3',
     'HRNet (AP 75,5) y ViTPose (80,9): más precisos en COCO, coste elevado en CPU']])
 caja(s, 9.3, 3.0, 5.7, 4.4, GRIS_CL)
 texto(s, 9.6, 3.2, 5.1, 0.5, 'Adaptación al agua', tam=17, color=ROJO, negrita=True)
@@ -746,7 +746,7 @@ texto(s, 9.6, 3.8, 5.1, 3.5, [[('•  ' + t, {'tam': 13, 'esp': 7})] for t in [
     'Filtros anatómicos: tronco girado o vertical, segmentos imposibles, codos < 25°',
     'Savitzky-Golay: suaviza sin aplastar los picos (frente a una media móvil)',
     '3D con MotionBERT solo de frente: en lateral la rodilla sale a 107° frente a 173° en 2D']])
-pie(s, '* MoveNet medido en otra prueba y con GPU (memoria, Tabla 2). AP: precisión media en COCO publicada.', y=7.6)
+pie(s, '* MoveNet: valores medidos con GPU (memoria, Tabla 2). AP: precisión media en COCO según las publicaciones originales (Tabla 1).', y=7.6)
 limpiar(s)
 
 # ------------------------------------------------------------------ D5 · Ciclos
