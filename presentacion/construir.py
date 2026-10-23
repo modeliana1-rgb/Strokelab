@@ -460,7 +460,8 @@ s = nueva('Texto', 'SHAP explica la fatiga', 'Atribución local en el ciclo de i
           'TreeSHAP reparte la puntuación de anomalía entre las variables. En la secuencia sintética de 90 s el inicio '
           'se detecta en el ciclo 35, a los 51,9 segundos, y las causas son el alcance del brazo derecho, que pasa de 1,78 a '
           '1,05 troncos, la asimetría de brazos, del 2 al 23 %, y la amplitud de patada. Son justo variables que se '
-          'alteraron en la simulación: la explicación es verificable. PELT situó el cambio en el ciclo 33. [≈ 1 min]')
+          'alteraron en la simulación: la explicación es verificable. Uso TreeSHAP porque da los valores exactos en modelos '
+          'de árboles, y compruebo en cada ejecución que el signo es coherente. [≈ 1 min 15 s]')
 imagen(s, FIG + 'sintetico_shap_waterfall_inicio.png', 0.99, 2.9, 7.0, 5.0)
 caja(s, 8.5, 3.05, 6.5, 2.4, NEGRO)
 texto(s, 8.8, 3.3, 5.9, 2.0, [
@@ -469,6 +470,8 @@ texto(s, 8.8, 3.3, 5.9, 2.0, [
       'asimetría de brazos (2 % → 23 %) y amplitud de patada (0,31 → 0,21 troncos).', {'color': BLANCO, 'tam': 15})]])
 texto(s, 8.5, 5.8, 6.5, 1.0, 'Las variables señaladas coinciden con las alteradas en la simulación: la explicación es verificable.',
       tam=14, color=NEGRO, negrita=True)
+texto(s, 8.5, 6.55, 6.5, 1.0, [[('Por qué TreeSHAP: ', {'b': True, 'color': ROJO, 'tam': 13}),
+      ('valores de Shapley exactos para modelos de árboles (como Isolation Forest); el signo se comprueba en cada ejecución (correlación 0,999).', {'tam': 13})]])
 pie(s, 'Datos sintéticos de referencia conocida (memoria, Figura 7 y apartado 4.6.2).', y=7.95)
 limpiar(s)
 
@@ -681,6 +684,171 @@ texto(s, 10.7, 3.05, 4.3, 4.2, [
 pie(s, '* Cumplido con limitaciones (3D válido en codo y cadera, no en rodilla).', y=7.55)
 limpiar(s)
 
+# ================================================================== VERSIÓN DE 12 DIAPOSITIVAS (defensa)
+# ------------------------------------------------------------------ D2 · Problema y objetivo
+s = nueva('Texto', 'Problema y objetivo', '¿Cuándo aparece la fatiga técnica y por qué?',
+          notas='Cuando un nadador se cansa, su técnica cambia antes de que caiga el tiempo: acorta la brazada, sube la '
+          'frecuencia, baja el codo. Hoy esto se ve a ojo o con sensores y varias cámaras, que son caros. Mi objetivo es '
+          'una tercera vía: un sistema de IA explicable que, con una cámara y un portátil sin GPU, mida la técnica, '
+          'detecte el inicio de la fatiga y diga qué variable la provoca. El director pidió que la explicabilidad fuera '
+          'lo más importante y que hubiera dos verticales de IA: visión y datos tabulares. [≈ 1 min]')
+tarjeta(s, 0.99, 3.0, 4.3, 2.75, 'Observación', 'Depende del ojo del entrenador: no cuantifica ni deja registro comparable.', num='01')
+tarjeta(s, 5.6, 3.0, 4.3, 2.75, 'Sistemas instrumentados', 'Sensores inerciales o varias cámaras: caros y de montaje complejo.', num='02')
+tarjeta(s, 10.21, 3.0, 4.3, 2.75, 'StrokeLab', 'Una cámara y un portátil sin GPU: mide, detecta el inicio de la fatiga y explica su causa.',
+        relleno=ROJO, ccab=BLANCO, ccue=BLANCO, num='03')
+caja(s, 0.99, 6.0, 13.52, 1.4, NEGRO)
+texto(s, 1.3, 6.0, 13.0, 1.4, [[('Objetivo: ', {'b': True, 'color': ROJO, 'tam': 15}),
+      ('IA explicable desde vídeo monocular en CPU. Indicaciones del director: la explicabilidad (SHAP) es lo más '
+       'importante · dos verticales de IA, visión y tabular · optimizar YOLO frente a MoveNet y ViTPose.', {'color': BLANCO, 'tam': 15})]],
+      ancla=MSO_ANCHOR.MIDDLE)
+limpiar(s)
+
+# ------------------------------------------------------------------ D3 · Algoritmos
+s = nueva('Texto', 'Algoritmos: qué y por qué', 'Vertical de visión (pose) → vertical tabular (ciclos, fatiga, SHAP)',
+          notas='Este es el sistema entero, etapa a etapa. La regla para elegir fue siempre la misma: que funcione en la '
+          'CPU de un portátil, con vídeo bajo el agua y sin etiquetas de fatiga, y que se pueda explicar. En la columna de '
+          'la derecha está el porqué de cada elección frente a la alternativa. Las dos verticales: la visión saca los '
+          'puntos del cuerpo; la tabular convierte esos puntos en variables por ciclo, detecta la fatiga y la explica. '
+          '[≈ 1 min 15 s]')
+tabla(s, 0.99, 3.0, 14.0, [
+    ['Etapa', 'Algoritmo elegido', 'Alternativa comparada', 'Por qué'],
+    ['Pose 2D', 'YOLOv8n-Pose (CNN, una etapa)', 'YOLO11n, YOLOv8s, MoveNet, HRNet, ViTPose', 'Detecta como v8s con 3,5× menos parámetros; doble de confianza que MoveNet'],
+    ['Pose 3D', 'MotionBERT-Lite (transformer)', 'Ángulos 2D', 'Solo de frente: en lateral falla la rodilla (107° frente a 173°)'],
+    ['Vista', 'Orientación del tronco, tramos de 60 s', 'Vista indicada a mano', 'Hay vídeos laterales y frontales, incluso en el mismo vídeo'],
+    ['Ciclos', 'Picos de la mano (lateral) · PCA (frontal)', 'Cada muñeca por separado', 'YOLO copia el brazo visible en el oculto'],
+    ['Fatiga', 'Isolation Forest + PELT', 'Red recurrente supervisada', 'No hay etiquetas de fatiga; coste lineal; SHAP exacto'],
+    ['Explicación', 'TreeSHAP', '—', 'Valores de Shapley exactos para modelos de árboles'],
+    ['Estilo', 'Reglas biomecánicas', 'XGBoost, bosque aleatorio', 'El supervisado aprendía al nadador: 9,1 % con un nadador nuevo'],
+], [1.6, 3.9, 3.6, 4.9], tam=12, alto_fila=0.55, resaltar=(5,))
+limpiar(s)
+
+# ------------------------------------------------------------------ D4 · Visión
+s = nueva('Texto', 'Visión: pose bajo el agua', 'Modelos medidos en el vídeo real (GX011614, CPU de 4 hilos)',
+          notas='Comparé los modelos en mi propio vídeo subacuático, porque la precisión publicada en COCO es con personas '
+          'en tierra. YOLOv8n detecta lo mismo que YOLOv8s con 3,5 veces menos parámetros y el doble de velocidad; '
+          'YOLO11n queda equivalente sin ser más rápido. MoveNet fue mi primera elección por fluidez, pero YOLO detecta con '
+          'el doble de confianza y da 15 ciclos válidos frente a 3; HRNet y ViTPose son más precisos en COCO pero caros en '
+          'CPU. Como YOLO se entrenó con personas de pie, lo adapté: giro el fotograma 90 grados si detecta mejor, descarto '
+          'cuerpos imposibles y suavizo con Savitzky-Golay. El 3D de MotionBERT pone la rodilla doblada como si el '
+          'nadador estuviera sentado, así que en lateral uso el 2D y el 3D solo de frente. [≈ 1 min 30 s]')
+tabla(s, 0.99, 3.0, 7.9, [['Modelo', 'Parám. (M)', 'FPS', 'Detección', 'Confianza'],
+                         ['YOLOv8n (elegido)', '3,3', '6,6', '35,6 %', '0,76'],
+                         ['YOLO11n', '2,9', '6,2', '37,6 %', '0,78'],
+                         ['YOLOv8s', '11,6', '3,3', '35,6 %', '0,74'],
+                         ['MoveNet Lightning', '—', '—', '35-48 %*', '0,34-0,37*']], [2.6, 1.3, 0.9, 1.5, 1.6], tam=13, alto_fila=0.5, resaltar=(1,))
+texto(s, 0.99, 5.6, 7.9, 1.8, [[('•  ' + t, {'tam': 13, 'esp': 5})] for t in [
+    'Frente a MoveNet: 15 ciclos válidos frente a 3 en el mismo vídeo',
+    'HRNet (AP 75,5) y ViTPose (80,9): más precisos en COCO, coste elevado en CPU']])
+caja(s, 9.3, 3.0, 5.7, 4.4, GRIS_CL)
+texto(s, 9.6, 3.2, 5.1, 0.5, 'Adaptación al agua', tam=17, color=ROJO, negrita=True)
+texto(s, 9.6, 3.8, 5.1, 3.5, [[('•  ' + t, {'tam': 13, 'esp': 7})] for t in [
+    'Giro ±90° del fotograma si detecta mejor (YOLO se entrenó con personas de pie)',
+    'Filtros anatómicos: tronco girado o vertical, segmentos imposibles, codos < 25°',
+    'Savitzky-Golay: suaviza sin aplastar los picos (frente a una media móvil)',
+    '3D con MotionBERT solo de frente: en lateral la rodilla sale a 107° frente a 173° en 2D']])
+pie(s, '* MoveNet medido en otra prueba y con GPU (memoria, Tabla 2). AP: precisión media en COCO publicada.', y=7.6)
+limpiar(s)
+
+# ------------------------------------------------------------------ D5 · Ciclos
+s = nueva('Texto', 'Contar ciclos en dos vistas', 'Cada vista usa la señal de brazada que puede ver',
+          notas='La vista se decide sola: por tramos de 60 segundos miro si el tronco aparece horizontal o vertical. En '
+          'lateral cuento brazadas con la mano más profunda respecto al cuerpo, porque YOLO copia el brazo visible en el '
+          'oculto: cada pico es una brazada y en crol dos brazadas son un ciclo. De frente esa profundidad no se ve y uso '
+          'el recorrido de cada muñeca en la dirección en que más se mueve, que saco con PCA. Lo validé con mi conteo '
+          'manual: error entre el 6,5 y el 8,2 %, en lateral y en frontal. [≈ 1 min 15 s]')
+imagen(s, FIG + 'aaron_brazadas.png', 0.99, 2.95, 8.4, 3.2)
+texto(s, 0.99, 6.3, 8.4, 1.3, [[('Lateral: ', {'b': True, 'tam': 13}), ('profundidad de la mano más profunda (YOLO copia el brazo oculto); cada pico, una brazada.', {'tam': 13})],
+                               [('Frontal: ', {'b': True, 'tam': 13}), ('recorrido de la muñeca en su dirección principal (PCA), en anchos de hombros.', {'tam': 13})]])
+tabla(s, 9.8, 3.0, 5.2, [['Secuencia (P1, crol)', 'Manual', 'Sistema', 'Error'],
+                         ['GX011614 · lateral', '54,0', '50,5', '−6,5 %'],
+                         ['IMG_7207 · frontal', '80,0', '73,9', '−7,6 %'],
+                         ['IMG_7215 · frontal', '51,1', '55,2', '+8,2 %']], [2.1, 0.95, 1.1, 1.05], tam=11, alto_fila=0.5)
+texto(s, 9.8, 5.1, 5.2, 0.4, 'Frecuencia (ciclos/min) frente al conteo manual', tam=11, color=GRIS)
+caja(s, 9.8, 5.65, 5.2, 1.75, NEGRO)
+texto(s, 10.05, 5.65, 4.7, 1.75, [[('Vista automática: ', {'b': True, 'color': ROJO, 'tam': 13}),
+      ('tramo frontal si ≥ 65 % de fotogramas con el tronco a > 55° de la horizontal.', {'color': BLANCO, 'tam': 13})]], ancla=MSO_ANCHOR.MIDDLE)
+limpiar(s)
+
+# ------------------------------------------------------------------ D6 · Fatiga
+s = nueva('Texto', 'Fatiga con Isolation Forest', 'Sin etiquetas: cuánto se aparta cada ciclo del nadador fresco',
+          notas='El plan inicial era una red recurrente supervisada, pero hacen falta ciclos etiquetados como fatigados y no '
+          'los hay. Por eso uso Isolation Forest, que se entrena solo con la fase fresca del propio nadador, el primer 30 % '
+          'de sus ciclos. Su idea: lo raro se aísla con pocos cortes aleatorios. Además tiene coste lineal y admite SHAP '
+          'exacto. El inicio es el primer momento con tres ciclos seguidos por encima del percentil 95 de la fase fresca. '
+          'Ese percentil lo elegí con un análisis de sensibilidad: con el 90 hay un 30 % de falsas alarmas y con el 99 se '
+          'pierden fatigas. PELT, un detector de cambios independiente, sirve de contraste. [≈ 1 min 30 s]')
+caja(s, 0.99, 3.0, 6.0, 1.05, GRIS_CL)
+texto(s, 1.25, 3.0, 5.5, 1.05, [[('Descartada: red recurrente supervisada. ', {'b': True, 'tam': 13, 'color': GRIS}),
+      ('Necesita ciclos etiquetados como fatigados: no existen.', {'tam': 13})]], ancla=MSO_ANCHOR.MIDDLE)
+pasos = [('1', 'Fase fresca', 'Primer 30 % de los ciclos (mín. 5); variables estandarizadas con ella'),
+         ('2', 'Isolation Forest', '500 árboles; lo anómalo se aísla con menos cortes aleatorios'),
+         ('3', 'Inicio', '3 ciclos seguidos sobre el percentil 95 fresco; PELT de contraste'),
+         ('4', 'TreeSHAP', 'Qué variable acerca cada ciclo a la fatiga')]
+for i, (n, c, d) in enumerate(pasos):
+    y = 4.25 + i * 0.83
+    caja(s, 0.99, y, 0.65, 0.65, ROJO)
+    texto(s, 0.99, y, 0.65, 0.65, n, tam=20, color=BLANCO, negrita=True, alin=PP_ALIGN.CENTER, ancla=MSO_ANCHOR.MIDDLE)
+    texto(s, 1.8, y - 0.02, 5.2, 0.35, c, tam=14, negrita=True)
+    texto(s, 1.8, y + 0.33, 5.2, 0.45, d, tam=12, color=GRIS)
+imagen(s, FIG + 'sintetico_fatiga_timeline.png', 7.3, 2.95, 7.7, 3.6)
+tabla(s, 7.3, 6.6, 7.7, [['Percentil', 'Detección', 'Falsas alarmas', 'Inicio (59-81 s)'],
+                         ['90 · 95 · 99', '100 · 100 · 60 %', '30 · 10 · 0 %', '64,1 · 70,5 · 80,5 s']], [1.6, 2.0, 1.9, 2.2], tam=11, alto_fila=0.4)
+pie(s, 'Gráfica y sensibilidad: datos sintéticos con fatiga programada (referencia conocida), no un nadador real.', y=7.55)
+limpiar(s)
+
+# ------------------------------------------------------------------ D9 · Resultados
+s = nueva('Texto', 'Resultados', 'Nadadores reales y datos sintéticos, por separado',
+          notas='Con nadadores reales: 17 secuencias de 4 participantes y 4 estilos, 95 ciclos válidos, la frecuencia con un '
+          'error del 6,5 al 8,2 % frente al conteo manual y la familia del estilo bien en 12 de 13. En las sesiones reales '
+          'no hubo fatiga ni falsas alarmas: son pasadas cortas con descansos. La gran limitación es la detección: el '
+          'nadador fue analizable el 34 % del tiempo. Como no tengo una referencia real de fatiga, la compruebo con datos '
+          'sintéticos donde sé la verdad: detecta el 100 % con un 10 % de falsas alarmas, y en tiempo real 10 de 10. '
+          '[≈ 1 min 15 s]')
+for fila, (et, col, items) in enumerate([
+        ('Nadadores reales · 17 secuencias, 4 participantes, 4 estilos', ROJO,
+         [('95', 'ciclos válidos (2,2 de 6,6 min analizables)'), ('6,5-8,2 %', 'error de frecuencia frente al conteo manual'),
+          ('12/13', 'familia del estilo correcta (reglas)'), ('0', 'falsas alarmas en 3 sesiones de pasadas cortas')]),
+        ('Datos sintéticos · referencia conocida', NEGRO,
+         [('4,7 %', 'error mediano en la frecuencia de ciclo'), ('100 %', 'fatigas detectadas'),
+          ('10 %', 'falsas alarmas'), ('10/10', 'detectadas en tiempo real, sin falsas alarmas')])]):
+    y = 2.95 + fila * 2.35
+    texto(s, 0.99, y, 14.0, 0.4, et, tam=15, color=col, negrita=True)
+    for i, (n, e) in enumerate(items):
+        x = 0.99 + i * 3.55
+        caja(s, x, y + 0.45, 3.35, 1.75, GRIS_CL)
+        cifra(s, x + 0.25, y + 0.55, 3.0, n, e, cnum=col, tam=32)
+pie(s, 'Limitación principal: el nadador fue analizable el 34 % del tiempo grabado (detección bajo el agua).', y=7.7)
+limpiar(s)
+
+# ------------------------------------------------------------------ D11 · Conclusiones
+s = nueva('Texto', 'Conclusiones y trabajo futuro', '7 objetivos cumplidos y 2 parciales',
+          notas='Siete objetivos cumplidos y dos parciales: la fatiga está validada con datos sintéticos, pero falta la '
+          'validación fisiológica con nadadores reales; y el estilo supervisado no generalizaba, por eso pasé a reglas. '
+          'La lección principal: la calidad de los datos pesa más que el modelo. Una versión anterior daba un 99,99 % y '
+          'era fuga de datos; desde entonces contrasté cada resultado con una referencia. El trabajo futuro sale de las '
+          'limitaciones: series largas con referencia fisiológica, anotar fotogramas propios para medir la pose y '
+          'ajustar el modelo a nadadores. Gracias. [≈ 1 min 15 s]')
+obj = [('OE1', 'Modelo de pose', 'C'), ('OE2', 'Elevación a 3D', 'C*'), ('OE3', 'Ciclos de brazada', 'C'),
+       ('OE4', 'Variables por ciclo', 'C'), ('OE5', 'Inicio de la fatiga', 'P'), ('OE6', 'Atribución SHAP', 'C'),
+       ('OE7', 'Estilo de nado', 'P'), ('OE8', 'Vídeo y tiempo real', 'C'), ('OE9', 'Datos sintéticos', 'C')]
+for i, (c, d, g) in enumerate(obj):
+    x = 0.99 + (i % 3) * 2.75
+    y = 3.0 + (i // 3) * 1.15
+    caja(s, x, y, 2.6, 1.0, ROJO if g.startswith('C') else NEGRO)
+    texto(s, x + 0.15, y + 0.1, 2.35, 0.35, f'{c} · {"Cumplido" if g == "C" else ("Cumplido*" if g == "C*" else "Parcial")}', tam=11, color=BLANCO, negrita=True)
+    texto(s, x + 0.15, y + 0.48, 2.35, 0.45, d, tam=12, color=BLANCO)
+texto(s, 0.99, 6.55, 8.1, 0.9, [[('La calidad de los datos pesa más que el modelo: ', {'b': True, 'color': ROJO, 'tam': 14}),
+      ('cada resultado se contrastó con una referencia.', {'tam': 14})]])
+caja(s, 9.5, 3.0, 5.5, 4.4, GRIS_CL)
+texto(s, 9.8, 3.2, 5.0, 0.4, 'Limitaciones → trabajo futuro', tam=16, color=ROJO, negrita=True)
+texto(s, 9.8, 3.75, 5.0, 3.6, [[('•  ' + t, {'tam': 12, 'esp': 6})] for t in [
+    'Sin referencia fisiológica de la fatiga → series largas con lactato, esfuerzo percibido y valoración experta',
+    'Detección parcial (34 %) → anotar fotogramas propios (OKS, PCK, mAP) y ajustar la pose con SwimXYZ',
+    '3D poco fiable en piernas → adaptar MotionBERT a nadadores; ViTPose con GPU',
+    'Umbrales fijados con los mismos vídeos → validar con nadadores nuevos']])
+pie(s, '* Cumplido con limitaciones (3D válido en codo y cadera, no en rodilla).', y=7.6)
+limpiar(s)
+
 # ------------------------------------------------------------------ 16 · Contraportada
 s = p.slides.add_slide(lay['Contraportada'])
 s.shapes.title.text = 'Gracias'
@@ -792,6 +960,36 @@ def quedarse(entrada, salida, quitar):
     q.save(salida)
 
 
+def titulo(sl):
+    return sl.shapes.title.text if sl.shapes.title is not None else ''
+
+
+def exportar(salida, titulos):
+    """Guarda solo las diapositivas con esos títulos, en ese orden."""
+    q = Presentation('completa.pptx')
+    ids = q.slides._sldIdLst
+    por_t = {titulo(sl): sid for sl, sid in zip(q.slides, list(ids))}
+    falta = [t for t in titulos if t not in por_t]
+    assert not falta, falta
+    elegidos = [por_t[t] for t in titulos]
+    for sid in list(ids):
+        ids.remove(sid)
+        if sid not in elegidos:
+            q.part.drop_rel(sid.rId)
+    for sid in elegidos:
+        ids.append(sid)
+    q.save(salida)
+
+
+DEFENSA = ['StrokeLab', 'Problema y objetivo', 'Algoritmos: qué y por qué', 'Visión: pose bajo el agua',
+           'Contar ciclos en dos vistas', 'Fatiga con Isolation Forest', 'SHAP explica la fatiga', 'Qué cambió y por qué',
+           'Resultados', 'Demostración: 100 m libre', 'Conclusiones y trabajo futuro', 'Gracias']
+APOYO = ['StrokeLab', 'Anexos', 'Pose 2D: por qué YOLOv8n', '3D con MotionBERT: cuándo sí y cuándo no',
+         'Dos vistas, dos señales de brazada', '¿Por qué Isolation Forest?', 'Umbral e inicio: elegidos con datos',
+         'TreeSHAP: cómo se explica cada ciclo', 'Estilo: del modelo supervisado a reglas', 'Validación con referencia conocida',
+         'Del análisis al entrenador', 'A1 · Modelos de pose en CPU', 'A2 · Fatiga en las sesiones reales',
+         'A3 · Caso sintético completo (Tabla 7)']
+exportar('StrokeLab_defensa.pptx', DEFENSA)
+exportar('StrokeLab_apoyo_preguntas.pptx', APOYO)
 n = len(p.slides._sldIdLst)
-quedarse('completa.pptx', 'StrokeLab_defensa.pptx', set(POST))
 quedarse('completa.pptx', 'StrokeLab_posterior_entrega.pptx', set(range(n)) - set(POST) - {0})
