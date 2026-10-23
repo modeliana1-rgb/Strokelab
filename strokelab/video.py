@@ -51,8 +51,9 @@ def _barra_fatiga(f, ciclos, res, t, dur_total):
     cv2.line(f, (xc, y0 - 4), (xc, y1 + 4), BLANCO, 2)
 
 
-def anotar(video, salida, kps, fr, ciclos, fps, nadador, formato='mp4', res=None, panel='fatiga', info=None):
-    """Escribe el vídeo anotado (máx. 1280 px de ancho). formato: 'mp4' (mp4v) o 'avi' (MJPG, se abre en todo)."""
+def anotar(video, salida, kps, fr, ciclos, fps, nadador, formato='mp4', res=None, panel='fatiga', info=None, esqueleto=True):
+    """Escribe el vídeo anotado (máx. 1280 px de ancho). formato: 'mp4' (mp4v) o 'avi' (MJPG, se abre en todo).
+    esqueleto=False: no se dibuja nada sobre el nadador (solo el panel y la barra de fatiga)."""
     res = res or {}
     cap = cv2.VideoCapture(str(video))
     W, H = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -78,7 +79,7 @@ def anotar(video, salida, kps, fr, ciclos, fps, nadador, formato='mp4', res=None
         i = ciclo_de[t]
         fat = hay_fatiga and res.get('inicio') is not None and t / fps >= res['t_inicio']
         col = ROJO if fat else VERDE
-        if valido[t]:                                      # solo detecciones anatómicamente válidas
+        if esqueleto and valido[t]:                        # solo detecciones anatómicamente válidas
             for a, b in SKELETON:
                 if not np.isnan(kv[t, [a, b]]).any():
                     cv2.line(f, tuple(kv[t, a].astype(int)), tuple(kv[t, b].astype(int)), col, 3, cv2.LINE_AA)

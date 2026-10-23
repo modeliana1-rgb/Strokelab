@@ -63,6 +63,8 @@ def main(argv=None):
     ap.add_argument('--dispositivo', default='auto', help="auto (GPU si hay, si no CPU), cpu o cuda:0")
     ap.add_argument('--panel', default='fatiga', choices=['fatiga', 'completo'],
                     help='panel del vídeo: solo fatiga (defecto) o también los ángulos articulares')
+    ap.add_argument('--sin-esqueleto', action='store_true',
+                    help='vídeo anotado sin nada dibujado sobre el nadador (ni esqueleto ni puntos): solo el panel')
     a = ap.parse_args(argv)
 
     vid = Path(a.video)
@@ -213,7 +215,7 @@ def main(argv=None):
         t0 = time.time()
         destino = out / f'video_anotado.{a.formato}'
         video.anotar(vid, destino, k2d, fr, ciclos_f, fps, a.nadador, a.formato, res=res, panel=a.panel,
-                     info=f'{a.estilo} · vista {vista_principal}')
+                     info=f'{a.estilo} - vista {vista_principal}', esqueleto=not a.sin_esqueleto)
         print(f'    {destino} ({time.time() - t0:.0f} s)')
 
     print(f'\nListo en {time.time() - t_total:.0f} s. Resultados en: {out.resolve()}')
