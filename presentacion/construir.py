@@ -226,18 +226,123 @@ s = nueva('Texto', 'Dos verticales de IA',
 imagen(s, FIG + 'arquitectura.png', 2.2, 2.25, 11.6, 6.0)
 limpiar(s)
 
+# ------------------------------------------------------------------ 5b · Mapa de algoritmos
+s = nueva('Texto', 'Los algoritmos, etapa a etapa', 'Qué se usa en cada paso y con qué se comparó',
+          notas='Antes de entrar en detalle, este es el mapa. En cada etapa elegí un algoritmo y lo comparé con '
+          'alternativas. La regla fue siempre la misma: que funcione en la CPU de un portátil, con vídeo bajo el agua y '
+          'sin etiquetas de fatiga, y que se pueda explicar. En las siguientes diapositivas explico el qué, el cómo y el '
+          'porqué de cada uno. [≈ 40 s]')
+tabla(s, 0.99, 3.0, 14.0, [
+    ['Etapa', 'Algoritmo elegido', 'Tipo', 'Comparado con / descartado'],
+    ['Pose 2D', 'YOLOv8n-Pose (CNN de una etapa)', 'Supervisado, preentrenado en COCO', 'YOLO11n, YOLOv8s, MoveNet; HRNet y ViTPose (coste en CPU)'],
+    ['Pose 3D', 'MotionBERT-Lite (transformer)', 'Preentrenado en Human3.6M', 'Ángulos 2D: se usan en vista lateral'],
+    ['Limpieza', 'Savitzky-Golay + filtros anatómicos', 'Procesado de señal', 'Media móvil (conserva peor los picos)'],
+    ['Vista', 'Orientación del tronco por tramos de 60 s', 'Regla', 'Vista indicada a mano por el usuario'],
+    ['Ciclos', 'Picos de la mano (lateral) · PCA de la muñeca (frontal)', 'Señal + PCA (no supervisado)', 'Cada muñeca por separado (YOLO copia el brazo)'],
+    ['Fatiga', 'Isolation Forest + PELT de contraste', 'No supervisado', 'Red recurrente supervisada'],
+    ['Explicación', 'TreeSHAP (valores de Shapley exactos)', 'IA explicable', '—'],
+    ['Estilo', 'Reglas biomecánicas', 'Reglas, sin entrenamiento', 'XGBoost y bosque aleatorio'],
+], [1.8, 4.5, 3.3, 4.4], tam=12, alto_fila=0.5)
+limpiar(s)
+
+# ------------------------------------------------------------------ 5c · Pose 2D: comparativa
+s = nueva('Texto', 'Pose 2D: por qué YOLOv8n', 'Ocho modelos considerados; cuatro medidos en el vídeo real',
+          notas='Hay tres familias. Los descendentes, como HRNet o ViTPose, detectan primero a la persona y después sus '
+          'puntos: son los más precisos en COCO, pero caros en CPU. Los ascendentes, como OpenPose, detectan todos los '
+          'puntos y luego los agrupan. Y los de una etapa, como YOLO-Pose, sacan la caja y los 17 puntos en una sola '
+          'pasada. La precisión en COCO está medida con personas en tierra, así que no decide sola: medí los candidatos '
+          'en mi vídeo subacuático. YOLOv8n detecta igual que YOLOv8s con 3,5 veces menos parámetros y el doble de '
+          'velocidad; YOLO11n da resultados equivalentes sin ser más rápido; y frente a MoveNet, que fue mi primera '
+          'elección por fluidez, YOLO detecta con el doble de confianza y da 15 ciclos válidos frente a 3. Como el vídeo '
+          'anotado se genera después del análisis, la fluidez de MoveNet dejó de importar. [≈ 1 min 15 s]')
+tabla(s, 0.99, 3.0, 7.6, [
+    ['Modelo', 'Tipo', 'AP COCO', 'Papel'],
+    ['ViTPose-G', 'Transformer', '80,9', 'Trabajo futuro'],
+    ['HRNet-W48', 'Descendente', '75,5', 'No usado (coste CPU)'],
+    ['OpenPose', 'Ascendente', '61,8', 'Referencia'],
+    ['YOLOv8s-Pose', 'Una etapa', '60,0', 'Comparado'],
+    ['YOLOv8n-Pose', 'Una etapa', '50,4', 'Elegido'],
+    ['YOLO11n-Pose', 'Una etapa', '50,0', 'Comparado'],
+    ['MoveNet Lightning', 'Una persona', '—', 'Comparado; opción'],
+], [2.35, 1.75, 1.2, 2.3], tam=12, alto_fila=0.5, resaltar=(5,))
+caja(s, 8.9, 3.0, 6.1, 4.0, GRIS_CL)
+texto(s, 9.2, 3.2, 5.5, 0.5, '¿Por qué YOLOv8n? (vídeo real, CPU)', tam=17, color=ROJO, negrita=True)
+texto(s, 9.2, 3.8, 5.5, 3.1, [[('•  ' + t, {'tam': 13, 'esp': 8})] for t in [
+    'Una sola pasada: caja y 17 puntos a la vez',
+    'Frente a YOLOv8s: misma detección (35,6 %) con 3,5× menos parámetros y el doble de FPS (6,6 frente a 3,3)',
+    'Frente a YOLO11n: resultados equivalentes (37,6 %, confianza 0,78) sin ser más rápido (6,2 FPS)',
+    'Frente a MoveNet: el doble de confianza (0,73-0,77 frente a 0,34-0,37) y 15 ciclos válidos frente a 3',
+    'HRNet y ViTPose: mejor AP, pero coste elevado en CPU']])
+pie(s, 'AP: precisión media en COCO según las publicaciones originales (personas en tierra). Sin anotaciones propias, la pose bajo el agua se validó con la tarea: frecuencia frente al conteo manual.', y=7.3)
+limpiar(s)
+
 # ------------------------------------------------------------------ 6 · Visión
 s = nueva('Texto', 'Adaptar la pose humana al agua', 'La pose bajo el agua necesita tres ajustes',
           notas='YOLO se entrenó con personas de pie, no con nadadores horizontales bajo el agua. Tres decisiones lo '
           'adaptan. Primero, el giro: pruebo el fotograma sin girar y girado 90 grados y me quedo con la orientación que '
           'mejor detecta. Segundo, filtros anatómicos: descarto cuerpos imposibles, como un tronco vertical en vista '
-          'lateral o la cadera encima del hombro. Tercero, la elección del modelo: en el mismo vídeo YOLOv8n dio 15 '
-          'ciclos válidos frente a 3 de MoveNet. El 3D de MotionBERT reconstruye mal las piernas de un nadador '
-          'horizontal, así que en vista lateral uso los ángulos 2D. [≈ 1 min]')
+          'lateral o la cadera encima del hombro. Tercero, limpio la señal: quito los puntos poco fiables, relleno huecos '
+          'cortos y suavizo con Savitzky-Golay, que, a diferencia de una media móvil, no aplasta los picos que luego uso '
+          'para contar brazadas. [≈ 50 s]')
 tarjeta(s, 0.99, 3.2, 4.3, 3.3, 'Giro ±90°', 'Se prueba el fotograma girado y se conserva la orientación que mejor detecta; las coordenadas vuelven al original.', num='01')
-tarjeta(s, 5.6, 3.2, 4.3, 3.3, 'Filtros anatómicos', 'Se descartan troncos verticales en vista lateral, segmentos imposibles y codos < 25°.', num='02')
-tarjeta(s, 10.21, 3.2, 4.3, 3.3, 'YOLOv8n-Pose', '15 ciclos válidos frente a 3 de MoveNet en el mismo vídeo; 6,6 FPS en la CPU del portátil.', num='03')
-pie(s, '3D (MotionBERT): válido en codo y cadera, no en rodilla → ángulos 2D en vista lateral y 3D en vista frontal u oblicua.', y=6.8)
+tarjeta(s, 5.6, 3.2, 4.3, 3.3, 'Filtros anatómicos', 'Se descartan troncos girados (> 45°) o verticales en lateral (> 55°), troncos fuera de 0,5-2 × la mediana, segmentos imposibles y codos < 25°.', num='02')
+tarjeta(s, 10.21, 3.2, 4.3, 3.3, 'Limpieza de la señal', 'Fuera los puntos con confianza < 0,30; huecos ≤ 0,4 s interpolados; Savitzky-Golay (≈ 0,2 s, grado 2), que conserva los picos mejor que una media móvil.', num='03')
+pie(s, 'En GX011614 el filtro de tronco girado quitó el 11,5 % de los fotogramas y la inclinación media del tronco pasó de 42° a 9°.', y=6.8)
+limpiar(s)
+
+# ------------------------------------------------------------------ 6b · 3D
+s = nueva('Texto', '3D con MotionBERT: cuándo sí y cuándo no', 'Elevación de la pose 2D a 3D con una sola cámara',
+          notas='Con una cámara, infinitas posturas 3D dan la misma imagen, así que la profundidad se predice con un '
+          'modelo que ha aprendido cómo se mueve el cuerpo: MotionBERT, un transformer preentrenado con Human3.6M, '
+          'actores de pie en un laboratorio. Para acercar el nadador a lo que conoce, centro cada fotograma en la pelvis, '
+          'giro el tronco a vertical y normalizo la escala; los ángulos no cambian con ese giro. Lo validé comparando '
+          'con el 2D en vista lateral: codo, hombro y cadera son coherentes, pero la rodilla sale a 107 grados, como '
+          'sentado, cuando la imagen la muestra casi extendida. Decisión: en lateral uso el 2D y guardo el 3D aparte; '
+          'de frente o en diagonal, donde el 2D se deforma por la perspectiva, uso el 3D. [≈ 1 min]')
+for i, (n, c, d) in enumerate([
+        ('1', 'Elevación (lifting)', 'La secuencia de puntos 2D entra en MotionBERT-Lite (transformer DSTformer), que predice la profundidad. ≈ 25 s por vídeo en CPU.'),
+        ('2', 'El problema', 'Preentrenado en Human3.6M: actores de pie en un laboratorio, no nadadores horizontales.'),
+        ('3', 'La adaptación', 'Centrar en la pelvis, girar el tronco a vertical y normalizar por el tamaño del cuerpo; los ángulos no cambian con el giro.')]):
+    y = 3.0 + i * 1.12
+    caja(s, 0.99, y, 0.8, 0.8, ROJO)
+    texto(s, 0.99, y, 0.8, 0.8, n, tam=24, color=BLANCO, negrita=True, alin=PP_ALIGN.CENTER, ancla=MSO_ANCHOR.MIDDLE)
+    texto(s, 2.0, y, 5.6, 0.4, c, tam=16, negrita=True)
+    texto(s, 2.0, y + 0.4, 5.6, 0.7, d, tam=12, color=GRIS)
+tabla(s, 8.2, 3.0, 6.8, [['Ángulo (I / D)', 'Mediana 2D', 'Mediana 3D', 'Correlación'],
+                         ['Codo', '156° / 144°', '158° / 143°', '0,51 / −0,08'],
+                         ['Hombro', '90° / 81°', '89° / 92°', '0,69 / 0,71'],
+                         ['Cadera', '171° / 172°', '160° / 164°', '0,58 / 0,69'],
+                         ['Rodilla', '173° / 173°', '107° / 106°', '0,01 / −0,04']], [1.6, 1.7, 1.7, 1.8], tam=12, alto_fila=0.5, resaltar=(4,))
+texto(s, 8.2, 5.6, 6.8, 0.4, 'Vista lateral, secuencia GX011614, 85 fotogramas (Tabla 14 de la memoria)', tam=11, color=GRIS)
+caja(s, 0.99, 6.45, 14.0, 1.0, NEGRO)
+texto(s, 1.3, 6.45, 13.4, 1.0, [[('Decisión: ', {'b': True, 'color': ROJO, 'tam': 15}),
+                                 ('vista lateral → ángulos 2D (el 3D se guarda aparte) · vista frontal u oblicua → ángulos 3D (el 2D se deforma por la perspectiva)', {'color': BLANCO, 'tam': 15})]],
+      ancla=MSO_ANCHOR.MIDDLE)
+limpiar(s)
+
+# ------------------------------------------------------------------ 6c · Vista y señales de ciclo
+s = nueva('Texto', 'Dos vistas, dos señales de brazada', 'El sistema decide la vista y usa la señal que esa vista permite ver',
+          notas='Parte de mis vídeos son laterales y parte frontales, y la señal que sirve en uno no sirve en el otro. '
+          'Primero, la vista se decide sola: divido el vídeo en tramos de 60 segundos y miro la orientación del tronco; '
+          'de lado es casi horizontal y de frente casi vertical. Un fotograma suelto no basta porque YOLO a veces pone '
+          'un esqueleto de pie. En lateral cuento brazadas con la profundidad de la mano más profunda: cada máximo es una '
+          'brazada. Uso la más profunda porque YOLO copia el brazo visible en el oculto. De frente esa profundidad no se '
+          've, así que uso el recorrido de cada muñeca en la dirección en que más se mueve, que saco con PCA, medido en '
+          'anchos de hombros. El ritmo es la mediana de los intervalos dentro del rango fisiológico de cada estilo, lo que '
+          'lo hace robusto a los huecos. [≈ 1 min 15 s]')
+caja(s, 0.99, 3.0, 14.0, 0.95, NEGRO)
+texto(s, 1.3, 3.0, 13.4, 0.95, [[('Vista automática: ', {'b': True, 'color': ROJO, 'tam': 14}),
+                                ('tramos de 60 s; un tramo es frontal si ≥ 65 % de sus fotogramas tienen el tronco a > 55° de la horizontal '
+                                 '(vídeos reales: laterales ≤ 46 %, frontales ≥ 87 %).', {'color': BLANCO, 'tam': 14})]], ancla=MSO_ANCHOR.MIDDLE)
+tarjeta(s, 0.99, 4.15, 6.85, 2.55, 'Lateral · profundidad de la mano',
+        'Mano más profunda respecto al eje del tronco, en longitudes de tronco; cada máximo es una brazada. '
+        'Se toma la más profunda porque YOLO copia el brazo visible en el oculto.')
+tarjeta(s, 8.14, 4.15, 6.85, 2.55, 'Frontal · recorrido de la muñeca (PCA)',
+        'Recorrido de cada muñeca respecto al centro de los hombros, proyectado en la 1.ª componente principal, en anchos '
+        'de hombros. De frente la profundidad no es observable.')
+texto(s, 0.99, 6.9, 14.0, 0.8, [[('Común: ', {'b': True, 'tam': 13}),
+      ('ritmo = mediana de los intervalos dentro del rango del estilo (crol 0,35-1,0 s; mariposa 0,7-2,0 s; braza 0,7-2,4 s) · '
+       'ciclo válido de 0,6-3,0 s con ≤ 30 % de datos ausentes · mínimos y máximos por ciclo con percentiles 10 y 90.', {'tam': 13})]])
 limpiar(s)
 
 # ------------------------------------------------------------------ 7 · Ciclos
@@ -253,6 +358,35 @@ tabla(s, 9.8, 3.1, 5.2, [['Secuencia (P1, crol)', 'Manual', 'Sistema', 'Error'],
                          ['IMG_7215 · frontal', '51,1', '55,2', '+8,2 %']], [2.1, 0.95, 1.1, 1.05], tam=11, alto_fila=0.5)
 texto(s, 9.8, 5.3, 5.2, 0.6, 'Frecuencia de ciclo (ciclos/min) frente al conteo manual', tam=11, color=GRIS)
 pie(s, 'Gris: intervalo del conteo manual (segundos 30-40). Triángulos: brazadas detectadas.', y=6.7)
+limpiar(s)
+
+# ------------------------------------------------------------------ 7b · Por qué Isolation Forest
+s = nueva('Texto', '¿Por qué Isolation Forest?', 'Sin etiquetas de fatiga: se busca lo que se aparta del nadador fresco',
+          notas='El plan inicial era una red recurrente supervisada, pero para entrenarla hacen falta ciclos etiquetados '
+          'como fatigados, y no los hay. Isolation Forest no los necesita: se entrena solo con la fase fresca del propio '
+          'nadador. Su idea es sencilla: lo raro se aísla con pocos cortes aleatorios. Si un ciclo queda aislado enseguida, '
+          'su puntuación se acerca a 1. Además no supone ninguna distribución, tiene coste lineal y, al ser de árboles, '
+          'admite valores SHAP exactos. Antes de entrenar estandarizo cada variable con la media y la desviación de la '
+          'fase fresca, y quito las variables redundantes, como la velocidad, que es frecuencia por distancia. '
+          '[≈ 1 min]')
+caja(s, 0.99, 3.0, 6.6, 1.45, GRIS_CL)
+texto(s, 1.3, 3.2, 6.0, 0.4, 'Plan inicial: red recurrente supervisada', tam=16, color=GRIS, negrita=True)
+texto(s, 1.3, 3.7, 6.0, 0.7, 'Necesita ciclos etiquetados como «fatigados»: no existen.', tam=14)
+caja(s, 0.99, 4.6, 6.6, 2.9, ROJO)
+texto(s, 1.3, 4.8, 6.0, 0.4, 'Elegido: Isolation Forest (no supervisado)', tam=16, color=BLANCO, negrita=True)
+texto(s, 1.3, 5.35, 6.0, 2.1, [[('•  ' + t, {'tam': 14, 'color': BLANCO, 'esp': 6})] for t in [
+    'Se entrena solo con la fase fresca del propio nadador', 'No supone ninguna distribución de los datos',
+    'Coste lineal: viable en la CPU', 'Admite SHAP exacto (TreeSHAP)']])
+texto(s, 8.0, 3.0, 7.0, 0.4, 'Cómo funciona', tam=18, color=ROJO, negrita=True)
+texto(s, 8.0, 3.5, 7.0, 0.7, 'Los ciclos anómalos son escasos y distintos: se aíslan con menos cortes aleatorios que los normales.', tam=14)
+caja(s, 8.0, 4.25, 7.0, 0.95, NEGRO)
+texto(s, 8.0, 4.25, 7.0, 0.6, [[('s(x, n) = 2^(−E[h(x)] / c(n))', {'tam': 20, 'color': BLANCO, 'b': True})]], alin=PP_ALIGN.CENTER, ancla=MSO_ANCHOR.MIDDLE)
+texto(s, 8.0, 4.85, 7.0, 0.35, 'h(x): cortes hasta aislar el ciclo · próximo a 1 = anómalo · < 0,5 = normal', tam=11, color=BLANCO, alin=PP_ALIGN.CENTER)
+texto(s, 8.0, 5.4, 7.0, 0.4, 'Configuración', tam=16, negrita=True)
+texto(s, 8.0, 5.85, 7.0, 1.7, [[('•  ' + t, {'tam': 13, 'esp': 5})] for t in [
+    'Variables estandarizadas con la fase base: z = (x − μ) / σ',
+    '500 árboles · fase base = primer 30 % de los ciclos (mín. 5) · mínimo 8 ciclos',
+    'Fuera las redundantes: velocidad (= SR · DPS), SI y potencia (∝ v³)']])
 limpiar(s)
 
 # ------------------------------------------------------------------ 8 · Fatiga
@@ -276,6 +410,50 @@ imagen(s, FIG + 'sintetico_fatiga_timeline.png', 6.7, 2.95, 8.3, 4.5)
 pie(s, 'Gráfica: datos sintéticos con fatiga programada (referencia conocida), no un nadador real.', y=7.55)
 limpiar(s)
 
+# ------------------------------------------------------------------ 8b · Umbral (sensibilidad) y PELT
+s = nueva('Texto', 'Umbral e inicio: elegidos con datos', 'Sensibilidad con fatiga programada entre t = 59 s y t = 81 s',
+          notas='Los parámetros del detector los fijé a priori y después comprobé su efecto con datos sintéticos, donde sé '
+          'cuándo empieza la fatiga. El percentil del umbral es lo que más pesa. Con el 90 lo detecta todo, pero con un 30 % '
+          'de falsas alarmas y antes de tiempo. Con el 99 no hay falsas alarmas, pero pierde un 40 % de las fatigas y llega '
+          'tarde. El 95 detecta todas, con un 10 % de falsas alarmas, y sitúa el inicio en el centro de la transición. '
+          'Como contraste uso PELT, un detector de cambios que no tiene nada que ver con Isolation Forest: si los dos '
+          'coinciden, la detección es más creíble. En la secuencia de 90 s: ciclo 35 frente a ciclo 33. [≈ 1 min]')
+tabla(s, 0.99, 3.0, 7.9, [['Percentil del umbral', 'Detección', 'Falsas alarmas', 'Inicio medio'],
+                         ['90', '100 %', '30 %', '64,1 s'],
+                         ['95 (elegido)', '100 %', '10 %', '70,5 s'],
+                         ['99', '60 %', '0 %', '80,5 s']], [2.5, 1.6, 2.0, 1.8], tam=13, alto_fila=0.55, resaltar=(2,))
+texto(s, 0.99, 5.35, 7.9, 0.4, 'Fase base 30 % y k = 3 ciclos seguidos (configuración usada).', tam=11, color=GRIS)
+texto(s, 0.99, 5.8, 7.9, 1.6, [[('•  ' + t, {'tam': 13, 'esp': 5})] for t in [
+    'p90 avisa antes de tiempo; p99 llega tarde y pierde fatigas', 'p95: inicio en 70,5 ± 5,0 s, centro de la transición',
+    'La fase base y k influyen menos: subir k quita falsas alarmas y retrasa el aviso']])
+caja(s, 9.3, 3.0, 5.7, 4.45, GRIS_CL)
+texto(s, 9.6, 3.2, 5.1, 0.5, 'PELT: contraste independiente', tam=17, color=ROJO, negrita=True)
+texto(s, 9.6, 3.8, 5.1, 3.6, [[('•  ' + t, {'tam': 13, 'esp': 7})] for t in [
+    'Busca los instantes en que cambia la serie de puntuaciones de anomalía',
+    'Segmentación exacta en tiempo lineal (poda de candidatos)', 'Coste L2 y penalización β = 2 ln n',
+    'Secuencia de 90 s: Isolation Forest ciclo 35 (51,9 s); PELT ciclo 33 (49,4 s)',
+    'Si coinciden, la detección se refuerza']])
+pie(s, 'Datos sintéticos (Tabla 12 de la memoria): 10 secuencias con fatiga y 10 sin fatiga por configuración.', y=7.6)
+limpiar(s)
+
+# ------------------------------------------------------------------ 8c · Cómo funciona SHAP
+s = nueva('Texto', 'TreeSHAP: cómo se explica cada ciclo', 'Valores de Shapley exactos sobre el Isolation Forest',
+          notas='SHAP viene de la teoría de juegos: reparte de forma justa la puntuación de un ciclo entre sus variables, y '
+          'la suma de las partes da la puntuación. Eso permite explicar un ciclo concreto y también todo el nado. Para '
+          'modelos de árboles existe TreeSHAP, que calcula los valores exactos, no aproximados, en tiempo polinómico; '
+          'por eso fue un criterio al elegir Isolation Forest y el bosque aleatorio. Invierto el signo para que positivo '
+          'signifique «acerca a la fatiga», y en cada ejecución compruebo que la suma de SHAP se mueve con la puntuación: '
+          '0,999 en la secuencia de 90 s. [≈ 50 s]')
+tarjeta(s, 0.99, 3.0, 4.3, 3.6, 'Valores de Shapley',
+        'Teoría de juegos: reparten la puntuación entre las variables de forma justa. Aditivos: f(x) = φ0 + Σ φj → explicación de un ciclo y de todo el nado.', num='01')
+tarjeta(s, 5.6, 3.0, 4.3, 3.6, 'TreeSHAP',
+        'Valores exactos en tiempo polinómico para modelos de árboles: sirve para Isolation Forest y para el bosque aleatorio.', num='02')
+tarjeta(s, 10.21, 3.0, 4.3, 3.6, 'Controles',
+        'Signo invertido: positivo = acerca a la fatiga. Correlación entre la suma SHAP y la puntuación en cada ejecución (0,999 en la secuencia de 90 s).', num='03')
+texto(s, 0.99, 6.85, 14.0, 0.7, [[('Salida para el entrenador: ', {'b': True, 'color': ROJO, 'tam': 14}),
+      ('las 4 variables con más contribución y su cambio respecto a la fase fresca. Sin variables redundantes, para que la atribución no se reparta entre medidas equivalentes.', {'tam': 14})]])
+limpiar(s)
+
 # ------------------------------------------------------------------ 9 · SHAP
 s = nueva('Texto', 'SHAP explica la fatiga', 'Atribución local en el ciclo de inicio (secuencia sintética de 90 s)',
           notas='La parte más importante para el director es la explicación. Para el ciclo en que empieza la fatiga, '
@@ -292,6 +470,44 @@ texto(s, 8.8, 3.3, 5.9, 2.0, [
 texto(s, 8.5, 5.8, 6.5, 1.0, 'Las variables señaladas coinciden con las alteradas en la simulación: la explicación es verificable.',
       tam=14, color=NEGRO, negrita=True)
 pie(s, 'Datos sintéticos de referencia conocida (memoria, Figura 7 y apartado 4.6.2).', y=7.95)
+limpiar(s)
+
+# ------------------------------------------------------------------ 9b · Estilo
+s = nueva('Texto', 'Estilo: del modelo supervisado a reglas', 'El 100 % con datos sintéticos no se mantenía con nadadores reales',
+          notas='Para el estilo empecé con XGBoost y lo cambié por un bosque aleatorio, más sencillo y con SHAP exacto. '
+          'Lo validé por vídeo, con GroupKFold, para no mezclar ventanas del mismo vídeo en entrenamiento y prueba. Con '
+          'datos sintéticos acertaba el 100 %. Con vídeos reales, dejando un vídeo fuera, el 45,5 %, apenas por encima del '
+          '36,4 % de decir siempre la clase mayoritaria; y dejando fuera a un participante, el 9,1 %: había aprendido a '
+          'reconocer al nadador, no el estilo. Por eso pasé a reglas que salen de la definición de cada estilo: si las '
+          'manos se mueven a la vez o alternas, y la altura de la cabeza. Aciertan la familia en 12 de 13 vídeos, que es '
+          'lo que necesito para contar ciclos. Los umbrales los fijé con esos vídeos, así que el dato es optimista. '
+          '[≈ 1 min]')
+tarjeta(s, 0.99, 3.0, 4.3, 3.9, 'XGBoost', 'Boosting: árboles en secuencia que corrigen al anterior. Se sustituyó por un modelo más sencillo y con SHAP exacto.', num='01')
+tarjeta(s, 5.6, 3.0, 4.3, 3.9, 'Bosque aleatorio',
+        '300 árboles, ventanas de 4 s, GroupKFold por vídeo. Sintéticos: 100 %. Reales: 45,5 % dejando un vídeo fuera '
+        '(base 36,4 %) y 9,1 % dejando fuera un participante → aprendía al nadador.', num='02')
+tarjeta(s, 10.21, 3.0, 4.3, 3.9, 'Reglas biomecánicas',
+        'Sin entrenamiento. Correlación de las manos (0,65 lateral / 0,20 frontal) → alternos o simultáneos; nariz '
+        'respecto a hombros → braza o espalda. Familia 12/13 reales; estilo 9/13; sintéticos 81 %.',
+        relleno=ROJO, ccab=BLANCO, ccue=BLANCO, num='03')
+pie(s, 'Umbrales fijados con los vídeos reales: la exactitud real es optimista. De frente no distingue mariposa de braza. La familia basta para contar ciclos (2 o 1 brazadas).', y=7.15)
+limpiar(s)
+
+# ------------------------------------------------------------------ 9c · Decisiones
+s = nueva('Texto', 'Qué cambió y por qué', 'Cambios respecto al planteamiento inicial (memoria, apartado 5.2)',
+          notas='Esta tabla resume las decisiones. Ninguna se tomó por preferencia: cada cambio responde a algo que medí. '
+          'La más importante para mí es la de la validación: una versión anterior daba un 99,99 % de exactitud por fotograma '
+          'y era fuga de datos; desde entonces todo se valida por vídeo o por participante. [≈ 45 s]')
+tabla(s, 0.99, 3.0, 14.0, [
+    ['Planteamiento inicial', 'Decisión final', 'Motivo'],
+    ['MoveNet', 'YOLOv8n-Pose', 'Doble de confianza y cinco veces más ciclos válidos bajo el agua'],
+    ['Solo vista lateral', 'Lateral y frontal, vista automática por tramos', 'Parte de los vídeos es frontal: la profundidad de la mano no se ve'],
+    ['Red recurrente supervisada', 'Isolation Forest no supervisado', 'Sin etiquetas de fatiga; admite SHAP exacto'],
+    ['XGBoost', 'Bosque aleatorio → reglas biomecánicas', 'El modelo supervisado aprendía al nadador, no el estilo'],
+    ['Validación por fotograma', 'Validación por vídeo (GroupKFold)', 'El 99,99 % de una versión anterior era fuga de datos'],
+    ['Potencia en vatios', 'Indicadores cinemáticos', 'La potencia depende de CD y A, no medibles desde vídeo'],
+    ['Sensores inerciales', 'Solo vídeo', 'No se dispuso de sensores (trabajo futuro)'],
+], [3.5, 4.6, 5.9], tam=13, alto_fila=0.55, resaltar=(5,))
 limpiar(s)
 
 # ------------------------------------------------------------------ 10 · Resultados reales
