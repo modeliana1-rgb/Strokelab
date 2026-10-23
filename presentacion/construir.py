@@ -14,6 +14,7 @@ ROJO, NEGRO, GRIS, GRIS_CL, BLANCO = (RGBColor(0xFF, 0x32, 0x28), RGBColor(0x1E,
                                       RGBColor(0xEE, 0xED, 0xED), RGBColor(0xFF, 0xFF, 0xFF))
 AZUL, VERDE, ROSA = RGBColor(0x2D, 0x41, 0xB4), RGBColor(0x23, 0xB4, 0xAA), RGBColor(0xFF, 0xAF, 0xAA)
 
+POST = []
 p = Presentation('plantilla_UE_2022.pptx')
 lay = {l.name: l for l in p.slide_layouts}
 
@@ -169,8 +170,8 @@ s.notes_slide.notes_text_frame.text = (
     'Todo funciona con una cámara normal y un portátil sin GPU. [≈ 20 s]')
 
 # ------------------------------------------------------------------ 2 · Índice
-s = nueva('Indice', 'Índice', notas='Esta es la estructura: el problema, el sistema, cómo lo validé, el trabajo que hice '
-          'después de entregar la memoria y las conclusiones. [≈ 15 s]', ancho_titulo=6)
+s = nueva('Indice', 'Índice', notas='Esta es la estructura: el problema, el sistema, cómo lo validé, una demostración con '
+          'dos grabaciones de 100 m libre y las conclusiones. [≈ 15 s]', ancho_titulo=6)
 s.shapes.title.left, s.shapes.title.top = Inches(1.75), Inches(1.1)
 s.shapes.title.height = Inches(1.2)
 for r in s.shapes.title.text_frame.paragraphs[0].runs:
@@ -180,7 +181,7 @@ ph(s, 15).left = Inches(1.75)
 ph(s, 15).text = ''
 tf = ph(s, 15).text_frame
 for i, (n, t) in enumerate([('01', 'El problema y el objetivo'), ('02', 'StrokeLab: visión + datos tabulares'),
-                            ('03', 'Validación y resultados'), ('04', 'Trabajo posterior a la entrega'),
+                            ('03', 'Validación y resultados'), ('04', 'Demostración: 100 m libre'),
                             ('05', 'Conclusiones y trabajo futuro')]):
     q = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
     r = q.add_run(); r.text = f'{n}   '; r.font.color.rgb = ROJO; r.font.bold = True; r.font.size = Pt(24)
@@ -211,7 +212,7 @@ tabla(s, 0.99, 3.15, 14.0, [
     ['La explicabilidad (SHAP) es lo más importante', 'Isolation Forest sobre el estado fresco del propio nadador + TreeSHAP + explicación en texto'],
     ['Dos verticales de IA: visión y tabular', 'Visión: pose 2D (YOLOv8n) y 3D (MotionBERT) · Tabular: variables por ciclo y modelo de fatiga'],
     ['Modos diferenciados (vídeo, tabular, audio)', 'Vídeo y tabular implementados; el audio queda como trabajo futuro'],
-    ['Optimizar YOLO (MoveNet, ViTPose)', 'Comparativa en CPU; YOLOv8n elegido; ajuste fino tras la entrega'],
+    ['Optimizar YOLO (MoveNet, ViTPose)', 'Comparativa en CPU; YOLOv8n elegido; ViTPose como trabajo futuro'],
 ], [5.2, 8.8], tam=14, alto_fila=0.62)
 limpiar(s)
 
@@ -276,36 +277,37 @@ pie(s, 'Gráfica: datos sintéticos con fatiga programada (referencia conocida),
 limpiar(s)
 
 # ------------------------------------------------------------------ 9 · SHAP
-s = nueva('Texto', 'SHAP explica la fatiga', 'Atribución por variable en el ciclo de inicio',
+s = nueva('Texto', 'SHAP explica la fatiga', 'Atribución local en el ciclo de inicio (secuencia sintética de 90 s)',
           notas='La parte más importante para el director es la explicación. Para el ciclo en que empieza la fatiga, '
-          'TreeSHAP reparte la puntuación de anomalía entre las variables. Aquí, la asimetría de brazos, la amplitud de '
-          'patada y el alcance son las que más empujan. El sistema lo traduce a un texto para el entrenador: qué cambió, '
-          'cuánto y cuánto contribuye. En los datos sintéticos, las variables señaladas coinciden con las que se '
-          'alteraron en la simulación, que es la comprobación de que la explicación es correcta. [≈ 1 min]')
+          'TreeSHAP reparte la puntuación de anomalía entre las variables. En la secuencia sintética de 90 s el inicio '
+          'se detecta en el ciclo 35, a los 51,9 segundos, y las causas son el alcance del brazo derecho, que pasa de 1,78 a '
+          '1,05 troncos, la asimetría de brazos, del 2 al 23 %, y la amplitud de patada. Son justo variables que se '
+          'alteraron en la simulación: la explicación es verificable. PELT situó el cambio en el ciclo 33. [≈ 1 min]')
 imagen(s, FIG + 'sintetico_shap_waterfall_inicio.png', 0.99, 2.9, 7.0, 5.0)
 caja(s, 8.5, 3.05, 6.5, 2.4, NEGRO)
 texto(s, 8.8, 3.3, 5.9, 2.0, [
     [('Lo que lee el entrenador', {'b': True, 'color': ROJO, 'tam': 16})],
-    [('«La fatiga aparece en el ciclo 35. Principales causas: asimetría de brazos, amplitud de patada y alcance '
-      'del brazo derecho».', {'color': BLANCO, 'tam': 15})]])
+    [('Inicio de la fatiga en el ciclo 35 (t = 51,9 s). Causas: alcance del brazo derecho (1,78 → 1,05 troncos), '
+      'asimetría de brazos (2 % → 23 %) y amplitud de patada (0,31 → 0,21 troncos).', {'color': BLANCO, 'tam': 15})]])
 texto(s, 8.5, 5.8, 6.5, 1.0, 'Las variables señaladas coinciden con las alteradas en la simulación: la explicación es verificable.',
       tam=14, color=NEGRO, negrita=True)
-pie(s, 'Datos sintéticos de referencia conocida.', y=7.95)
+pie(s, 'Datos sintéticos de referencia conocida (memoria, Figura 7 y apartado 4.6.2).', y=7.95)
 limpiar(s)
 
 # ------------------------------------------------------------------ 10 · Resultados reales
 s = nueva('Texto', 'Resultados con nadadores reales', '17 secuencias · 4 participantes · 4 estilos',
           notas='Con vídeo real analicé 17 secuencias de 4 participantes en 4 estilos: 6,6 minutos grabados, de los que '
           '2,2 minutos fueron analizables, con 95 ciclos válidos. La frecuencia se aproxima al conteo manual con un '
-          'error del 6,5 al 8,2 %. La vista de la cámara se detecta sola en todas las secuencias y la familia del estilo '
+          'error del 6,5 al 8,2 %. La vista automática clasificó bien las 17 secuencias, aunque el umbral se fijó con ellas, y la familia del estilo '
           'en 12 de 13. Las sesiones de pasadas cortas no dieron fatiga, y tampoco falsas alarmas: es lo esperable, '
-          'porque son pasadas a ritmo técnico con descansos. [≈ 1 min]')
+          'porque son pasadas a ritmo técnico con descansos. El nadador fue analizable en el 34 % del tiempo: la detección '
+          'bajo el agua es la principal limitación. [≈ 1 min]')
 items = [('95', 'ciclos válidos de 6,6 min grabados (2,2 min analizables)'),
          ('6,5-8,2 %', 'error de la frecuencia frente al conteo manual'),
-         ('17/17', 'secuencias con la vista de cámara detectada automáticamente'),
+         ('17/17', 'secuencias reales con la vista de cámara bien clasificada (umbral fijado con ellas)'),
          ('12/13', 'secuencias con la familia del estilo correcta (reglas biomecánicas)'),
          ('0', 'falsas alarmas de fatiga en 3 sesiones de pasadas cortas'),
-         ('CPU', 'todo el análisis en el portátil, sin GPU')]
+         ('34 %', 'del tiempo grabado con el nadador analizable: la detección es el cuello de botella')]
 for i, (n, e) in enumerate(items):
     x = 0.99 + (i % 3) * 4.7
     y = 3.05 + (i // 3) * 2.35
@@ -348,7 +350,22 @@ for i, (c, d) in enumerate([('Estado por ciclo', 'FRESCO / FATIGA, ciclo y frecu
 pie(s, 'Captura del vídeo anotado sobre datos sintéticos.', y=7.55)
 limpiar(s)
 
+# ------------------------------------------------------------------ 12b · Demostración
+s = nueva('Texto', 'Demostración: 100 m libre', 'Dos grabaciones nuevas analizadas con StrokeLab',
+          notas='Para terminar la parte técnica, una demostración. Son dos grabaciones de 100 m libre hechas después de '
+          'entregar la memoria, solo para mostrar el sistema funcionando; no forman parte de los resultados del trabajo. '
+          'Aquí se ve el vídeo anotado: el esqueleto, el ciclo, la frecuencia y la barra de anomalía por ciclo. '
+          '[Reproducir el vídeo ≈ 1 min] (No afirmar nada de fatiga que no se haya comprobado en el análisis.)')
+for k, x in enumerate((0.99, 8.1)):
+    caja(s, x, 3.0, 6.9, 3.9, GRIS_CL, linea=RGBColor(0xB4, 0xB4, 0xB4))
+    texto(s, x, 3.0, 6.9, 3.9, [[(f'Vídeo {k + 1}', {'tam': 20, 'b': True, 'color': ROJO})],
+                                [('Insertar aquí el vídeo anotado (Insertar → Vídeo → Este dispositivo)', {'tam': 13, 'color': GRIS})]],
+          alin=PP_ALIGN.CENTER, ancla=MSO_ANCHOR.MIDDLE)
+pie(s, 'Grabaciones realizadas para la demostración, posteriores a la entrega: no forman parte de los resultados de la memoria.', y=7.3)
+limpiar(s)
+
 # ------------------------------------------------------------------ 13 · Posterior a la entrega
+POST.append(len(p.slides._sldIdLst))
 s = nueva('Texto', 'Tras la entrega: ajuste fino de la pose',
           '405 imágenes reales anotadas · validación cruzada por grabación',
           notas='Después de entregar quise atacar la principal limitación, la detección bajo el agua. Usé 405 imágenes '
@@ -396,23 +413,25 @@ limpiar(s)
 # ------------------------------------------------------------------ 14 · Limitaciones y futuro
 s = nueva('Texto', 'Limitaciones y trabajo futuro', 'La debilidad está en los datos, no en la arquitectura',
           notas='Las limitaciones son claras y las identifiqué con datos. Faltan grabaciones de nado continuo y una '
-          'referencia fisiológica, así que la fatiga real no está validada todavía. La detección bajo el agua sigue '
-          'siendo el cuello de botella y el modelo copia el brazo oculto. El 3D falla en las piernas. El trabajo futuro '
-          'sale directamente de ellas: grabar nado continuo con lactato o escala de esfuerzo, anotar fotogramas propios, '
-          'recalibrar las reglas con el modelo ajustado y probar ViTPose y el modo audio. [≈ 1 min]')
+          'referencia fisiológica, así que la fatiga real no está validada todavía. El nadador solo es analizable el 34 % '
+          'del tiempo y en vista lateral el modelo copia el brazo oculto. Con una cámara, los ángulos son proyecciones y '
+          'el 3D falla en las piernas. El trabajo futuro sale directamente de ellas: series largas con lactato, esfuerzo '
+          'percibido y valoración del entrenador; anotar fotogramas propios para medir OKS, PCK y mAP; ajustar la pose '
+          'con SwimXYZ y datos propios; y ampliar con audio, sensores inerciales y una interfaz. [≈ 1 min]')
 for k, (cab, its, x, rel) in enumerate([
         ('Limitaciones', ['Pocos datos reales y sin referencia fisiológica de la fatiga',
-                          'Detección bajo el agua: el brazo oculto se copia del visible',
-                          'El 3D no reconstruye bien las piernas de un nadador horizontal',
+                          'Detección parcial: nadador analizable el 34 % del tiempo',
+                          'Vista lateral: brazos y piernas de cada lado poco distinguibles',
+                          'Una sola cámara: ángulos 2D proyectados; 3D poco fiable en piernas',
                           'Umbrales de vista y estilo fijados con los mismos vídeos'], 0.99, GRIS_CL),
-        ('Trabajo futuro', ['Nado continuo con lactato o escala de esfuerzo (RPE)',
-                            'Anotar fotogramas propios y recalibrar con el modelo ajustado',
-                            'ViTPose y modelos específicos de natación',
-                            'Modo audio: sonido de brazadas y respiración'], 8.0, ROJO)]):
+        ('Trabajo futuro', ['Series largas de nado continuo con lactato, esfuerzo percibido y valoración experta',
+                            'Anotar fotogramas propios: OKS, PCK y mAP con datos propios',
+                            'Ajuste fino de la pose con SwimXYZ y fotogramas propios; ViTPose con GPU',
+                            'Modo audio, sensores inerciales e interfaz para el entrenador'], 8.0, ROJO)]):
     caja(s, x, 3.05, 7.0, 4.5, rel)
     col = NEGRO if rel == GRIS_CL else BLANCO
     texto(s, x + 0.35, 3.3, 6.3, 0.5, cab, tam=20, color=ROJO if rel == GRIS_CL else BLANCO, negrita=True)
-    texto(s, x + 0.35, 4.0, 6.3, 3.4, [[('•  ' + t, {'color': col, 'tam': 15, 'esp': 12})] for t in its])
+    texto(s, x + 0.35, 3.95, 6.3, 3.5, [[('•  ' + t, {'color': col, 'tam': 14, 'esp': 10})] for t in its])
 limpiar(s)
 
 # ------------------------------------------------------------------ 15 · Conclusiones
@@ -464,7 +483,8 @@ tabla(s, 0.99, 3.15, 14.0, [['Modelo', 'Parámetros (M)', 'FPS en CPU', 'Detecci
 pie(s, 'La detección ronda el 36 % porque el nadador solo está en el encuadre parte del vídeo. En el mismo vídeo: 15 ciclos válidos con YOLO frente a 3 con MoveNet.', y=6.6)
 limpiar(s)
 
-s = nueva('Texto', 'A2 · Tamaño del modelo y sintéticos', 'Media de 4 pliegues por grabación · sin giro salvo indicación',
+POST.append(len(p.slides._sldIdLst))
+s = nueva('Texto', 'B1 · Tamaño del modelo y sintéticos', 'Media de 4 pliegues por grabación · sin giro salvo indicación',
           notas='Tras el ajuste los tres tamaños quedan igual o el pequeño mejor: con unas 200 imágenes de entrenamiento '
           'el límite son los datos. Los sintéticos de SwimXYZ (vista frontal, fuera del agua) no mejoran la prueba, que '
           'es lateral bajo el agua, y aumentan las falsas detecciones.')
@@ -478,7 +498,8 @@ tabla(s, 0.99, 3.15, 14.0, [['Modelo', 'Detección', 'OKS', 'PCK@0,1', 'PCK@0,2'
 pie(s, 'Imágenes de Roboflow «Deep Dive Pose Technique» (CC BY 4.0), repartidas por grabación para evitar fuga de datos. Posterior a la entrega.', y=7.0)
 limpiar(s)
 
-s = nueva('Texto', 'A3 · Modelo ajustado en vídeos propios', '17 secuencias del TFM, misma resolución (640 px)',
+POST.append(len(p.slides._sldIdLst))
+s = nueva('Texto', 'B2 · Modelo ajustado en vídeos propios', '17 secuencias del TFM, misma resolución (640 px)',
           notas='Con el modelo ajustado el sistema analiza más tiempo y saca más ciclos, pero la frecuencia frente al '
           'conteo manual no mejora: la señal de la mano tiene picos dobles. Las reglas posteriores están calibradas con '
           'el modelo original; recalibrarlas exige más conteos manuales. Por eso el sistema del TFM mantiene el original.')
@@ -491,7 +512,8 @@ texto(s, 0.99, 5.9, 14.0, 1.4, 'Conclusión: un mejor modelo de pose no basta; h
       tam=16, negrita=True)
 limpiar(s)
 
-s = nueva('Texto', 'A4 · Vídeos públicos de televisión', 'Robustez fuera de las condiciones de diseño',
+POST.append(len(p.slides._sldIdLst))
+s = nueva('Texto', 'B3 · Vídeos públicos de televisión', 'Robustez fuera de las condiciones de diseño',
           notas='Probé dos vídeos de televisión. En la retransmisión del 800 libre de 2001, desde fuera del agua, con '
           'varios nadadores y cambios de plano, el sistema falla: la frecuencia salta de 40 a 90 ciclos por minuto. En '
           'un vídeo con cámara en el fondo y un solo nadador, detecta sola la vista frontal y sigue al nadador. El '
@@ -503,7 +525,7 @@ tarjeta(s, 8.2, 3.1, 6.8, 3.3, 'Cámara en el fondo, un nadador',
         relleno=ROJO, ccab=BLANCO, ccue=BLANCO, num='✓')
 limpiar(s)
 
-s = nueva('Texto', 'A5 · Fatiga en las sesiones reales', 'Sesiones de pasadas cortas del mismo participante, estilo y cámara',
+s = nueva('Texto', 'A2 · Fatiga en las sesiones reales', 'Sesiones de pasadas cortas del mismo participante, estilo y cámara',
           notas='Ninguna sesión mostró fatiga ni falsas alarmas. Son pasadas cortas a ritmo técnico con descansos, no un '
           'esfuerzo continuo. No demuestra la capacidad de detectar fatiga real, pero sí que el sistema no inventa fatiga.')
 tabla(s, 0.99, 3.15, 14.0, [['Sesión', 'Secuencias', 'Ciclos', 'Resultado'],
@@ -515,5 +537,36 @@ tabla(s, 0.99, 3.15, 14.0, [['Sesión', 'Secuencias', 'Ciclos', 'Resultado'],
       [5.0, 2.4, 2.0, 4.6], tam=14, alto_fila=0.58)
 limpiar(s)
 
-p.save('StrokeLab_defensa.pptx')
-print('ok', len(p.slides))
+s = nueva('Texto', 'A3 · Caso sintético completo (Tabla 7)', 'Secuencia de 120 s con fatiga programada entre t = 59 s y t = 81 s',
+          notas='Si preguntan por la validación con referencia conocida: en vista lateral se estiman frecuencia, velocidad y '
+          'distancia por ciclo con errores medianos del 4,7, 1,3 y 4,3 %; de frente, la frecuencia con un 0,3 %. El inicio '
+          'se detecta a los 57,3 s, al comienzo de la transición, y SHAP señala variables alteradas en la simulación.')
+tabla(s, 0.99, 3.1, 14.0, [['Medida', 'Vista lateral', 'Vista frontal'],
+                           ['Ciclos analizados', '91', '98'],
+                           ['Error mediano de la frecuencia de ciclo', '4,7 %', '0,3 %'],
+                           ['Error mediano de la velocidad', '1,3 %', 'No observable de frente'],
+                           ['Error mediano de la distancia por ciclo', '4,3 %', 'No observable de frente'],
+                           ['Inicio de la fatiga detectado', 't = 57,3 s (ciclo 42)', 't = 57,8 s (ciclo 45)'],
+                           ['Variables con mayor atribución SHAP', 'Apertura del hombro, asimetría de brazos, inclinación del tronco',
+                            'Frecuencia de ciclo, asimetría de brazos, alcance del brazo']],
+      [4.6, 4.7, 4.7], tam=13, alto_fila=0.58)
+pie(s, 'Datos sintéticos. Fuente: memoria, Tabla 7.', y=7.4)
+limpiar(s)
+
+p.save('completa.pptx')
+print('ok', len(p.slides), 'posteriores', POST)
+
+
+def quedarse(entrada, salida, quitar):
+    q = Presentation(entrada)
+    ids = q.slides._sldIdLst
+    for k, sid in reversed(list(enumerate(ids))):
+        if k in quitar:
+            q.part.drop_rel(sid.rId)
+            ids.remove(sid)
+    q.save(salida)
+
+
+n = len(p.slides._sldIdLst)
+quedarse('completa.pptx', 'StrokeLab_defensa.pptx', set(POST))
+quedarse('completa.pptx', 'StrokeLab_posterior_entrega.pptx', set(range(n)) - set(POST) - {0})
