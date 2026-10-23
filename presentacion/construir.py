@@ -351,17 +351,26 @@ pie(s, 'Captura del vídeo anotado sobre datos sintéticos.', y=7.55)
 limpiar(s)
 
 # ------------------------------------------------------------------ 12b · Demostración
-s = nueva('Texto', 'Demostración: 100 m libre', 'Dos grabaciones nuevas analizadas con StrokeLab',
-          notas='Para terminar la parte técnica, una demostración. Son dos grabaciones de 100 m libre hechas después de '
-          'entregar la memoria, solo para mostrar el sistema funcionando; no forman parte de los resultados del trabajo. '
-          'Aquí se ve el vídeo anotado: el esqueleto, el ciclo, la frecuencia y la barra de anomalía por ciclo. '
-          '[Reproducir el vídeo ≈ 1 min] (No afirmar nada de fatiga que no se haya comprobado en el análisis.)')
-for k, x in enumerate((0.99, 8.1)):
-    caja(s, x, 3.0, 6.9, 3.9, GRIS_CL, linea=RGBColor(0xB4, 0xB4, 0xB4))
-    texto(s, x, 3.0, 6.9, 3.9, [[(f'Vídeo {k + 1}', {'tam': 20, 'b': True, 'color': ROJO})],
-                                [('Insertar aquí el vídeo anotado (Insertar → Vídeo → Este dispositivo)', {'tam': 13, 'color': GRIS})]],
-          alin=PP_ALIGN.CENTER, ancla=MSO_ANCHOR.MIDDLE)
-pie(s, 'Grabaciones realizadas para la demostración, posteriores a la entrega: no forman parte de los resultados de la memoria.', y=7.3)
+s = nueva('Texto', 'Demostración: 100 m libre', 'Dos grabaciones nuevas analizadas con StrokeLab (GoPro, 60 fps)',
+          notas='Para terminar, una demostración con dos grabaciones de 100 m libre, una suave y otra rápida, hechas después '
+          'de entregar la memoria; no forman parte de sus resultados. [Reproducir el vídeo anotado del 100 suave.] '
+          'En el suave el sistema decidió solo que la vista era lateral y el estilo crol, y obtuvo 20 ciclos válidos a 56 '
+          'ciclos por minuto. En el rápido la cámara ve al nadador de frente u oblicuo gran parte del tiempo: en lateral '
+          'solo salían 2 ciclos válidos y, indicando la vista frontal, 39 ciclos a 54 ciclos por minuto. En ninguno hay '
+          'fatiga sostenida, lo esperable en 100 metros. La frecuencia de los dos es parecida; sin un conteo manual no '
+          'afirmo cuál es más precisa. Es justo lo que dice la memoria: la vista y la detección condicionan el análisis. '
+          '[≈ 1 min 30 s] NO mostrar los ángulos de cadera y rodilla del suave: las piernas se detectan mal en este vídeo.')
+for k, (x, cab, its) in enumerate([
+        (0.99, '100 suave', ['Vista lateral y estilo crol detectados automáticamente', '20 ciclos válidos · 42,5 s analizables de 86 s',
+                             '56 ciclos/min de media', 'Sin fatiga sostenida']),
+        (8.1, '100 rápido', ['Vista frontal u oblicua: indicada manualmente (en lateral, solo 2 ciclos)', '39 ciclos válidos · 76 s analizables de 106 s',
+                             '54 ciclos/min de media', 'Sin fatiga sostenida'])]):
+    caja(s, x, 3.0, 6.9, 2.3, GRIS_CL, linea=RGBColor(0xB4, 0xB4, 0xB4))
+    texto(s, x, 3.0, 6.9, 2.3, [[('Insertar aquí el vídeo anotado', {'tam': 13, 'color': GRIS})],
+                                [('Insertar → Vídeo → Este dispositivo', {'tam': 11, 'color': GRIS})]], alin=PP_ALIGN.CENTER, ancla=MSO_ANCHOR.MIDDLE)
+    texto(s, x, 5.45, 6.9, 0.45, cab, tam=18, color=ROJO, negrita=True)
+    texto(s, x, 5.95, 6.9, 1.5, [[('•  ' + t, {'tam': 13, 'esp': 4})] for t in its])
+pie(s, 'Grabaciones posteriores a la entrega, solo como demostración; frecuencia sin validar con conteo manual.', y=7.6)
 limpiar(s)
 
 # ------------------------------------------------------------------ 13 · Posterior a la entrega
