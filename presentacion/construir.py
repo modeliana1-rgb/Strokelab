@@ -44,13 +44,16 @@ def nueva(nombre, titulo=None, subt=None, notas=None, ancho_titulo=13.5):
     if titulo is not None:
         t = s.shapes.title
         t.text = titulo
-        t.width = Inches(min(ancho_titulo, 11.8))
+        l, tp, h = t.left, t.top, t.height
+        t.left, t.top, t.width, t.height = l, tp, Inches(min(ancho_titulo, 11.8)), h
         for q in t.text_frame.paragraphs:
             for r in q.runs:
                 r.font.size = Pt(32)
     if subt is not None:
-        ph(s, 18).text = subt
-        ph(s, 18).width = Inches(13.5)
+        q = ph(s, 18)
+        q.text = subt
+        l, tp, h = q.left, q.top, q.height
+        q.left, q.top, q.width, q.height = l, tp, Inches(13.5), h
     if notas:
         s.notes_slide.notes_text_frame.text = notas
     return s
@@ -176,8 +179,7 @@ s.shapes.title.left, s.shapes.title.top = Inches(1.75), Inches(1.1)
 s.shapes.title.height = Inches(1.2)
 for r in s.shapes.title.text_frame.paragraphs[0].runs:
     r.font.size = Pt(44)
-ph(s, 15).top = Inches(2.6)
-ph(s, 15).left = Inches(1.75)
+ph(s, 15).left, ph(s, 15).top, ph(s, 15).width, ph(s, 15).height = Inches(1.75), Inches(2.6), Inches(9.0), Inches(4.6)
 ph(s, 15).text = ''
 tf = ph(s, 15).text_frame
 for i, (n, t) in enumerate([('01', 'El problema y el objetivo'), ('02', 'Método y algoritmos'),
@@ -859,7 +861,7 @@ limpiar(s)
 
 # ================================================================== GUION DE LA DEFENSA (esquema de la guía UE)
 # ------------------------------------------------------------------ G2 · Problema y estado del arte
-s = nueva('Texto', 'El problema y el estado del arte', 'Falta una herramienta accesible que mida, detecte y explique la fatiga',
+s = nueva('Texto', 'El problema y el estado del arte', '¿Cuándo aparece la fatiga técnica y por qué?',
           notas='Con la fatiga, la técnica se degrada: sube la frecuencia, baja la distancia por ciclo y cambia la coordinación '
           'de los brazos. Hoy el entrenador lo valora a ojo, y así no puede saber en qué momento empieza ni qué variable '
           'cambia primero. Los sistemas comerciales necesitan sensores inerciales, varias cámaras o marcadores, y dan '
@@ -867,15 +869,19 @@ s = nueva('Texto', 'El problema y el estado del arte', 'Falta una herramienta ac
           'detectan la fatiga, pero no combinan las dos cosas con una explicación, en algo barato que funcione en un '
           'portátil. De ahí salen mis tres preguntas de investigación; la tercera es la central: sin etiquetas de fatiga, '
           '¿en qué ciclo se degrada la técnica y qué variables lo explican? [≈ 1 min 30 s]')
-tabla(s, 0.99, 3.0, 14.0, [
+texto(s, 0.99, 2.95, 14.0, 1.0, [[('El problema. ', {'b': True, 'color': ROJO, 'tam': 15}),
+      ('No existe una herramienta accesible que, a partir de un único vídeo y sin instrumentación adicional, cuantifique '
+       'la eficiencia de la técnica de nado, detecte el inicio de la fatiga técnica y atribuya esa fatiga a variables '
+       'biomecánicas que el entrenador pueda interpretar.', {'tam': 15})]])
+tabla(s, 0.99, 4.05, 14.0, [
     ['', 'Observación del entrenador', 'Sistemas instrumentados', 'StrokeLab'],
     ['Entrada', 'El ojo del entrenador', 'Sensores inerciales, varias cámaras o marcadores', 'Un único vídeo convencional'],
     ['Coste y equipo', 'Ninguno', 'Coste elevado', 'Portátil sin GPU, ejecución local'],
     ['¿Cuándo empieza la fatiga?', 'No se fija con precisión', 'Miden la técnica o la fatiga por separado', 'Ciclo de inicio, sin etiquetas'],
     ['¿Por qué? (qué variable)', 'No se sabe cuál cambia primero', 'Métricas sin explicar su relación con el estado', 'SHAP por variable y texto para el entrenador'],
-], [2.9, 3.4, 4.0, 3.7], tam=12, alto_fila=0.55)
-caja(s, 0.99, 6.0, 14.0, 1.05, NEGRO)
-texto(s, 1.3, 6.0, 13.4, 1.05, [[('Preguntas de investigación: ', {'b': True, 'color': ROJO, 'tam': 14}),
+], [2.9, 3.4, 4.0, 3.7], tam=11, alto_fila=0.44)
+caja(s, 0.99, 6.4, 14.0, 1.05, NEGRO)
+texto(s, 1.3, 6.4, 13.4, 1.05, [[('Preguntas de investigación: ', {'b': True, 'color': ROJO, 'tam': 14}),
       ('(1) pose bajo el agua en CPU · (2) de la pose a ciclos y variables biomecánicas · (3, la central) sin etiquetas, '
        'en qué ciclo se degrada la técnica y qué variables lo explican.', {'color': BLANCO, 'tam': 14})]], ancla=MSO_ANCHOR.MIDDLE)
 limpiar(s)
@@ -888,10 +894,10 @@ s = nueva('Texto', 'Objetivo y aportación', 'IA explicable desde un vídeo, en 
           'variables, fatiga explicable, y entrega y validación. La aportación no está en el detector de pose, que es '
           'preentrenado, sino en lo que construyo encima: la adaptación a la natación y la vertical tabular explicable. '
           'Es lo que pidió el director: la explicabilidad como eje y dos verticales de IA. [≈ 1 min]')
-caja(s, 0.99, 3.0, 14.0, 1.0, NEGRO)
-texto(s, 1.3, 3.0, 13.4, 1.0, [[('Objetivo general: ', {'b': True, 'color': ROJO, 'tam': 14}),
-      ('cuantificar la eficiencia de la técnica, detectar el inicio de la fatiga técnica y atribuir sus causas a variables '
-       'biomecánicas con valores de Shapley, a partir de un vídeo y sin GPU.', {'color': BLANCO, 'tam': 14})]], ancla=MSO_ANCHOR.MIDDLE)
+texto(s, 0.99, 2.95, 14.0, 1.15, [[('El objetivo. ', {'b': True, 'color': ROJO, 'tam': 15}),
+      ('Desarrollar un sistema de inteligencia artificial explicable que, a partir de un vídeo de nado y en un ordenador '
+       'personal sin GPU, cuantifique la eficiencia de la técnica de nado, detecte el inicio de la fatiga técnica y '
+       'atribuya sus causas a variables biomecánicas interpretables.', {'tam': 15})]])
 for i, (cab, cue, pie_) in enumerate([
         ('Visión', ['OE1 · elegir el modelo de pose en CPU', 'OE2 · elevar a 3D y evaluarlo'], 'Vertical de visión'),
         ('Ciclos y variables', ['OE3 · ciclos validados con conteo manual', 'OE4 · eficiencia y ángulos por ciclo', 'OE7 · estilo de nado'], 'Vertical tabular'),
