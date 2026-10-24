@@ -704,13 +704,20 @@ texto(s, 1.3, 6.0, 13.0, 1.4, [[('Objetivo: ', {'b': True, 'color': ROJO, 'tam':
 limpiar(s)
 
 # ------------------------------------------------------------------ D3 · Algoritmos
-s = nueva('Texto', 'Algoritmos: qué y por qué', 'Vertical de visión (pose) → vertical tabular (ciclos, fatiga, SHAP)',
+s = nueva('Texto', 'Método: un algoritmo por etapa', 'Vertical de visión (pose) → vertical tabular (ciclos, fatiga, SHAP)',
           notas='Este es el sistema entero, etapa a etapa. La regla para elegir fue siempre la misma: que funcione en la '
           'CPU de un portátil, con vídeo bajo el agua y sin etiquetas de fatiga, y que se pueda explicar. En la columna de '
           'la derecha está el porqué de cada elección frente a la alternativa. Las dos verticales: la visión saca los '
           'puntos del cuerpo; la tabular convierte esos puntos en variables por ciclo, detecta la fatiga y la explica. '
-          '[≈ 1 min 15 s]')
-tabla(s, 0.99, 3.0, 14.0, [
+          'Los datos: 17 secuencias reales de 4 participantes, sin ningún fotograma anotado, así que valido con mi conteo '
+          'manual y con datos sintéticos donde conozco la verdad. No entrené un modelo de pose propio: no había fotogramas '
+          'anotados, no había GPU y los modelos preentrenados ya saben cómo es un cuerpo. [≈ 1 min 30 s]')
+caja(s, 0.99, 3.0, 14.0, 0.75, NEGRO)
+texto(s, 1.3, 3.0, 13.4, 0.75, [[('Datos: ', {'b': True, 'color': ROJO, 'tam': 13}),
+      ('17 secuencias reales · 4 participantes · 4 estilos · 6,6 min (GoPro 5K lateral y móvil desde el borde) · '
+       'sin fotogramas anotados → validación con conteo manual y datos sintéticos de referencia conocida', {'color': BLANCO, 'tam': 13})]],
+      ancla=MSO_ANCHOR.MIDDLE)
+tabla(s, 0.99, 3.95, 14.0, [
     ['Etapa', 'Algoritmo elegido', 'Alternativa comparada', 'Por qué'],
     ['Pose 2D', 'YOLOv8n-Pose (CNN, una etapa)', 'YOLO11n, YOLOv8s, MoveNet, HRNet, ViTPose', 'Detecta como v8s (35,6 %) con 3,3 M parámetros frente a 11,6 M; doble de confianza que MoveNet'],
     ['Pose 3D', 'MotionBERT-Lite (transformer)', 'Ángulos 2D', 'Solo de frente: en lateral falla la rodilla (107° frente a 173°)'],
@@ -719,7 +726,7 @@ tabla(s, 0.99, 3.0, 14.0, [
     ['Fatiga', 'Isolation Forest + PELT', 'Red recurrente supervisada', 'No hay etiquetas de fatiga; coste lineal; SHAP exacto'],
     ['Explicación', 'TreeSHAP', '—', 'Valores de Shapley exactos para modelos de árboles'],
     ['Estilo', 'Reglas biomecánicas', 'XGBoost, bosque aleatorio', 'El supervisado aprendía al nadador: 9,1 % con un nadador nuevo'],
-], [1.6, 3.9, 3.6, 4.9], tam=12, alto_fila=0.55, resaltar=(5,))
+], [1.6, 3.9, 3.6, 4.9], tam=11, alto_fila=0.46, resaltar=(5,))
 limpiar(s)
 
 # ------------------------------------------------------------------ D4 · Visión
@@ -738,7 +745,8 @@ tabla(s, 0.99, 3.0, 7.9, [['Modelo', 'Parám. (M)', 'FPS', 'Detección', 'Confia
                          ['MoveNet Lightning', '—', '—', '35-48 %*', '0,34-0,37*']], [2.6, 1.3, 0.9, 1.5, 1.6], tam=13, alto_fila=0.5, resaltar=(1,))
 texto(s, 0.99, 5.6, 7.9, 1.8, [[('•  ' + t, {'tam': 13, 'esp': 5})] for t in [
     'Frente a MoveNet (vídeo subacuático): doble de confianza y 15 ciclos válidos frente a 3',
-    'HRNet (AP 75,5) y ViTPose (80,9): más precisos en COCO, coste elevado en CPU']])
+    'HRNet (AP 75,5) y ViTPose (80,9): más precisos en COCO, coste elevado en CPU',
+    'Sin modelo propio: ningún fotograma subacuático anotado y sin GPU; se reutiliza un modelo preentrenado']])
 caja(s, 9.3, 3.0, 5.7, 4.4, GRIS_CL)
 texto(s, 9.6, 3.2, 5.1, 0.5, 'Adaptación al agua', tam=17, color=ROJO, negrita=True)
 texto(s, 9.6, 3.8, 5.1, 3.5, [[('•  ' + t, {'tam': 13, 'esp': 7})] for t in [
@@ -847,6 +855,109 @@ texto(s, 9.8, 3.75, 5.0, 3.6, [[('•  ' + t, {'tam': 12, 'esp': 6})] for t in [
     '3D poco fiable en piernas → adaptar MotionBERT a nadadores; ViTPose con GPU',
     'Umbrales fijados con los mismos vídeos → validar con nadadores nuevos']])
 pie(s, '* Cumplido con limitaciones (3D válido en codo y cadera, no en rodilla).', y=7.6)
+limpiar(s)
+
+# ================================================================== GUION DE LA DEFENSA (esquema de la guía UE)
+# ------------------------------------------------------------------ G2 · Problema y estado del arte
+s = nueva('Texto', 'El problema y el estado del arte', 'Falta una herramienta accesible que mida, detecte y explique la fatiga',
+          notas='Con la fatiga, la técnica se degrada: sube la frecuencia, baja la distancia por ciclo y cambia la coordinación '
+          'de los brazos. Hoy el entrenador lo valora a ojo, y así no puede saber en qué momento empieza ni qué variable '
+          'cambia primero. Los sistemas comerciales necesitan sensores inerciales, varias cámaras o marcadores, y dan '
+          'métricas sin explicar su relación con el estado del nadador. Los trabajos existentes miden la técnica o '
+          'detectan la fatiga, pero no combinan las dos cosas con una explicación, en algo barato que funcione en un '
+          'portátil. De ahí salen mis tres preguntas de investigación; la tercera es la central: sin etiquetas de fatiga, '
+          '¿en qué ciclo se degrada la técnica y qué variables lo explican? [≈ 1 min 30 s]')
+tabla(s, 0.99, 3.0, 14.0, [
+    ['', 'Observación del entrenador', 'Sistemas instrumentados', 'StrokeLab'],
+    ['Entrada', 'El ojo del entrenador', 'Sensores inerciales, varias cámaras o marcadores', 'Un único vídeo convencional'],
+    ['Coste y equipo', 'Ninguno', 'Coste elevado', 'Portátil sin GPU, ejecución local'],
+    ['¿Cuándo empieza la fatiga?', 'No se fija con precisión', 'Miden la técnica o la fatiga por separado', 'Ciclo de inicio, sin etiquetas'],
+    ['¿Por qué? (qué variable)', 'No se sabe cuál cambia primero', 'Métricas sin explicar su relación con el estado', 'SHAP por variable y texto para el entrenador'],
+], [2.9, 3.4, 4.0, 3.7], tam=12, alto_fila=0.55)
+caja(s, 0.99, 6.0, 14.0, 1.05, NEGRO)
+texto(s, 1.3, 6.0, 13.4, 1.05, [[('Preguntas de investigación: ', {'b': True, 'color': ROJO, 'tam': 14}),
+      ('(1) pose bajo el agua en CPU · (2) de la pose a ciclos y variables biomecánicas · (3, la central) sin etiquetas, '
+       'en qué ciclo se degrada la técnica y qué variables lo explican.', {'color': BLANCO, 'tam': 14})]], ancla=MSO_ANCHOR.MIDDLE)
+limpiar(s)
+
+# ------------------------------------------------------------------ G3 · Objetivo y aportación
+s = nueva('Texto', 'Objetivo y aportación', 'IA explicable desde un vídeo, en un portátil sin GPU',
+          notas='El objetivo general es un sistema de IA explicable que, desde un vídeo y en un portátil sin GPU, cuantifique '
+          'la eficiencia de la técnica, detecte el inicio de la fatiga y atribuya sus causas a variables biomecánicas con '
+          'valores de Shapley. Lo concreté en nueve objetivos específicos que agrupo en cuatro bloques: visión, ciclos y '
+          'variables, fatiga explicable, y entrega y validación. La aportación no está en el detector de pose, que es '
+          'preentrenado, sino en lo que construyo encima: la adaptación a la natación y la vertical tabular explicable. '
+          'Es lo que pidió el director: la explicabilidad como eje y dos verticales de IA. [≈ 1 min]')
+caja(s, 0.99, 3.0, 14.0, 1.0, NEGRO)
+texto(s, 1.3, 3.0, 13.4, 1.0, [[('Objetivo general: ', {'b': True, 'color': ROJO, 'tam': 14}),
+      ('cuantificar la eficiencia de la técnica, detectar el inicio de la fatiga técnica y atribuir sus causas a variables '
+       'biomecánicas con valores de Shapley, a partir de un vídeo y sin GPU.', {'color': BLANCO, 'tam': 14})]], ancla=MSO_ANCHOR.MIDDLE)
+for i, (cab, cue, pie_) in enumerate([
+        ('Visión', ['OE1 · elegir el modelo de pose en CPU', 'OE2 · elevar a 3D y evaluarlo'], 'Vertical de visión'),
+        ('Ciclos y variables', ['OE3 · ciclos validados con conteo manual', 'OE4 · eficiencia y ángulos por ciclo', 'OE7 · estilo de nado'], 'Vertical tabular'),
+        ('Fatiga explicable', ['OE5 · inicio respecto al propio nadador', 'OE6 · causas con SHAP y en texto'], 'Vertical tabular + XAI'),
+        ('Entrega y validación', ['OE8 · vídeo anotado y tiempo real', 'OE9 · datos sintéticos de referencia conocida'], 'Producto y evaluación')]):
+    x = 0.99 + i * 3.55
+    caja(s, x, 4.2, 3.35, 2.45, ROJO if i == 2 else GRIS_CL)
+    c1, c2 = (BLANCO, BLANCO) if i == 2 else (ROJO, NEGRO)
+    texto(s, x + 0.25, 4.35, 2.9, 0.4, cab, tam=16, color=c1, negrita=True)
+    texto(s, x + 0.25, 4.85, 2.9, 1.4, [[(t, {'tam': 12, 'color': c2, 'esp': 4})] for t in cue])
+    texto(s, x + 0.25, 6.25, 2.9, 0.3, pie_, tam=10, color=c1 if i == 2 else GRIS)
+texto(s, 0.99, 6.85, 14.0, 0.7, [[('Aportación: ', {'b': True, 'color': ROJO, 'tam': 13}),
+      ('detección no supervisada del inicio de la fatiga y atribución por variable interpretable, en un sistema de bajo coste. '
+       'No está en el detector de pose, sino en lo que se construye sobre él.', {'tam': 13})]])
+limpiar(s)
+
+# ------------------------------------------------------------------ G9 · Resultados frente a los objetivos
+s = nueva('Texto', 'Resultados frente a los objetivos', '7 cumplidos y 2 parciales · reales y sintéticos, por separado',
+          notas='Así quedan los nueve objetivos. Con vídeo real: la frecuencia de ciclo con un error del 6,5 al 8,2 % frente '
+          'al conteo manual, 95 ciclos válidos en 17 secuencias y la familia del estilo en 12 de 13. Con datos sintéticos, '
+          'donde sé la verdad: errores por debajo del 5 % y la fatiga detectada en el 100 % de los casos con un 10 % de '
+          'falsas alarmas, también en tiempo real. Los dos parciales son honestos: a la fatiga le falta una referencia '
+          'fisiológica real, y el estilo supervisado no generalizaba, por eso pasé a reglas. [≈ 1 min 15 s]')
+tabla(s, 0.99, 3.0, 14.0, [
+    ['Objetivo', 'Resultado medido', 'Estado'],
+    ['OE1 · Modelo de pose', 'Comparativa en CPU; YOLOv8n-Pose elegido y justificado', 'Cumplido'],
+    ['OE2 · Elevación a 3D', 'Implementada y evaluada; válida en codo y cadera, no en rodilla', 'Cumplido con limitaciones'],
+    ['OE3 · Ciclos de brazada', 'Error de la frecuencia del 6,5 % al 8,2 % frente al conteo manual; vista automática', 'Cumplido'],
+    ['OE4 · Variables por ciclo', '17 secuencias reales, 95 ciclos válidos; eficiencia y ángulos de codo, hombro, cadera, rodilla y pies', 'Cumplido'],
+    ['OE5 · Inicio de la fatiga', 'Sintéticos: detección 100 %, falsas alarmas 10 %; tiempo real 10/10; sin referencia fisiológica', 'Parcial'],
+    ['OE6 · Atribución SHAP', 'Global, local y en texto; coincide con las variables alteradas', 'Cumplido'],
+    ['OE7 · Estilo de nado', 'Supervisado: 100 % sintético, no generaliza; reglas: familia correcta en 12 de 13 vídeos reales', 'Parcial'],
+    ['OE8 · Vídeo y tiempo real', 'Panel de fatiga por ciclo en el vídeo anotado y en tiempo real', 'Cumplido'],
+    ['OE9 · Datos sintéticos', 'Referencia conocida: errores medianos 4,7 % (SR), 1,3 % (velocidad), 4,3 % (DPS)', 'Cumplido'],
+], [3.2, 8.3, 2.5], tam=11, alto_fila=0.42, resaltar=(5, 7))
+pie(s, 'Reales: nadador analizable el 34 % del tiempo grabado; 0 falsas alarmas en 3 sesiones de pasadas cortas (sin fatiga, como se esperaba).', y=7.35)
+limpiar(s)
+
+# ------------------------------------------------------------------ G11 · Alcance y conclusiones
+s = nueva('Texto', 'Alcance y conclusiones', 'Dónde terminan las cifras y dónde empieza el trabajo futuro',
+          notas='Quiero ser clara con el alcance. La fatiga está validada con datos sintéticos; con nadadores reales solo '
+          'tengo pasadas cortas, que no producen fatiga. El nadador es analizable un tercio del tiempo. Y los umbrales de '
+          'vista y estilo los fijé con los mismos vídeos. La debilidad está en los datos, no en la arquitectura: el sistema '
+          'está preparado para validarse en cuanto haya series largas con una referencia fisiológica. La lección que me '
+          'llevo es que la calidad de los datos pesa más que el modelo: un 99,99 % de una versión anterior era fuga de '
+          'datos, y desde entonces contrasté cada resultado con una referencia. Muchas gracias. [≈ 1 min 15 s]')
+for i, (cab, cue) in enumerate([
+        ('Fatiga sin referencia real', 'Validada con datos sintéticos; las sesiones reales son pasadas cortas, sin fatiga.'),
+        ('Detección parcial', 'Nadador analizable el 34 % del tiempo; en lateral el modelo copia el brazo oculto.'),
+        ('Umbrales optimistas', 'Vista y estilo se fijaron con los mismos vídeos; falta validar con nadadores nuevos.')]):
+    x = 0.99 + i * 4.7
+    caja(s, x, 3.0, 4.5, 1.75, GRIS_CL)
+    texto(s, x + 0.25, 3.15, 4.0, 0.4, cab, tam=15, color=ROJO, negrita=True)
+    texto(s, x + 0.25, 3.6, 4.0, 1.1, cue, tam=12)
+texto(s, 0.99, 5.0, 6.8, 0.4, 'Conclusiones', tam=17, color=ROJO, negrita=True)
+texto(s, 0.99, 5.45, 6.8, 2.1, [[('•  ' + t, {'tam': 13, 'esp': 6})] for t in [
+    'Sistema completo en CPU: del vídeo a cuándo empieza la fatiga y por qué',
+    'La debilidad está en los datos reales, no en el modelo ni en la arquitectura',
+    'La calidad de los datos pesa más que el modelo: el 99,99 % de una versión anterior era fuga de datos']])
+caja(s, 8.2, 5.0, 6.8, 2.5, ROJO)
+texto(s, 8.45, 5.1, 6.3, 0.4, 'Líneas futuras', tam=17, color=BLANCO, negrita=True)
+texto(s, 8.45, 5.55, 6.3, 1.9, [[('•  ' + t, {'tam': 12, 'color': BLANCO, 'esp': 4})] for t in [
+    'Series largas de nado continuo con lactato, esfuerzo percibido y valoración experta',
+    'Anotar fotogramas propios: OKS, PCK y mAP; ajuste fino con SwimXYZ',
+    'Adaptar MotionBERT a nadadores; ViTPose con GPU',
+    'Modo audio y sensores inerciales']])
 limpiar(s)
 
 # ------------------------------------------------------------------ 16 · Contraportada
@@ -981,10 +1092,10 @@ def exportar(salida, titulos):
     q.save(salida)
 
 
-DEFENSA = ['StrokeLab', 'Problema y objetivo', 'Algoritmos: qué y por qué', 'Visión: pose bajo el agua',
-           'Contar ciclos en dos vistas', 'Fatiga con Isolation Forest', 'SHAP explica la fatiga', 'Qué cambió y por qué',
-           'Resultados', 'Demostración: 100 m libre', 'Conclusiones y trabajo futuro', 'Gracias']
-APOYO = ['StrokeLab', 'Anexos', 'Pose 2D: por qué YOLOv8n', '3D con MotionBERT: cuándo sí y cuándo no',
+DEFENSA = ['StrokeLab', 'El problema y el estado del arte', 'Objetivo y aportación', 'Método: un algoritmo por etapa',
+           'Visión: pose bajo el agua', 'Contar ciclos en dos vistas', 'Fatiga con Isolation Forest', 'SHAP explica la fatiga',
+           'Resultados frente a los objetivos', 'Demostración: 100 m libre', 'Alcance y conclusiones', 'Gracias']
+APOYO = ['StrokeLab', 'Anexos', 'Dos verticales de IA', 'Qué cambió y por qué', 'Resultados', 'Pose 2D: por qué YOLOv8n', '3D con MotionBERT: cuándo sí y cuándo no',
          'Dos vistas, dos señales de brazada', '¿Por qué Isolation Forest?', 'Umbral e inicio: elegidos con datos',
          'TreeSHAP: cómo se explica cada ciclo', 'Estilo: del modelo supervisado a reglas', 'Validación con referencia conocida',
          'Del análisis al entrenador', 'A1 · Modelos de pose en CPU', 'A2 · Fatiga en las sesiones reales',
