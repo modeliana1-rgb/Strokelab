@@ -576,16 +576,18 @@ s = nueva('Texto', 'Demostración: 100 m libre', 'Dos grabaciones nuevas analiza
           notas='Para terminar, una demostración con dos grabaciones de 100 m libre, una suave y otra rápida, hechas después '
           'de entregar la memoria; no forman parte de sus resultados. [Reproducir el vídeo anotado del 100 suave.] '
           'En el suave el sistema decidió solo que la vista era lateral y el estilo crol, y obtuvo 20 ciclos válidos a 56 '
-          'ciclos por minuto. En el rápido la cámara ve al nadador de frente u oblicuo gran parte del tiempo: en lateral '
-          'solo salían 2 ciclos válidos y, indicando la vista frontal, 39 ciclos a 54 ciclos por minuto. En ninguno hay '
-          'fatiga sostenida declarada. En el rápido, sin embargo, la puntuación de anomalía sube al final: los dos últimos ciclos son los más anómalos de todo el vídeo, pero la regla exige tres ciclos seguidos y el vídeo termina antes. La frecuencia de los dos es parecida; sin un conteo manual no '
+          'ciclos por minuto. En el rápido el nadador termina a los 72 segundos, así que analizo solo hasta ahí. La cámara '
+          'lo ve de frente u oblicuo gran parte del tiempo: indicando la vista frontal salen 25 ciclos válidos a 52 ciclos '
+          'por minuto. En ninguno hay fatiga sostenida declarada: un 100 m es corto y la fase fresca ya incluye parte del '
+          'esfuerzo. De frente, el sistema estimó brazos simultáneos, así que el estilo crol lo indiqué a mano. La frecuencia '
+          'de los dos es parecida; sin un conteo manual no '
           'afirmo cuál es más precisa. Es justo lo que dice la memoria: la vista y la detección condicionan el análisis. '
           '[≈ 1 min 30 s] Los vídeos no llevan nada dibujado sobre el nadador: solo el panel con tiempo, ciclo, frecuencia y estado.')
 for k, (x, cab, its) in enumerate([
         (0.99, '100 suave', ['Vista lateral y estilo crol detectados automáticamente', '20 ciclos válidos · 42,5 s analizables de 86 s',
                              '56 ciclos/min de media', 'Sin fatiga sostenida']),
-        (8.1, '100 rápido', ['Vista frontal u oblicua: indicada manualmente (en lateral, solo 2 ciclos)', '39 ciclos válidos · 76 s analizables de 106 s',
-                             '54 ciclos/min de media', 'Sin fatiga declarada: los 2 últimos ciclos son los más anómalos del vídeo (la regla exige 3 seguidos)'])]):
+        (8.1, '100 rápido', ['Analizado hasta t = 72 s, cuando el nadador termina', 'Vista frontal u oblicua y estilo crol indicados a mano',
+                             '25 ciclos válidos · 46,5 s analizables de 72 s · 52 ciclos/min de media', 'Sin fatiga sostenida'])]):
     caja(s, x, 3.0, 6.9, 2.3, GRIS_CL, linea=RGBColor(0xB4, 0xB4, 0xB4))
     texto(s, x, 3.0, 6.9, 2.3, [[('Insertar aquí el vídeo anotado', {'tam': 13, 'color': GRIS})],
                                 [('Insertar → Vídeo → Este dispositivo', {'tam': 11, 'color': GRIS})]], alin=PP_ALIGN.CENTER, ancla=MSO_ANCHOR.MIDDLE)
