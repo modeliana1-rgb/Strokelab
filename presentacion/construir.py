@@ -170,8 +170,8 @@ s.notes_slide.notes_text_frame.text = (
     'Todo funciona con una cámara normal y un portátil sin GPU. [≈ 20 s]')
 
 # ------------------------------------------------------------------ 2 · Índice
-s = nueva('Indice', 'Índice', notas='Esta es la estructura: el problema, el sistema, cómo lo validé, una demostración con '
-          'dos grabaciones de 100 m libre y las conclusiones. [≈ 15 s]', ancho_titulo=6)
+s = nueva('Indice', 'Guion', notas='Este es el guion: el problema y el objetivo, el método y los algoritmos, la validación, '
+          'una demostración con dos grabaciones de 100 m libre y el alcance con las conclusiones. [≈ 15 s]', ancho_titulo=6)
 s.shapes.title.left, s.shapes.title.top = Inches(1.75), Inches(1.1)
 s.shapes.title.height = Inches(1.2)
 for r in s.shapes.title.text_frame.paragraphs[0].runs:
@@ -180,9 +180,9 @@ ph(s, 15).top = Inches(2.6)
 ph(s, 15).left = Inches(1.75)
 ph(s, 15).text = ''
 tf = ph(s, 15).text_frame
-for i, (n, t) in enumerate([('01', 'El problema y el objetivo'), ('02', 'StrokeLab: visión + datos tabulares'),
+for i, (n, t) in enumerate([('01', 'El problema y el objetivo'), ('02', 'Método y algoritmos'),
                             ('03', 'Validación y resultados'), ('04', 'Demostración: 100 m libre'),
-                            ('05', 'Conclusiones y trabajo futuro')]):
+                            ('05', 'Alcance y conclusiones')]):
     q = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
     r = q.add_run(); r.text = f'{n}   '; r.font.color.rgb = ROJO; r.font.bold = True; r.font.size = Pt(24)
     r = q.add_run(); r.text = t; r.font.size = Pt(24)
@@ -484,7 +484,7 @@ s = nueva('Texto', 'Estilo: del modelo supervisado a reglas', 'El 100 % con dato
           'reconocer al nadador, no el estilo. Por eso pasé a reglas que salen de la definición de cada estilo: si las '
           'manos se mueven a la vez o alternas, y la altura de la cabeza. Aciertan la familia en 12 de 13 vídeos, que es '
           'lo que necesito para contar ciclos. Los umbrales los fijé con esos vídeos, así que el dato es optimista. '
-          '[≈ 1 min]')
+          '[≈ 50 s]')
 tarjeta(s, 0.99, 3.0, 4.3, 3.9, 'XGBoost', 'Boosting: árboles en secuencia que corrigen al anterior. Se sustituyó por un modelo más sencillo y con SHAP exacto.', num='01')
 tarjeta(s, 5.6, 3.0, 4.3, 3.9, 'Bosque aleatorio',
         '300 árboles, ventanas de 4 s, GroupKFold por vídeo. Sintéticos: 100 %. Reales: 45,5 % dejando un vídeo fuera '
@@ -541,7 +541,7 @@ s = nueva('Texto', 'Validación con referencia conocida', 'Datos sintéticos: se
           'del 4,7 % en frecuencia, del 1,3 % en velocidad y del 4,3 % en distancia por ciclo. El detector encuentra la '
           'fatiga en el 100 % de los casos con un 10 % de falsas alarmas, y en tiempo real detecta 10 de 10 sin falsas '
           'alarmas. Son datos sintéticos y así los presento: sirven para comprobar que el método funciona cuando la '
-          'verdad se conoce. [≈ 1 min]')
+          'verdad se conoce. [≈ 50 s]')
 for i, (n, e) in enumerate([('4,7 %', 'error mediano en la frecuencia de ciclo'), ('1,3 %', 'error mediano en la velocidad'),
                             ('4,3 %', 'error mediano en la distancia por ciclo')]):
     cifra(s, 0.99 + i * 2.6, 3.2, 2.4, n, e, tam=34)
@@ -578,7 +578,7 @@ s = nueva('Texto', 'Demostración: 100 m libre', 'Dos grabaciones nuevas analiza
           'solo salían 2 ciclos válidos y, indicando la vista frontal, 39 ciclos a 54 ciclos por minuto. En ninguno hay '
           'fatiga sostenida declarada. En el rápido, sin embargo, la puntuación de anomalía sube al final: los dos últimos ciclos son los más anómalos de todo el vídeo, pero la regla exige tres ciclos seguidos y el vídeo termina antes. La frecuencia de los dos es parecida; sin un conteo manual no '
           'afirmo cuál es más precisa. Es justo lo que dice la memoria: la vista y la detección condicionan el análisis. '
-          '[≈ 1 min 30 s] NO mostrar los ángulos de cadera y rodilla del suave: las piernas se detectan mal en este vídeo.')
+          '[≈ 1 min 30 s] Los vídeos no llevan nada dibujado sobre el nadador: solo el panel con tiempo, ciclo, frecuencia y estado.')
 for k, (x, cab, its) in enumerate([
         (0.99, '100 suave', ['Vista lateral y estilo crol detectados automáticamente', '20 ciclos válidos · 42,5 s analizables de 86 s',
                              '56 ciclos/min de media', 'Sin fatiga sostenida']),
@@ -911,10 +911,9 @@ limpiar(s)
 # ------------------------------------------------------------------ G9 · Resultados frente a los objetivos
 s = nueva('Texto', 'Resultados frente a los objetivos', '7 cumplidos y 2 parciales · reales y sintéticos, por separado',
           notas='Así quedan los nueve objetivos. Con vídeo real: la frecuencia de ciclo con un error del 6,5 al 8,2 % frente '
-          'al conteo manual, 95 ciclos válidos en 17 secuencias y la familia del estilo en 12 de 13. Con datos sintéticos, '
-          'donde sé la verdad: errores por debajo del 5 % y la fatiga detectada en el 100 % de los casos con un 10 % de '
-          'falsas alarmas, también en tiempo real. Los dos parciales son honestos: a la fatiga le falta una referencia '
-          'fisiológica real, y el estilo supervisado no generalizaba, por eso pasé a reglas. [≈ 1 min 15 s]')
+          'al conteo manual, 95 ciclos válidos en 17 secuencias y la familia del estilo en 12 de 13; con datos sintéticos, '
+          'lo que acabo de mostrar. Los dos parciales son honestos: a la fatiga le falta una referencia '
+          'fisiológica real, y el estilo supervisado no generalizaba, por eso pasé a reglas. [≈ 1 min]')
 tabla(s, 0.99, 3.0, 14.0, [
     ['Objetivo', 'Resultado medido', 'Estado'],
     ['OE1 · Modelo de pose', 'Comparativa en CPU; YOLOv8n-Pose elegido y justificado', 'Cumplido'],
@@ -1057,6 +1056,18 @@ tabla(s, 0.99, 3.1, 14.0, [['Medida', 'Vista lateral', 'Vista frontal'],
 pie(s, 'Datos sintéticos. Fuente: memoria, Tabla 7.', y=7.4)
 limpiar(s)
 
+# Tiempo de cada diapositiva calculado con el texto de las notas: 140 palabras/min + 10 s para señalar la pantalla
+import re as _re
+for _s in p.slides:
+    if not _s.has_notes_slide:
+        continue
+    _tf = _s.notes_slide.notes_text_frame
+    _m = _re.search(r'\[≈ [^\]]+\]', _tf.text)
+    if _m:
+        _seg = len(_tf.text[:_m.start()].split()) / 140 * 60 + 10
+        _seg = int(round(_seg / 5) * 5)
+        _txt = f'{_seg // 60} min {_seg % 60} s' if _seg >= 60 and _seg % 60 else (f'{_seg // 60} min' if _seg >= 60 else f'{_seg} s')
+        _tf.text = _tf.text[:_m.start()] + f'[≈ {_txt}]' + _tf.text[_m.end():]
 p.save('completa.pptx')
 print('ok', len(p.slides), 'posteriores', POST)
 
@@ -1092,12 +1103,12 @@ def exportar(salida, titulos):
     q.save(salida)
 
 
-DEFENSA = ['StrokeLab', 'El problema y el estado del arte', 'Objetivo y aportación', 'Método: un algoritmo por etapa',
+DEFENSA = ['StrokeLab', 'Guion', 'El problema y el estado del arte', 'Objetivo y aportación', 'Método: un algoritmo por etapa',
            'Visión: pose bajo el agua', 'Contar ciclos en dos vistas', 'Fatiga con Isolation Forest', 'SHAP explica la fatiga',
-           'Resultados frente a los objetivos', 'Demostración: 100 m libre', 'Alcance y conclusiones', 'Gracias']
+           'Estilo: del modelo supervisado a reglas', 'Validación con referencia conocida', 'Resultados frente a los objetivos', 'Demostración: 100 m libre', 'Alcance y conclusiones', 'Gracias']
 APOYO = ['StrokeLab', 'Anexos', 'Dos verticales de IA', 'Qué cambió y por qué', 'Resultados', 'Pose 2D: por qué YOLOv8n', '3D con MotionBERT: cuándo sí y cuándo no',
          'Dos vistas, dos señales de brazada', '¿Por qué Isolation Forest?', 'Umbral e inicio: elegidos con datos',
-         'TreeSHAP: cómo se explica cada ciclo', 'Estilo: del modelo supervisado a reglas', 'Validación con referencia conocida',
+         'TreeSHAP: cómo se explica cada ciclo',
          'Del análisis al entrenador', 'A1 · Modelos de pose en CPU', 'A2 · Fatiga en las sesiones reales',
          'A3 · Caso sintético completo (Tabla 7)']
 exportar('StrokeLab_defensa.pptx', DEFENSA)
