@@ -174,7 +174,7 @@ s.notes_slide.notes_text_frame.text = (
 
 # ------------------------------------------------------------------ 2 · Índice
 s = nueva('Indice', 'Guion', notas='Este es el guion: el problema y el objetivo, el método y los algoritmos, la validación, '
-          'una demostración con dos grabaciones de 100 m libre y el alcance con las conclusiones. [≈ 15 s]', ancho_titulo=6)
+          'una demostración con un 100 m libre y el alcance con las conclusiones. [≈ 15 s]', ancho_titulo=6)
 s.shapes.title.left, s.shapes.title.top = Inches(1.75), Inches(1.1)
 s.shapes.title.height = Inches(1.2)
 for r in s.shapes.title.text_frame.paragraphs[0].runs:
@@ -572,28 +572,25 @@ pie(s, 'Captura del vídeo anotado sobre datos sintéticos.', y=7.55)
 limpiar(s)
 
 # ------------------------------------------------------------------ 12b · Demostración
-s = nueva('Texto', 'Demostración: 100 m libre', 'Dos grabaciones nuevas analizadas con StrokeLab (GoPro, 60 fps)',
-          notas='Para terminar, una demostración con dos grabaciones de 100 m libre, una suave y otra rápida, hechas después '
-          'de entregar la memoria; no forman parte de sus resultados. [Reproducir el vídeo anotado del 100 suave.] '
-          'En el suave el sistema decidió solo que la vista era lateral y el estilo crol, y obtuvo 20 ciclos válidos a 56 '
-          'ciclos por minuto. En el rápido el nadador termina a los 72 segundos, así que analizo solo hasta ahí. La cámara '
-          'lo ve de frente u oblicuo gran parte del tiempo: indicando la vista frontal salen 25 ciclos válidos a 52 ciclos '
-          'por minuto. En ninguno hay fatiga sostenida declarada: un 100 m es corto y la fase fresca ya incluye parte del '
-          'esfuerzo. De frente, el sistema estimó brazos simultáneos, así que el estilo crol lo indiqué a mano. La frecuencia '
-          'de los dos es parecida; sin un conteo manual no '
-          'afirmo cuál es más precisa. Es justo lo que dice la memoria: la vista y la detección condicionan el análisis. '
-          '[≈ 1 min 30 s] Los vídeos no llevan nada dibujado sobre el nadador: solo el panel con tiempo, ciclo, frecuencia y estado.')
-for k, (x, cab, its) in enumerate([
-        (0.99, '100 suave', ['Vista lateral y estilo crol detectados automáticamente', '20 ciclos válidos · 42,5 s analizables de 86 s',
-                             '56 ciclos/min de media', 'Sin fatiga sostenida']),
-        (8.1, '100 rápido', ['Analizado hasta t = 72 s, cuando el nadador termina', 'Vista frontal u oblicua y estilo crol indicados a mano',
-                             '25 ciclos válidos · 46,5 s analizables de 72 s · 52 ciclos/min de media', 'Sin fatiga sostenida'])]):
-    caja(s, x, 3.0, 6.9, 2.3, GRIS_CL, linea=RGBColor(0xB4, 0xB4, 0xB4))
-    texto(s, x, 3.0, 6.9, 2.3, [[('Insertar aquí el vídeo anotado', {'tam': 13, 'color': GRIS})],
-                                [('Insertar → Vídeo → Este dispositivo', {'tam': 11, 'color': GRIS})]], alin=PP_ALIGN.CENTER, ancla=MSO_ANCHOR.MIDDLE)
-    texto(s, x, 5.45, 6.9, 0.45, cab, tam=18, color=ROJO, negrita=True)
-    texto(s, x, 5.95, 6.9, 1.5, [[('•  ' + t, {'tam': 13, 'esp': 4})] for t in its])
-pie(s, 'Grabaciones posteriores a la entrega, solo como demostración; frecuencia sin validar con conteo manual.', y=7.6)
+s = nueva('Texto', 'Demostración: 100 m libre', 'Una grabación nueva analizada con StrokeLab (GoPro, vista lateral)',
+          notas='Para terminar, una demostración con una grabación de 100 m libre a ritmo suave, hecha después de entregar la '
+          'memoria; no forma parte de sus resultados. [Reproducir el vídeo.] El sistema decidió solo que la vista era '
+          'lateral y el estilo crol. Arriba a la izquierda se ve en cada momento el tiempo, el ciclo, la frecuencia y si el '
+          'nadador está fresco o fatigado; abajo, la barra con la anomalía de cada ciclo. Obtuvo 20 ciclos válidos a 56 ciclos '
+          'por minuto y no declaró fatiga sostenida, lo esperable en un 100 m a ritmo suave. No hay nada dibujado sobre el '
+          'nadador: solo el panel. [≈ 1 min]')
+caja(s, 0.99, 3.0, 8.6, 4.6, GRIS_CL, linea=RGBColor(0xB4, 0xB4, 0xB4))
+texto(s, 0.99, 3.0, 8.6, 4.6, [[('Insertar aquí el vídeo anotado del 100 suave', {'tam': 14, 'color': GRIS})],
+                              [('Insertar → Vídeo → Este dispositivo', {'tam': 11, 'color': GRIS})]], alin=PP_ALIGN.CENTER, ancla=MSO_ANCHOR.MIDDLE)
+caja(s, 9.9, 3.0, 5.1, 4.6, GRIS_CL)
+texto(s, 10.2, 3.2, 4.5, 0.5, '100 m libre · ritmo suave', tam=17, color=ROJO, negrita=True)
+texto(s, 10.2, 3.8, 4.5, 3.7, [[('•  ' + t, {'tam': 14, 'esp': 9})] for t in [
+    'Vista lateral y estilo crol detectados por el sistema',
+    '20 ciclos válidos', '42,5 s analizables de 86 s',
+    '56 ciclos/min de media',
+    'Sin fatiga sostenida',
+    'Panel: tiempo, ciclo, frecuencia y estado FRESCO / FATIGA; barra de anomalía por ciclo']])
+pie(s, 'Grabación posterior a la entrega, solo como demostración; frecuencia sin validar con conteo manual.', y=7.75)
 limpiar(s)
 
 # ------------------------------------------------------------------ 13 · Posterior a la entrega
