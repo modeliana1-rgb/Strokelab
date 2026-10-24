@@ -63,6 +63,7 @@ def main(argv=None):
     ap.add_argument('--dispositivo', default='auto', help="auto (GPU si hay, si no CPU), cpu o cuda:0")
     ap.add_argument('--panel', default='fatiga', choices=['fatiga', 'completo'],
                     help='panel del vídeo: solo fatiga (defecto) o también los ángulos articulares')
+    ap.add_argument('--hasta', type=float, help='analizar solo hasta este segundo del vídeo (p. ej. cuando el nadador ya ha terminado)')
     ap.add_argument('--sin-esqueleto', action='store_true',
                     help='vídeo anotado sin nada dibujado sobre el nadador (ni esqueleto ni puntos): solo el panel')
     a = ap.parse_args(argv)
@@ -108,6 +109,10 @@ def main(argv=None):
         ajustes = (a.imgsz, a.conf_det)
         np.savez(npz, kps=kps, conf=conf, fps=fps, w=W, h=H, modelo=a.modelo, cada=a.cada, giro=rot, imgsz=a.imgsz, conf_det=a.conf_det)
         print(f'    {len(kps)} fotogramas, {W}x{H}, {fps:.2f} fps, en {time.time() - t0:.0f} s')
+    if a.hasta:                                # lo posterior (nadador parado, fuera de la prueba) no se analiza
+        n = min(len(kps), int(round(a.hasta * fps)))
+        kps, conf = kps[:n], conf[:n]
+        print(f'    se analiza solo hasta t = {n / fps:.1f} s ({n} fotogramas)')
     analizados = conf.max(1) > 0
     print(f'    fotogramas analizados con >= 5 articulaciones fiables: '
           f'{100 * np.mean((conf[analizados] > 0.3).sum(1) >= 5):.1f}%')
