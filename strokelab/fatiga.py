@@ -132,6 +132,9 @@ def graficas(ciclos, res, nadador, carpeta):
     Xn = res['X'].rename(columns=NOMBRES)
     plt.figure(); shap.summary_plot(res['shap'], Xn, show=False); plt.title('Atribución SHAP a la puntuación de fatiga')
     plt.tight_layout(); plt.savefig(carpeta / 'fig_shap_summary.png', dpi=150, bbox_inches='tight'); plt.close()
+    viejo = carpeta / 'fig_shap_waterfall_inicio.png'
+    if res['inicio'] is None and viejo.exists():      # de un análisis anterior con fatiga: ya no vale
+        viejo.unlink()
     if res['inicio'] is not None:
         i = res['inicio']
         e = shap.Explanation(values=res['shap'][i], base_values=res['base_shap'], data=res['X'].iloc[i].values,
