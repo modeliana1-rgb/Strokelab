@@ -80,6 +80,7 @@ def main(argv=None):
     ap.add_argument('--base-largos', type=int, default=2)
     ap.add_argument('--metros-largo', type=float, default=25.0)
     ap.add_argument('--margen', type=float, default=2.0, help='segundos de vídeo tras la llegada')
+    ap.add_argument('--aproximados', action='store_true', help='los tiempos de paso son estimados, no medidos en el vídeo')
     a = ap.parse_args(argv)
 
     carpeta = Path(a.resultados)
@@ -151,7 +152,7 @@ def main(argv=None):
         x0, x1, y1 = 30, OW - 30, OH - 24
         y0 = y1 - 44
         d.rounded_rectangle((x0 - 14, y0 - 40, x1 + 14, y1 + 14), 10, fill=(0, 0, 0, 165))
-        d.text((x0, y0 - 32), 'Largos (tiempo de paso por la pared)', font=f_peq, fill='white')
+        d.text((x0, y0 - 32), 'Largos (parciales aproximados)' if a.aproximados else 'Largos (tiempo de paso por la pared)', font=f_peq, fill='white')
         X = lambda s: x0 + (x1 - x0) * (s - limites[0]) / total
         for _, r in L.iterrows():
             xa, xb = X(r.desde) + 2, X(r.hasta) - 2
